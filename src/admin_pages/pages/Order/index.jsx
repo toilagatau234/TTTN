@@ -1,11 +1,16 @@
 import React, { useState } from 'react';
-import { Table, Tag, Input, Select, DatePicker, Button, Space, Tooltip } from 'antd';
+import { Table, Select, Input, DatePicker, Button, Dropdown, Menu, Tooltip } from 'antd';
 import { 
   SearchOutlined, 
-  EyeOutlined, 
   FilterOutlined, 
-  ReloadOutlined,
-  CalendarOutlined
+  CheckCircleOutlined,
+  CloseCircleOutlined,
+  ExclamationCircleOutlined,
+  ClockCircleOutlined,
+  MoreOutlined,
+  ExportOutlined,
+  EyeOutlined,
+  DeleteOutlined
 } from '@ant-design/icons';
 
 const { RangePicker } = DatePicker;
@@ -15,223 +20,219 @@ const OrderPage = () => {
   const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState('');
 
-  // --- MOCK DATA (Dữ liệu giả lập cho Hoa Tươi) ---
+  // --- DỮ LIỆU GIẢ LẬP (MOCK DATA) ---
   const initialData = [
     {
       key: '1',
-      id: '#ORD-7829',
+      id: '#ORD-001',
       customer: 'Nguyễn Văn A',
-      date: '2025-10-24',
-      total: 550000,
-      payment: 'COD',
-      status: 'Pending', // Chờ xử lý
-      items: 'Bó hoa hồng đỏ (x1)',
+      date: '24/01/2026',
+      total: '550.000 ₫',
+      status: 'Approved', // Đã duyệt/Hoàn thành
+      payment: 'VNPAY',
+      items: 'Bó Hoa Hồng Đỏ (x1)'
     },
     {
       key: '2',
-      id: '#ORD-7830',
+      id: '#ORD-002',
       customer: 'Trần Thị B',
-      date: '2025-10-24',
-      total: 1200000,
-      payment: 'VNPAY',
-      status: 'Processing', // Đang cắm hoa
-      items: 'Lẵng hoa khai trương (x1)',
+      date: '24/01/2026',
+      total: '1.200.000 ₫',
+      status: 'Pending', // Chờ xử lý
+      payment: 'COD',
+      items: 'Lẵng Hoa Khai Trương (x1)'
     },
     {
       key: '3',
-      id: '#ORD-7831',
+      id: '#ORD-003',
       customer: 'Lê Hoàng C',
-      date: '2025-10-23',
-      total: 350000,
+      date: '23/01/2026',
+      total: '350.000 ₫',
+      status: 'Error', // Đã hủy
       payment: 'Momo',
-      status: 'Delivered', // Giao thành công
-      items: 'Hộp hoa baby (x1)',
+      items: 'Hộp Hoa Baby (x1)'
     },
     {
       key: '4',
-      id: '#ORD-7832',
+      id: '#ORD-004',
       customer: 'Phạm Thu D',
-      date: '2025-10-22',
-      total: 890000,
+      date: '22/01/2026',
+      total: '890.000 ₫',
+      status: 'Disable', // Tạm hoãn
       payment: 'COD',
-      status: 'Cancelled', // Đã hủy
-      items: 'Bó hoa hướng dương (x2)',
+      items: 'Bó Hướng Dương (x2)'
+    },
+    {
+      key: '5',
+      id: '#ORD-005',
+      customer: 'Hoàng Văn E',
+      date: '21/01/2026',
+      total: '2.500.000 ₫',
+      status: 'Approved',
+      payment: 'Banking',
+      items: 'Lan Hồ Điệp (x1)'
     },
   ];
 
-  const [dataSource, setDataSource] = useState(initialData);
-
-  // --- CẤU HÌNH CỘT CHO BẢNG ---
+  // --- CẤU HÌNH CỘT (COLUMNS) ---
   const columns = [
     {
-      title: 'Mã Đơn',
+      title: 'MÃ ĐƠN',
       dataIndex: 'id',
       key: 'id',
-      render: (text) => <span className="font-bold text-brand-500 cursor-pointer hover:underline">{text}</span>,
+      render: (text) => <span className="font-bold text-navy-700 hover:text-brand-500 cursor-pointer">{text}</span>,
     },
     {
-      title: 'Khách Hàng',
+      title: 'KHÁCH HÀNG',
       dataIndex: 'customer',
       key: 'customer',
-      render: (text) => (
-        <div>
-          <p className="font-medium text-navy-700">{text}</p>
-        </div>
-      ),
+      render: (text) => <span className="font-bold text-navy-700">{text}</span>,
     },
     {
-      title: 'Sản Phẩm',
-      dataIndex: 'items',
-      key: 'items',
-      responsive: ['lg'], // Chỉ hiện trên màn hình lớn
-      render: (text) => <span className="text-gray-500 text-sm">{text}</span>,
-    },
-    {
-      title: 'Ngày Đặt',
+      title: 'NGÀY ĐẶT',
       dataIndex: 'date',
       key: 'date',
-      render: (text) => (
-        <div className="flex items-center gap-2 text-gray-600">
-          <CalendarOutlined /> {text}
-        </div>
-      ),
+      render: (text) => <span className="font-medium text-gray-500">{text}</span>,
     },
     {
-      title: 'Tổng Tiền',
+      title: 'TỔNG TIỀN',
       dataIndex: 'total',
       key: 'total',
-      render: (amount) => (
-        <span className="font-bold text-navy-700">
-          {amount.toLocaleString('vi-VN')} ₫
-        </span>
-      ),
+      render: (text) => <span className="font-bold text-navy-700">{text}</span>,
     },
     {
-      title: 'Trạng Thái',
+      title: 'TRẠNG THÁI',
       dataIndex: 'status',
       key: 'status',
       render: (status) => {
-        let color = 'default';
-        let label = 'Không rõ';
-
+        let icon, color, text;
         switch (status) {
+          case 'Approved':
+            icon = <CheckCircleOutlined />;
+            color = 'text-green-500';
+            text = 'Hoàn thành';
+            break;
           case 'Pending':
-            color = 'orange';
-            label = 'Chờ xử lý';
+            icon = <ClockCircleOutlined />;
+            color = 'text-orange-500';
+            text = 'Chờ xử lý';
             break;
-          case 'Processing':
-            color = 'blue';
-            label = 'Đang cắm hoa';
+          case 'Disable':
+            icon = <ExclamationCircleOutlined />;
+            color = 'text-orange-400';
+            text = 'Đang giao';
             break;
-          case 'Delivered':
-            color = 'green';
-            label = 'Hoàn thành';
-            break;
-          case 'Cancelled':
-            color = 'red';
-            label = 'Đã hủy';
+          case 'Error':
+            icon = <CloseCircleOutlined />;
+            color = 'text-red-500';
+            text = 'Đã hủy';
             break;
           default:
-            break;
+            icon = <CheckCircleOutlined />;
+            color = 'text-gray-500';
+            text = status;
         }
         return (
-          <Tag color={color} className="rounded-md px-2 py-1 font-medium border-0">
-            {label}
-          </Tag>
+          <div className={`flex items-center gap-2 ${color}`}>
+            <span className="text-lg">{icon}</span>
+            <span className="font-bold text-sm text-navy-700">{text}</span>
+          </div>
         );
       },
     },
     {
-      title: 'Thao tác',
+      title: 'HÀNH ĐỘNG',
       key: 'action',
-      render: (_, record) => (
-        <Tooltip title="Xem chi tiết">
-          <Button 
-            type="text" 
-            icon={<EyeOutlined />} 
-            className="text-gray-500 hover:text-brand-500 hover:bg-light-primary"
-          />
-        </Tooltip>
+      render: () => (
+        <Dropdown 
+          overlay={
+            <Menu items={[
+              { key: '1', label: 'Xem chi tiết', icon: <EyeOutlined /> },
+              { key: '2', label: 'Xóa đơn', icon: <DeleteOutlined />, danger: true },
+            ]} />
+          } 
+          trigger={['click']}
+        >
+          <div className="cursor-pointer text-gray-400 hover:text-navy-700 text-xl bg-light-primary w-8 h-8 flex items-center justify-center rounded-lg">
+             <MoreOutlined />
+          </div>
+        </Dropdown>
       ),
     },
   ];
 
   return (
     <div className="w-full">
-      {/* --- HEADER & FILTERS --- */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+      
+      {/* --- HEADER TITLE --- */}
+      <div className="mb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-navy-700">Danh sách đơn hàng</h2>
-          <p className="text-gray-500">Quản lý các đơn đặt hoa từ khách hàng</p>
+           <h2 className="text-2xl font-bold text-navy-700">Quản lý Đơn hàng</h2>
+           <p className="text-gray-500 text-sm">Kiểm tra và cập nhật trạng thái các đơn đặt hoa</p>
         </div>
-        
-        <div className="flex gap-2">
-           <Button icon={<ReloadOutlined />} onClick={() => {}} className="border-gray-200 text-gray-500 rounded-xl">
-             Làm mới
-           </Button>
-           <Button type="primary" className="bg-brand-500 font-medium rounded-xl shadow-brand-500/50">
-             Xuất Excel
-           </Button>
-        </div>
+        <Button 
+          icon={<ExportOutlined />} 
+          className="bg-white border-gray-200 text-gray-600 font-medium rounded-xl h-10 shadow-sm hover:text-brand-500 hover:border-brand-500"
+        >
+          Xuất Excel
+        </Button>
       </div>
 
-      {/* --- CARD LỌC VÀ BẢNG --- */}
-      <div className="bg-white p-5 rounded-[20px] shadow-sm">
+      {/* --- MAIN CARD --- */}
+      <div className="bg-white p-6 rounded-[20px] shadow-sm">
         
-        {/* THANH CÔNG CỤ LỌC */}
-        <div className="flex flex-wrap gap-4 mb-6">
-          {/* 1. Tìm kiếm */}
-          <Input 
-            prefix={<SearchOutlined className="text-gray-400" />} 
-            placeholder="Tìm theo tên, mã đơn..." 
-            className="w-full md:w-[250px] rounded-xl py-2 bg-light-primary border-none text-navy-700 placeholder:text-gray-400"
-            value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
-          />
+        {/* --- FILTER BAR (Giống mẫu Metrix) --- */}
+        <div className="flex flex-wrap gap-4 mb-8 justify-between items-center">
+            
+            {/* Left: Search & Select */}
+            <div className="flex flex-wrap gap-3 w-full lg:w-auto">
+               <div className="relative">
+                  <Input 
+                    prefix={<SearchOutlined className="text-gray-400" />}
+                    placeholder="Tìm đơn hàng..." 
+                    className="w-full sm:w-[250px] h-[44px] rounded-xl border-none bg-[#F4F7FE] text-navy-700 placeholder:text-gray-400 focus:ring-0"
+                  />
+               </div>
 
-          {/* 2. Lọc Trạng Thái */}
-          <Select 
-            defaultValue="all" 
-            className="w-[180px] h-[40px] custom-select-metrix"
-            bordered={false}
-            style={{ backgroundColor: '#F4F7FE', borderRadius: '12px' }}
-          >
-            <Option value="all">Tất cả trạng thái</Option>
-            <Option value="pending">Chờ xử lý</Option>
-            <Option value="processing">Đang cắm hoa</Option>
-            <Option value="delivered">Đã giao</Option>
-            <Option value="cancelled">Đã hủy</Option>
-          </Select>
+               <Select 
+                 defaultValue="all" 
+                 className="h-[44px] w-[160px] custom-select-borderless"
+                 dropdownStyle={{ borderRadius: '12px', padding: '10px' }}
+                 bordered={false}
+                 style={{ backgroundColor: '#F4F7FE', borderRadius: '12px' }}
+               >
+                 <Option value="all">Tất cả trạng thái</Option>
+                 <Option value="Approved">Hoàn thành</Option>
+                 <Option value="Pending">Chờ xử lý</Option>
+                 <Option value="Error">Đã hủy</Option>
+               </Select>
 
-          {/* 3. Lọc Ngày */}
-          <RangePicker 
-            className="rounded-xl border-none bg-light-primary py-2" 
-            format="DD/MM/YYYY"
-          />
-          
-          <Button 
-            icon={<FilterOutlined />} 
-            className="border-none bg-light-primary text-brand-500 font-medium rounded-xl h-[40px]"
-          >
-            Lọc
-          </Button>
+               <RangePicker 
+                 className="h-[44px] border-none bg-[#F4F7FE] rounded-xl"
+                 format="DD/MM/YYYY"
+               />
+            </div>
+
+            {/* Right: Filter Button */}
+            <Button 
+               type="primary" 
+               icon={<FilterOutlined />}
+               className="bg-brand-500 h-[44px] px-6 rounded-xl border-none font-bold shadow-brand-500/50"
+            >
+              Lọc Dữ Liệu
+            </Button>
         </div>
 
-        {/* BẢNG DỮ LIỆU */}
-        <Table
-          columns={columns}
-          dataSource={dataSource}
-          loading={loading}
-          pagination={{ 
-            pageSize: 5,
-            itemRender: (page, type, originalElement) => {
-              if (type === 'prev') return <a className="text-gray-500">Trước</a>;
-              if (type === 'next') return <a className="text-gray-500">Sau</a>;
-              return originalElement;
-            }
-          }}
-          className="custom-table-metrix"
-        />
+        {/* --- TABLE --- */}
+        <div className="overflow-x-auto">
+          <Table 
+            columns={columns} 
+            dataSource={initialData} 
+            pagination={{ pageSize: 6 }} 
+            className="custom-table-metrix"
+          />
+        </div>
+
       </div>
     </div>
   );
