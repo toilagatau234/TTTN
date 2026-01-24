@@ -1,87 +1,97 @@
 import React from 'react';
-import { Form, Input, Button, Checkbox, message } from 'antd';
-import { UserOutlined, LockOutlined } from '@ant-design/icons';
+import { Form, Input, Checkbox, Button, message } from 'antd';
 import { useNavigate } from 'react-router-dom';
 
 const LoginPage = () => {
     const navigate = useNavigate();
 
     const onFinish = (values) => {
-        // Demo logic đăng nhập đơn giản
-        console.log('Thông tin đăng nhập: ', values);
-        if (values.username === 'admin' && values.password === '123456') {
+        console.log('Success:', values);
+        // Giả lập đăng nhập thành công
+        if (values.email === 'admin' && values.password === '123') {
             message.success('Đăng nhập thành công!');
-            // Chuyển hướng đến Dashboard sau khi đăng nhập thành công
-            // navigate('/admin/dashboard'); 
+            navigate('/admin/dashboard');
         } else {
-            message.error('Tài khoản hoặc mật khẩu không đúng!');
+            message.error('Sai tài khoản hoặc mật khẩu (Thử admin/123)');
         }
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-[#F4F7FE]">
-            <div className="bg-white p-10 rounded-2xl shadow-xl w-full max-w-md">
-                {/* Phần Logo và Tiêu đề */}
-                <div className="text-center mb-8">
-                    <div className="flex justify-center mb-4">
-                        {/* Placeholder cho Logo */}
-                        <div className="h-12 w-12 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-blue-500/30">
-                            A
-                        </div>
-                    </div>
-                    <h2 className="text-3xl font-bold text-gray-800 mb-2">Welcome Admin!</h2>
-                    <p className="text-gray-500">Đăng nhập để quản lý hệ thống hoa tươi</p>
+        <div className="min-h-screen w-full flex items-center justify-center bg-light-primary px-4">
+            {/* Card Container */}
+            <div className="max-w-[450px] w-full bg-white rounded-[20px] shadow-sm p-8 md:p-10">
+
+                {/* Header: Logo & Title */}
+                <div className="mb-10">
+                    <h1 className="text-3xl font-bold text-navy-700 mb-2">Đăng Nhập</h1>
+                    <p className="text-gray-400 text-sm">
+                        Nhập email và mật khẩu để truy cập trang quản trị
+                    </p>
                 </div>
 
-                {/* Form Ant Design */}
+                {/* Form */}
                 <Form
-                    name="admin_login"
-                    initialValues={{ remember: true }}
-                    onFinish={onFinish}
-                    size="large"
+                    name="login"
                     layout="vertical"
+                    onFinish={onFinish}
+                    autoComplete="off"
+                    size="large"
+                    className="flex flex-col gap-2"
                 >
+                    {/* Email Field */}
                     <Form.Item
-                        name="username"
-                        rules={[{ required: true, message: 'Vui lòng nhập tài khoản!' }]}
+                        label={<span className="text-navy-700 font-medium ml-1">Email*</span>}
+                        name="email"
+                        rules={[{ required: true, message: 'Vui lòng nhập Email!' }]}
                     >
                         <Input
-                            prefix={<UserOutlined className="text-gray-400" />}
-                            placeholder="Tài khoản hoặc Email"
-                            className="rounded-lg py-2"
+                            placeholder="mail@simmmple.com"
+                            className="rounded-2xl border-gray-200 bg-white py-3 px-4 text-navy-700 placeholder:text-gray-400 focus:border-brand-500 hover:border-brand-400"
                         />
                     </Form.Item>
 
+                    {/* Password Field */}
                     <Form.Item
+                        label={<span className="text-navy-700 font-medium ml-1">Mật khẩu*</span>}
                         name="password"
                         rules={[{ required: true, message: 'Vui lòng nhập mật khẩu!' }]}
                     >
                         <Input.Password
-                            prefix={<LockOutlined className="text-gray-400" />}
-                            placeholder="Mật khẩu"
-                            className="rounded-lg py-2"
+                            placeholder="Nhập mật khẩu"
+                            className="rounded-2xl border-gray-200 bg-white py-3 px-4 text-navy-700 placeholder:text-gray-400 focus:border-brand-500 hover:border-brand-400"
                         />
                     </Form.Item>
 
+                    {/* Checkbox & Forgot Password */}
                     <div className="flex justify-between items-center mb-6">
                         <Form.Item name="remember" valuePropName="checked" noStyle>
-                            <Checkbox>Ghi nhớ đăng nhập</Checkbox>
+                            <Checkbox className="text-navy-700 font-medium">Ghi nhớ tôi</Checkbox>
                         </Form.Item>
-                        <a className="text-blue-600 hover:text-blue-800 font-medium" href="#">
+
+                        <a href="#" className="text-brand-500 font-bold hover:text-brand-600 text-sm">
                             Quên mật khẩu?
                         </a>
                     </div>
 
-                    <Form.Item>
+                    {/* Submit Button */}
+                    <Form.Item className="mb-0">
                         <Button
                             type="primary"
                             htmlType="submit"
-                            className="w-full bg-blue-600 hover:bg-blue-700 border-none h-12 text-lg font-semibold rounded-xl shadow-lg shadow-blue-500/30 transition-all duration-300"
+                            className="w-full h-[50px] rounded-2xl bg-brand-500 hover:!bg-brand-600 border-none font-bold text-base shadow-lg shadow-brand-500/40"
                         >
-                            Đăng nhập
+                            Đăng Nhập
                         </Button>
                     </Form.Item>
                 </Form>
+
+                {/* Footer Text */}
+                <div className="mt-6 text-center">
+                    <span className="text-gray-500 text-sm">Chưa có tài khoản? </span>
+                    <a href="#" className="text-brand-500 font-bold hover:text-brand-600 text-sm">
+                        Tạo tài khoản
+                    </a>
+                </div>
             </div>
         </div>
     );

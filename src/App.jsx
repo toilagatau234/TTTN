@@ -1,25 +1,20 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import AdminRoutes from './admin_pages/routes';
+import React from 'react';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 
-const ClientRoutes = () => <div className="p-10 text-center">Trang Người Dùng (Client Page)</div>;
+// Import 2 luồng router riêng biệt
+import AdminRoutes from './admin_pages/routes/routes';
+import ClientRoutes from './client_pages/routes'; // File vừa tạo ở bước 2
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* === CẤU HÌNH ADMIN === */}
-
-        {/* Logic chuyển hướng: Truy cập /admin -> Tự động sang /admin/login */}
-        <Route path="/admin" element={<Navigate to="/admin/login" replace />} />
-
-        {/* Load các routes con của Admin từ file cấu hình riêng */}
+        {/* --- ADMIN --- */}
         <Route path="/admin/*" element={<AdminRoutes />} />
 
 
-        {/* === CẤU HÌNH CLIENT === */}
-        {/* Các đường dẫn dành cho trang người dùng */}
+        {/* --- USER (CLIENT) --- */}
         <Route path="/*" element={<ClientRoutes />} />
-
       </Routes>
     </BrowserRouter>
   );
