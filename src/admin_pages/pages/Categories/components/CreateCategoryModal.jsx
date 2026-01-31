@@ -31,7 +31,7 @@ const CreateCategoryModal = ({ open, onCancel, onCreate }) => {
         id: Math.floor(Math.random() * 100),
         ...values,
         icon: imageUrl || 'https://via.placeholder.com/150', // Icon mặc định
-        count: 0, // Danh mục mới chưa có sản phẩm
+        count: 0,
         createdAt: new Date().toLocaleDateString('vi-VN')
       };
 

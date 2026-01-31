@@ -21,7 +21,7 @@ const CreateGameModal = ({ open, onCancel, onCreate }) => {
         participants: 0,
         startDate: values.time ? values.time[0].format('DD/MM/YYYY') : '',
         endDate: values.time ? values.time[1].format('DD/MM/YYYY') : '',
-        image: 'https://img.freepik.com/free-vector/fortune-wheel-vector-illustration_1284-11915.jpg' // Ảnh giả lập
+        image: 'https://img.freepik.com/free-vector/fortune-wheel-vector-illustration_1284-11915.jpg' // Ảnh giả
       };
       
       onCreate(newGame);

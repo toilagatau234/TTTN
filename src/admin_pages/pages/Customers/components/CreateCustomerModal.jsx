@@ -15,31 +15,28 @@ const CreateCustomerModal = ({ open, onCancel, onCreate }) => {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
 
-  // Xử lý khi nhấn nút "Tạo mới"
   const handleOk = async () => {
     try {
       const values = await form.validateFields();
       setLoading(true);
 
-      // --- LOGIC XỬ LÝ DỮ LIỆU ---
-      // 1. Giả lập upload ảnh (Nếu có backend thì upload lên Cloudinary ở đây)
+      // Giả lập upload ảnh (khi xây dựng backend thì upload lên Cloudinary)
       const newCustomerData = {
         ...values,
-        id: Math.floor(Math.random() * 10000), // ID giả lập
+        id: Math.floor(Math.random() * 10000),
         joinDate: new Date().toLocaleDateString('vi-VN'),
         status: values.status || 'Active',
         avatar: 'https://i.pravatar.cc/150?img=' + Math.floor(Math.random() * 70), // Avatar ngẫu nhiên
-        spent: '0 ₫' // Khách mới chưa chi tiêu
+        spent: '0 ₫'
       };
 
-      // 2. Gọi hàm callback để cập nhật lại bảng dữ liệu bên ngoài
-      // Sau này thay bằng: await userService.add(newCustomerData);
+      
       setTimeout(() => {
         onCreate(newCustomerData);
         message.success('Thêm khách hàng thành công!');
-        form.resetFields(); // Xóa trắng form
+        form.resetFields();
         setLoading(false);
-      }, 1000); // Giả lập độ trễ mạng 1s
+      }, 1000);
 
     } catch (error) {
       console.log('Validate Failed:', error);
@@ -67,7 +64,7 @@ const CreateCustomerModal = ({ open, onCancel, onCreate }) => {
         initialValues={{ role: 'User', status: 'Active' }}
       >
         
-        {/* --- 1. ẢNH ĐẠI DIỆN --- */}
+        {/* --- ẢNH ĐẠI DIỆN --- */}
         <div className="flex justify-center mb-8">
            <Upload name="avatar" showUploadList={false} listType="picture-circle" className="avatar-uploader">
               <div className="flex flex-col items-center justify-center text-gray-400 hover:text-brand-500 transition-colors">
@@ -77,7 +74,7 @@ const CreateCustomerModal = ({ open, onCancel, onCreate }) => {
            </Upload>
         </div>
 
-        {/* --- 2. THÔNG TIN CÁ NHÂN --- */}
+        {/* --- THÔNG TIN CÁ NHÂN --- */}
         <Row gutter={16}>
           <Col span={12}>
             <Form.Item 
@@ -123,7 +120,7 @@ const CreateCustomerModal = ({ open, onCancel, onCreate }) => {
           </Col>
         </Row>
 
-        {/* --- 3. PHÂN QUYỀN & TRẠNG THÁI --- */}
+        {/* --- PHÂN QUYỀN & TRẠNG THÁI --- */}
         <Row gutter={16}>
           <Col span={12}>
              <Form.Item name="role" label="Vai trò hệ thống">

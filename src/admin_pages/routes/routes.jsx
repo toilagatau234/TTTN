@@ -1,16 +1,23 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
+
 import LoginPage from '../pages/Login/LoginPage';
 import AdminLayout from '../layouts/AdminLayout';
 import Dashboard from '../pages/Dashboard';
 import OrderPage from '../pages/Order';
 import CustomersPage from '../pages/Customers';
+import CategoryPage from '../pages/Categories';
+import SettingsPage from '../pages/Settings';
 import NotFoundPage from '../components/NotFoundPage';
+import VoucherPage from '../pages/Vouchers';
+import ReviewsPage from '../pages/Reviews';
+import ChatPage from '../pages/Chat';
+
 import ProductPage from '../pages/Products';
 import CreateProduct from '../pages/Products/CreateProduct';
-import CategoryPage from '../pages/Categories';
-import MinigameListPage from '../pages/Minigame/index';
-import MinigameDetailPage from '../pages/Minigame/GameDetail';
+
+import MinigamePage from '../pages/Minigame'; 
+import GameDetail from '../pages/Minigame/GameDetail';
 
 const AdminRoutes = () => {
   return (
@@ -27,11 +34,19 @@ const AdminRoutes = () => {
 
         <Route path="categories" element={<CategoryPage />} />
 
-        <Route path="minigames" element={<MinigameListPage />} />
-        <Route path="minigames/:id" element={<MinigameDetailPage />} />
+        <Route path="minigames" element={<MinigamePage />} />
+        <Route path="minigames/:id" element={<GameDetail />} />
 
         <Route path="products" element={<ProductPage />} />
         <Route path="products/create" element={<CreateProduct />} />
+
+        <Route path="settings" element={<SettingsPage />} />
+
+        <Route path="vouchers" element={<VoucherPage />} />
+
+        <Route path="reviews" element={<ReviewsPage />} />
+
+        <Route path="chat" element={<ChatPage />} />
 
         {/* Redirect mặc định về Login */}
         <Route path="/" element={<Navigate to="login" replace />} />

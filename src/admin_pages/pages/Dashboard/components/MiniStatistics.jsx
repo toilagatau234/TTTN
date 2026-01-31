@@ -5,7 +5,7 @@ const MiniStatistics = ({ icon, title, value, growth, prefix, loading }) => {
   return (
     <div className="relative flex flex-col min-w-0 break-words bg-white rounded-[20px] shadow-sm p-4 bg-clip-border transition-all hover:shadow-md">
       {loading ? (
-        // Giao diện khi chưa có dữ liệu (Skeleton)
+        // Giao diện khi chưa có dữ liệu
         <div className="flex items-center gap-3">
           <Skeleton.Avatar active size="large" shape="square" />
           <Skeleton active paragraph={{ rows: 1 }} title={false} className="w-full" />

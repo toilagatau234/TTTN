@@ -16,16 +16,15 @@ const { TextArea } = Input;
 const CreateProductModal = ({ open, onCancel, onCreate }) => {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
-  const [imageUrl, setImageUrl] = useState(null); // State lưu ảnh đại diện preview
-  const [fileList, setFileList] = useState([]);   // State lưu danh sách ảnh chi tiết
+  const [imageUrl, setImageUrl] = useState(null); 
+  const [fileList, setFileList] = useState([]);   
 
-  // --- XỬ LÝ UPLOAD ẢNH ĐẠI DIỆN (LOCAL PREVIEW) ---
+  // --- XỬ LÝ UPLOAD ẢNH ĐẠI DIỆN ---
   const handleAvatarChange = (info) => {
     if (info.file.status === 'uploading') {
       setLoading(true);
       return;
     }
-    // Khi chọn ảnh xong, đọc file để hiện preview ngay lập tức
     const reader = new FileReader();
     reader.addEventListener('load', () => setImageUrl(reader.result));
     reader.readAsDataURL(info.file.originFileObj);
@@ -37,7 +36,7 @@ const CreateProductModal = ({ open, onCancel, onCreate }) => {
     try {
       const values = await form.validateFields();
       
-      // Giả lập dữ liệu sản phẩm mới (Sau này sẽ gọi API ở đây)
+      // Giả lập dữ liệu sản phẩm mới
       const newProduct = {
         key: Date.now(),
         id: `#PROD-${Math.floor(Math.random() * 9999)}`,
@@ -47,10 +46,8 @@ const CreateProductModal = ({ open, onCancel, onCreate }) => {
         status: values.stock > 0 ? (values.isPublished ? 'In Stock' : 'Hidden') : 'Out of Stock'
       };
 
-      // Gửi dữ liệu ra component cha để cập nhật bảng
       onCreate(newProduct);
       
-      // Reset form về mặc định
       form.resetFields();
       setImageUrl(null);
       setFileList([]);
@@ -93,20 +90,20 @@ const CreateProductModal = ({ open, onCancel, onCreate }) => {
       >
         <Row gutter={32}>
           
-          {/* --- CỘT TRÁI: QUẢN LÝ MEDIA (30%) --- */}
+          {/* --- CỘT TRÁI: QUẢN LÝ MEDIA --- */}
           <Col span={8} className="border-r border-gray-100 pr-6">
             <h4 className="text-sm font-bold text-gray-500 uppercase mb-4 flex items-center gap-2">
               <FileImageOutlined /> Hình ảnh
             </h4>
             
-            {/* 1. Ảnh Đại Diện (Main Image) */}
+            {/* Ảnh Đại Diện */}
             <Form.Item label="Ảnh đại diện" className="text-center mb-6">
               <Upload
                 name="avatar"
                 listType="picture-card"
                 className="avatar-uploader w-full h-[220px] overflow-hidden rounded-xl border-dashed border-2 border-gray-300 hover:border-brand-500 transition-colors bg-gray-50"
                 showUploadList={false}
-                beforeUpload={() => false} // Chặn auto upload để xử lý tay
+                beforeUpload={() => false} 
                 onChange={handleAvatarChange}
               >
                 {imageUrl ? (
@@ -120,7 +117,7 @@ const CreateProductModal = ({ open, onCancel, onCreate }) => {
               </Upload>
             </Form.Item>
 
-            {/* 2. Ảnh Chi Tiết (Gallery) */}
+            {/* Ảnh Chi Tiết */}
             <Form.Item label="Ảnh chi tiết (Gallery)">
               <Upload
                 listType="picture-card"
@@ -135,7 +132,7 @@ const CreateProductModal = ({ open, onCancel, onCreate }) => {
             </Form.Item>
           </Col>
 
-          {/* --- CỘT PHẢI: THÔNG TIN CHI TIẾT (70%) --- */}
+          {/* --- CỘT PHẢI: THÔNG TIN CHI TIẾT --- */}
           <Col span={16} className="pl-4">
             <h4 className="text-sm font-bold text-gray-500 uppercase mb-4 flex items-center gap-2">
               <TagOutlined /> Thông tin chi tiết

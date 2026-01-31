@@ -24,14 +24,14 @@ import CreateOrderModal from './components/CreateOrderModal';
 const { RangePicker } = DatePicker;
 const { Option } = Select;
 
-// --- COMPONENT CON: OrderStatCard (Thẻ thống kê theo nhóm) ---
+// --- COMPONENT CON: OrderStatCard ---
 const OrderStatCard = ({ title, options, icon }) => {
-  const [filter, setFilter] = useState('week'); // Default filter
+  const [filter, setFilter] = useState('week');
 
   return (
     <div className="bg-white p-5 rounded-[20px] shadow-sm flex flex-col justify-between h-full relative overflow-hidden">
       
-      {/* Header của Card: Tiêu đề + Bộ lọc thời gian */}
+      {/* Header Card: Tiêu đề + Bộ lọc thời gian */}
       <div className="flex justify-between items-start mb-4 z-10">
         <div className="flex items-center gap-3">
            <div className="bg-light-primary text-brand-500 w-10 h-10 rounded-full flex items-center justify-center text-xl">
@@ -40,7 +40,7 @@ const OrderStatCard = ({ title, options, icon }) => {
            <h4 className="text-lg font-bold text-navy-700">{title}</h4>
         </div>
         
-        {/* Dropdown Filter nhỏ gọn */}
+        {/* Dropdown Filter */}
         <Select 
           defaultValue="week" 
           value={filter}
@@ -56,7 +56,7 @@ const OrderStatCard = ({ title, options, icon }) => {
         </Select>
       </div>
 
-      {/* Nội dung thống kê (Chia cột) */}
+      {/* Nội dung thống kê */}
       <div className="flex items-center justify-around z-10">
         {options.map((item, index) => (
           <React.Fragment key={index}>
@@ -72,7 +72,7 @@ const OrderStatCard = ({ title, options, icon }) => {
         ))}
       </div>
       
-      {/* Background Decor (Icon mờ) */}
+      {/* Background Decor */}
       <div className="absolute -right-5 -bottom-5 text-[100px] text-gray-100 opacity-50 z-0 pointer-events-none">
         {icon}
       </div>
@@ -83,7 +83,7 @@ const OrderStatCard = ({ title, options, icon }) => {
 const OrderPage = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // Dữ liệu giả lập cho bảng
+  // Dữ liệu giả cho bảng
   const [dataSource, setDataSource] = useState([
     {
       key: '1',
@@ -194,10 +194,10 @@ const OrderPage = () => {
 
   return (
     <div className="w-full">
-      {/* --- PHẦN 1: 3 BẢNG THỐNG KÊ (WIDGETS) --- */}
+      {/* --- BẢNG THỐNG KÊ --- */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-6">
         
-        {/* Bảng 1: Tổng quan đơn hàng */}
+        {/* Tổng quan đơn hàng */}
         <OrderStatCard 
           title="Tổng quan đơn hàng"
           icon={<InboxOutlined />}
@@ -208,7 +208,7 @@ const OrderPage = () => {
           ]}
         />
 
-        {/* Bảng 2: Đơn có vấn đề */}
+        {/* Đơn có vấn đề */}
         <OrderStatCard 
           title="Đơn cần chú ý"
           icon={<StopOutlined />}
@@ -219,7 +219,7 @@ const OrderPage = () => {
           ]}
         />
 
-        {/* Bảng 3: Khách hàng & Giỏ hàng */}
+        {/* Khách hàng & Giỏ hàng */}
         <OrderStatCard 
           title="Hiệu suất khách hàng"
           icon={<ShoppingCartOutlined />}

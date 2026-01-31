@@ -1,4 +1,3 @@
-// src/admin_pages/pages/Order/components/CreateOrderModal.jsx
 import React, { useState } from 'react';
 import { Modal, Form, Input, Select, DatePicker, Button, InputNumber, Divider, List, Avatar, message } from 'antd';
 import { 
@@ -17,7 +16,7 @@ const CreateOrderModal = ({ open, onCancel, onCreate }) => {
   const [form] = Form.useForm();
   const [selectedProducts, setSelectedProducts] = useState([]);
 
-  // --- Dữ liệu giả lập sản phẩm để chọn ---
+  // --- Dữ liệu giả sản phẩm để chọn ---
   const mockProducts = [
     { id: 1, name: 'Bó Hoa Hồng Đỏ', price: 550000, img: 'https://images.unsplash.com/photo-1562690868-60bbe7293e94?auto=format&fit=crop&w=64&q=80' },
     { id: 2, name: 'Lẵng Hoa Khai Trương', price: 1200000, img: 'https://images.unsplash.com/photo-1597826368522-9f4a53586d0e?auto=format&fit=crop&w=64&q=80' },
@@ -31,10 +30,8 @@ const CreateOrderModal = ({ open, onCancel, onCreate }) => {
 
     const existItem = selectedProducts.find(item => item.id === productId);
     if (existItem) {
-      // Tăng số lượng nếu đã có
       setSelectedProducts(prev => prev.map(item => item.id === productId ? { ...item, quantity: item.quantity + 1 } : item));
     } else {
-      // Thêm mới
       setSelectedProducts(prev => [...prev, { ...product, quantity: 1 }]);
     }
   };

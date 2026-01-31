@@ -6,7 +6,6 @@ const LoginPage = () => {
     const navigate = useNavigate();
 
     const onFinish = (values) => {
-        // Demo logic: Sau này bạn sẽ thay bằng API gọi xuống Backend kiểm tra role Admin
         if (values.email === 'admin' && values.password === '123') {
             message.success('Xin chào Admin!');
             navigate('/admin/dashboard');
@@ -43,7 +42,7 @@ const LoginPage = () => {
                         name="email"
                         rules={[
                             { required: true, message: 'Vui lòng nhập Email!' },
-                            // { type: 'email', message: 'Email không hợp lệ!' } // Bật dòng này nếu muốn validate email chặt
+                            { type: 'email', message: 'Email không hợp lệ!' } // kiểm tra validate email chặt chẽ
                         ]}
                         className="mb-6"
                     >
@@ -72,11 +71,6 @@ const LoginPage = () => {
                             <Checkbox className="text-navy-700 font-medium custom-checkbox">Ghi nhớ tôi</Checkbox>
                         </Form.Item>
 
-                        {/* Nếu admin quên mật khẩu thì thường phải liên hệ IT/Database admin để reset, 
-                nhưng cứ để link ở đây cho đẹp layout hoặc phát triển sau */}
-                        {/* <a href="#" className="text-brand-500 font-bold hover:text-brand-600 text-sm">
-              Quên mật khẩu?
-            </a> */}
                     </div>
 
                     {/* Submit Button */}

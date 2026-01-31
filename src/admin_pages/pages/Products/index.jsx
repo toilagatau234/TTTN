@@ -1,4 +1,3 @@
-// src/admin_pages/pages/Products/index.jsx
 import React, { useState } from 'react';
 import { Table, Button, Input, Select, Tag, Progress, Dropdown, Menu, message } from 'antd';
 import { 
@@ -7,17 +6,16 @@ import {
   ShopOutlined, CheckCircleOutlined, WarningOutlined,
   ClockCircleOutlined, StarOutlined, ArrowUpOutlined
 } from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom'; // <--- 1. Import useNavigate
-
+import { useNavigate } from 'react-router-dom';
 const { Option } = Select;
 
-// --- COMPONENT 1: OVERVIEW WIDGET ---
+// --- OVERVIEW WIDGET ---
 const ProductOverviewWidget = () => {
   return (
     <div className="bg-white rounded-[20px] shadow-sm p-6 flex flex-col justify-center h-full">
       <h4 className="text-lg font-bold text-navy-700 mb-5">Tổng quan kho hàng</h4>
       <div className="flex items-center justify-between gap-6">
-        {/* Phần 1: All Products */}
+        {/* All Products */}
         <div className="flex items-center gap-4 flex-1 p-4 rounded-2xl bg-light-primary">
            <div className="w-12 h-12 rounded-full bg-white text-brand-500 flex items-center justify-center text-2xl shadow-sm">
               <ShopOutlined />
@@ -31,7 +29,7 @@ const ProductOverviewWidget = () => {
            </div>
         </div>
         <div className="h-12 w-[1px] bg-gray-200"></div>
-        {/* Phần 2: Active Products */}
+        {/* Active Products */}
         <div className="flex items-center gap-4 flex-1 p-4 rounded-2xl bg-green-50">
            <div className="w-12 h-12 rounded-full bg-white text-green-500 flex items-center justify-center text-2xl shadow-sm">
               <CheckCircleOutlined />
@@ -49,7 +47,7 @@ const ProductOverviewWidget = () => {
   );
 };
 
-// --- COMPONENT 2: ALERT WIDGET ---
+// --- ALERT WIDGET ---
 const ProductAlertWidget = () => {
   const [filter, setFilter] = useState('today');
 
@@ -90,9 +88,8 @@ const ProductAlertWidget = () => {
 };
 
 const ProductPage = () => {
-  const navigate = useNavigate(); // <--- 2. Sử dụng hook điều hướng
+  const navigate = useNavigate(); 
   
-  // Dữ liệu giả lập (Mock data)
   const [data, setData] = useState([
     {
       key: '1',
@@ -220,7 +217,6 @@ const ProductPage = () => {
         <Button 
           type="primary" 
           icon={<PlusOutlined />} 
-          // 4. Sửa onClick để chuyển trang
           onClick={() => navigate('/admin/products/create')}
           className="bg-brand-500 h-10 px-6 rounded-xl font-medium shadow-brand-500/50 border-none hover:bg-brand-600"
         >
@@ -256,7 +252,6 @@ const ProductPage = () => {
         />
       </div>
       
-      {/* Đã xóa <CreateProductModal /> */}
     </div>
   );
 };

@@ -20,7 +20,7 @@ const GameDetail = () => {
     type: 'Lucky Wheel',
   });
 
-  // Cấu hình phần thưởng (Riêng cho game này)
+  // Cấu hình phần thưởng
   const [rewards, setRewards] = useState([
     { key: '1', name: 'Voucher 10%', type: 'Common', probability: 50, quantity: 1000 },
     { key: '2', name: 'Voucher 50%', type: 'Rare', probability: 10, quantity: 50 },

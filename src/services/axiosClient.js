@@ -20,7 +20,7 @@ axiosClient.interceptors.request.use(
   }
 );
 
-// Interceptor cho Response (Xử lý dữ liệu trả về gọn gàng)
+// Interceptor cho Response
 axiosClient.interceptors.response.use(
   (response) => {
     if (response && response.data) {

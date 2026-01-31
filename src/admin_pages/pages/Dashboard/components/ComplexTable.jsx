@@ -9,7 +9,7 @@ import {
 
 const ComplexTable = () => {
   
-  // 1. Dữ liệu giả lập (Sau này sẽ thay bằng dữ liệu từ API)
+  // Dữ liệu giả
   const data = [
     {
       key: '1',
@@ -17,7 +17,7 @@ const ComplexTable = () => {
       image: 'https://images.unsplash.com/photo-1562690868-60bbe7293e94?auto=format&fit=crop&w=64&q=80',
       status: 'Approved',
       price: '550.000 ₫',
-      stock: 90, // 90%
+      stock: 90,
     },
     {
       key: '2',
@@ -45,7 +45,7 @@ const ComplexTable = () => {
     },
   ];
 
-  // 2. Định nghĩa các cột (Columns)
+  // Định nghĩa các cột
   const columns = [
     {
       title: 'TÊN SẢN PHẨM',
@@ -54,7 +54,6 @@ const ComplexTable = () => {
       width: '40%',
       render: (text, record) => (
         <div className="flex items-center gap-3">
-          {/* Ảnh sản phẩm bo góc */}
           <div className="h-12 w-12 rounded-xl overflow-hidden shadow-sm">
              <img 
                src={record.image} 
@@ -75,7 +74,6 @@ const ComplexTable = () => {
       render: (status) => {
         let icon, color, text;
         
-        // Logic hiển thị trạng thái
         switch (status) {
           case 'Approved':
             icon = <CheckCircleOutlined />;
@@ -125,7 +123,7 @@ const ComplexTable = () => {
             <Progress 
               percent={percent} 
               showInfo={false} 
-              // Đổi màu thanh dựa trên % (Đỏ nếu sắp hết, Xanh nếu còn nhiều)
+              // Đổi màu thanh dựa trên %
               strokeColor={percent < 20 ? "#FF4D4F" : "#4318FF"} 
               trailColor="#EFF4FB"
               size="small"
@@ -137,14 +135,13 @@ const ComplexTable = () => {
     },
   ];
 
-  // 3. Render
   return (
     <div className="w-full overflow-x-auto">
       <Table 
         columns={columns} 
         dataSource={data} 
         pagination={false} 
-        className="custom-table-metrix" // Sử dụng lại class CSS chúng ta đã viết cho OrderPage
+        className="custom-table-metrix"
       />
     </div>
   );

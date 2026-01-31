@@ -6,12 +6,11 @@ import {
   CheckCircleOutlined, TeamOutlined, UserAddOutlined, CrownOutlined
 } from '@ant-design/icons';
 
-// IMPORT MODAL VỪA TẠO
 import CreateCustomerModal from './components/CreateCustomerModal';
 
 const { Option } = Select;
 
-// Component Widget thống kê (giữ nguyên)
+// Component Widget thống kê
 const CustomerStatCard = ({ icon, label, value, color }) => (
   <div className="bg-white p-5 rounded-[20px] shadow-sm flex items-center justify-between">
      <div>
@@ -35,20 +34,17 @@ const CustomersPage = () => {
 
   // --- HÀM XỬ LÝ THÊM MỚI ---
   const handleCreate = (newCustomer) => {
-    // Tạo cấu trúc dữ liệu khớp với bảng
     const newItem = {
-      key: Date.now(), // Key duy nhất cho React
+      key: Date.now(),
       ...newCustomer
     };
     
-    // Cập nhật state bảng dữ liệu
     setData([newItem, ...data]); 
     
-    // Đóng modal
     setIsModalOpen(false);
   };
 
-  // Cấu hình cột (Giữ nguyên như cũ)
+  // Cấu hình cột
   const columns = [
     {
       title: 'THÀNH VIÊN',

@@ -18,11 +18,10 @@ const Dashboard = () => {
       setLoading(false);
     }, 1000);
 
-    // Hàm dọn dẹp (Cleanup function)
     return () => clearTimeout(timer);
   }, []);
 
-  // Dữ liệu biểu đồ giả lập
+  // Dữ liệu biểu đồ giả
   const chartData = [
     { name: 'T2', revenue: 4000 },
     { name: 'T3', revenue: 3000 },
@@ -33,7 +32,6 @@ const Dashboard = () => {
     { name: 'CN', revenue: 3490 },
   ];
 
-  // Component Card bao ngoài (Widget)
   const CardBox = ({ children, title, extraClass = '' }) => (
     <div className={`bg-white p-5 rounded-[20px] shadow-sm ${extraClass}`}>
       {title && (
@@ -51,7 +49,7 @@ const Dashboard = () => {
   return (
     <div className="flex flex-col gap-5 mt-3">
 
-      {/* --- HÀNG 1: THỐNG KÊ (Mini Stats) --- */}
+      {/* --- THỐNG KÊ --- */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
         <MiniStatistics
           loading={loading}
@@ -84,12 +82,11 @@ const Dashboard = () => {
         />
       </div>
 
-      {/* --- HÀNG 2: BIỂU ĐỒ DOANH THU & WIDGET --- */}
+      {/* --- BIỂU ĐỒ DOANH THU & WIDGET --- */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
 
-        {/* Biểu đồ cột (Chiếm 2 phần) */}
+        {/* Biểu đồ cột */}
         <CardBox title="Doanh thu tuần này" extraClass="lg:col-span-2 min-h-[350px]">
-          {/* SỬA LỖI 2: Thêm style cứng minHeight để tránh lỗi width(-1) */}
           <div className="h-[300px] w-full" style={{ minHeight: '300px' }}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartData}>
@@ -119,7 +116,7 @@ const Dashboard = () => {
           </div>
         </CardBox>
 
-        {/* Các Widget bên phải (Chiếm 1 phần) */}
+        {/* Các Widget bên phải */}
         <div className="flex flex-col gap-5">
           <CardBox title="Loại hoa bán chạy" extraClass="flex-1 flex flex-col justify-center">
             <div className="flex items-center gap-4 py-4">
@@ -147,7 +144,7 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* --- HÀNG 3: BẢNG SẢN PHẨM (Top Products) --- */}
+      {/* --- BẢNG SẢN PHẨM (Top Products) --- */}
       <CardBox
         title="Sản phẩm nổi bật"
         extraClass="overflow-hidden"

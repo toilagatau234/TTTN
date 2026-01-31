@@ -10,7 +10,7 @@ import CreateCategoryModal from './components/CreateCategoryModal';
 
 const { Option } = Select;
 
-// Widget Thống kê (Reusable)
+// Widget Thống kê
 const CategoryStatCard = ({ icon, title, value, color }) => (
   <div className="bg-white p-5 rounded-[20px] shadow-sm flex items-center justify-between">
     <div>
@@ -26,7 +26,7 @@ const CategoryStatCard = ({ icon, title, value, color }) => (
 const CategoryPage = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   
-  // Dữ liệu giả lập
+  // Dữ liệu giả
   const [data, setData] = useState([
     {
       key: '1',

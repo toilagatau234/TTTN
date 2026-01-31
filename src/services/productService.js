@@ -1,4 +1,3 @@
-// src/services/productService.js
 import axiosClient from "./axiosClient";
 
 const PRODUCT_ENDPOINT = '/products';
