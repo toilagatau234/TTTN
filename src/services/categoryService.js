@@ -1,6 +1,6 @@
 import axiosClient from "./axiosClient";
 
-const CATEGORY_ENDPOINT = '/categories'; // Backend route
+const CATEGORY_ENDPOINT = 'http://localhost:4000/api'; // Backend route
 
 const categoryService = {
   // Lấy tất cả danh mục
