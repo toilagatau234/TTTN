@@ -1,24 +1,22 @@
+// src/admin_pages/pages/Products/index.jsx
 import React, { useState } from 'react';
-import { Table, Button, Input, Select, Tag, Progress, Dropdown, Menu, message, Divider } from 'antd';
+import { Table, Button, Input, Select, Tag, Progress, Dropdown, Menu, message } from 'antd';
 import { 
   PlusOutlined, SearchOutlined, FilterOutlined, 
   MoreOutlined, EditOutlined, DeleteOutlined, 
   ShopOutlined, CheckCircleOutlined, WarningOutlined,
   ClockCircleOutlined, StarOutlined, ArrowUpOutlined
 } from '@ant-design/icons';
-
-import CreateProductModal from './components/CreateProductModal';
+import { useNavigate } from 'react-router-dom'; // <--- 1. Import useNavigate
 
 const { Option } = Select;
 
-// --- COMPONENT 1: OVERVIEW WIDGET (Tổng quan & Active) ---
+// --- COMPONENT 1: OVERVIEW WIDGET ---
 const ProductOverviewWidget = () => {
   return (
     <div className="bg-white rounded-[20px] shadow-sm p-6 flex flex-col justify-center h-full">
       <h4 className="text-lg font-bold text-navy-700 mb-5">Tổng quan kho hàng</h4>
-      
       <div className="flex items-center justify-between gap-6">
-        
         {/* Phần 1: All Products */}
         <div className="flex items-center gap-4 flex-1 p-4 rounded-2xl bg-light-primary">
            <div className="w-12 h-12 rounded-full bg-white text-brand-500 flex items-center justify-center text-2xl shadow-sm">
@@ -32,9 +30,7 @@ const ProductOverviewWidget = () => {
               </p>
            </div>
         </div>
-
         <div className="h-12 w-[1px] bg-gray-200"></div>
-
         {/* Phần 2: Active Products */}
         <div className="flex items-center gap-4 flex-1 p-4 rounded-2xl bg-green-50">
            <div className="w-12 h-12 rounded-full bg-white text-green-500 flex items-center justify-center text-2xl shadow-sm">
@@ -48,13 +44,12 @@ const ProductOverviewWidget = () => {
               </p>
            </div>
         </div>
-
       </div>
     </div>
   );
 };
 
-// --- COMPONENT 2: ALERT WIDGET (Cảnh báo & Bộ lọc) ---
+// --- COMPONENT 2: ALERT WIDGET ---
 const ProductAlertWidget = () => {
   const [filter, setFilter] = useState('today');
 
@@ -66,7 +61,6 @@ const ProductAlertWidget = () => {
 
   return (
     <div className="bg-white rounded-[20px] shadow-sm p-6 h-full flex flex-col">
-      {/* Header: Title + Filter */}
       <div className="flex justify-between items-center mb-6">
         <h4 className="text-lg font-bold text-navy-700">Cần chú ý (Alerts)</h4>
         <Select 
@@ -80,8 +74,6 @@ const ProductAlertWidget = () => {
           <Option value="week">Tuần này</Option>
         </Select>
       </div>
-
-      {/* Alert Items */}
       <div className="flex justify-between gap-4 flex-1 items-center">
         {alerts.map((item, index) => (
           <div key={index} className="flex flex-col items-center flex-1 text-center p-3 rounded-xl hover:bg-gray-50 transition-colors cursor-pointer group">
@@ -98,8 +90,9 @@ const ProductAlertWidget = () => {
 };
 
 const ProductPage = () => {
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const navigate = useNavigate(); // <--- 2. Sử dụng hook điều hướng
   
+  // Dữ liệu giả lập (Mock data)
   const [data, setData] = useState([
     {
       key: '1',
@@ -135,11 +128,6 @@ const ProductPage = () => {
       image: 'https://images.unsplash.com/photo-1588825838638-349f291350a4?auto=format&fit=crop&w=100&q=80'
     }
   ]);
-
-  const handleCreate = (newProduct) => {
-    setData([newProduct, ...data]);
-    setIsModalOpen(false);
-  };
 
   const handleDelete = (key) => {
     setData(data.filter(item => item.key !== key));
@@ -227,28 +215,28 @@ const ProductPage = () => {
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
         <div>
-           
+           {/* 3. Đã thêm lại Tiêu đề bị thiếu */}
+           <h2 className="text-2xl font-bold text-navy-700">Quản lý Sản phẩm</h2>
+           <p className="text-gray-500 text-sm">Quản lý kho hoa và danh sách sản phẩm</p>
         </div>
         <Button 
           type="primary" 
           icon={<PlusOutlined />} 
-          onClick={() => setIsModalOpen(true)}
-          className="bg-brand-500 h-10 px-6 rounded-xl font-medium shadow-brand-500/50 border-none"
+          // 4. Sửa onClick để chuyển trang
+          onClick={() => navigate('/admin/products/create')}
+          className="bg-brand-500 h-10 px-6 rounded-xl font-medium shadow-brand-500/50 border-none hover:bg-brand-600"
         >
           Thêm sản phẩm
         </Button>
       </div>
 
-      {/* --- PHẦN 1 & 2: THỐNG KÊ (GRID 2 CỘT) --- */}
+      {/* --- WIDGETS --- */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-6">
-         {/* Cột Trái: Overview (All + Active) */}
          <ProductOverviewWidget />
-
-         {/* Cột Phải: Alerts (Low Stock, Expired, Rating) + Filter */}
          <ProductAlertWidget />
       </div>
 
-      {/* --- PHẦN 3: BẢNG DỮ LIỆU --- */}
+      {/* --- TABLE --- */}
       <div className="bg-white p-6 rounded-[20px] shadow-sm">
         <div className="flex flex-wrap gap-4 mb-6 justify-between">
            <div className="flex flex-wrap gap-3 w-full md:w-auto">
@@ -269,12 +257,8 @@ const ProductPage = () => {
           className="custom-table-metrix"
         />
       </div>
-
-      <CreateProductModal 
-        open={isModalOpen} 
-        onCancel={() => setIsModalOpen(false)} 
-        onCreate={handleCreate} 
-      />
+      
+      {/* Đã xóa <CreateProductModal /> */}
     </div>
   );
 };

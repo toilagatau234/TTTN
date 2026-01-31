@@ -7,6 +7,8 @@ import OrderPage from '../pages/Order';
 import CustomersPage from '../pages/Customers';
 import NotFoundPage from '../components/NotFoundPage';
 import ProductPage from '../pages/Products';
+import CreateProduct from '../pages/Products/CreateProduct';
+import CategoryPage from '../pages/Categories';
 
 const AdminRoutes = () => {
   return (
@@ -16,9 +18,15 @@ const AdminRoutes = () => {
       {/* Các trang quản trị nằm TRONG Layout */}
       <Route element={<AdminLayout />}>
         <Route path="dashboard" element={<Dashboard />} />
+
         <Route path="orders" element={<OrderPage />} />
+
         <Route path="customers" element={<CustomersPage />} />
+
+        <Route path="categories" element={<CategoryPage />} />
+
         <Route path="products" element={<ProductPage />} />
+        <Route path="products/create" element={<CreateProduct />} />
 
         {/* Redirect mặc định về Login */}
         <Route path="/" element={<Navigate to="login" replace />} />
