@@ -1,84 +1,158 @@
-// src/admin_pages/pages/Dashboard/index.jsx
 import React, { useState, useEffect } from 'react';
-import { 
-  BarChartOutlined, ShoppingCartOutlined, UsergroupAddOutlined, WalletOutlined, CalendarOutlined
+import {
+  BarChartOutlined,
+  ShoppingCartOutlined,
+  UsergroupAddOutlined,
+  WalletOutlined,
+  CalendarOutlined
 } from '@ant-design/icons';
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import MiniStatistics from './components/MiniStatistics';
+import ComplexTable from './components/ComplexTable';
 
 const Dashboard = () => {
   const [loading, setLoading] = useState(true);
-  useEffect(() => setTimeout(() => setLoading(false), 1000), []);
 
-  // Dữ liệu giả cho biểu đồ
-  const chartData = [{ name: 'T2', rev: 4000 }, { name: 'T3', rev: 3000 }, { name: 'T4', rev: 2000 }, { name: 'T5', rev: 2780 }, { name: 'T6', rev: 1890 }, { name: 'T7', rev: 2390 }, { name: 'CN', rev: 3490 }];
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setLoading(false);
+    }, 1000);
 
-  // Component Widget bao ngoài (Card trắng bo góc)
+    // Hàm dọn dẹp (Cleanup function)
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Dữ liệu biểu đồ giả lập
+  const chartData = [
+    { name: 'T2', revenue: 4000 },
+    { name: 'T3', revenue: 3000 },
+    { name: 'T4', revenue: 2000 },
+    { name: 'T5', revenue: 2780 },
+    { name: 'T6', revenue: 1890 },
+    { name: 'T7', revenue: 2390 },
+    { name: 'CN', revenue: 3490 },
+  ];
+
+  // Component Card bao ngoài (Widget)
   const CardBox = ({ children, title, extraClass = '' }) => (
     <div className={`bg-white p-5 rounded-[20px] shadow-sm ${extraClass}`}>
-      {title && <h4 className="text-lg font-bold text-navy-700 mb-4">{title}</h4>}
+      {title && (
+        <div className="flex justify-between items-center mb-4">
+          <h4 className="text-xl font-bold text-navy-700">{title}</h4>
+          <button className="bg-[#F4F7FE] rounded-full p-2 hover:bg-gray-100 transition-colors">
+            <CalendarOutlined className="text-brand-500" />
+          </button>
+        </div>
+      )}
       {children}
     </div>
   );
 
   return (
-    <div className="flex flex-col gap-5">
-      {/* --- HÀNG 1: MINI STATS (Grid 6 cột chuẩn Metrix) --- */}
-      {/* Trên màn hình lớn (2xl), chia 6 cột. Màn hình nhỏ hơn chia ít cột hơn */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6 gap-5">
-        {/* Ô đầu tiên thường lớn hơn để tạo điểm nhấn (chiếm 2 cột trên màn hình lớn) */}
-        <div className="md:col-span-2 2xl:col-span-2 bg-brand-500 p-5 rounded-[20px] text-white flex flex-col justify-between relative overflow-hidden shadow-brand-500/50">
-             <div>
-                 <h4 className="text-lg font-bold opacity-90">Doanh thu hôm nay</h4>
-                 <h2 className="text-4xl font-bold mt-2">5.400.000 ₫</h2>
-             </div>
-             <p className="text-sm opacity-80 mt-4">Tốt hơn hôm qua 15%</p>
-             <WalletOutlined className="absolute -right-5 -bottom-5 text-[150px] opacity-20" />
-        </div>
-        
-        {/* Các ô thống kê nhỏ */}
-        <MiniStatistics loading={loading} icon={<ShoppingCartOutlined />} title="Đơn chờ xử lý" value="12" />
-        <MiniStatistics loading={loading} icon={<UsergroupAddOutlined />} title="Khách mới (Tuần)" value="85" growth={8.2} />
-        <MiniStatistics loading={loading} icon={<BarChartOutlined />} title="Tổng doanh thu (Tháng)" value="350M" prefix="₫" growth={12.5} />
-        <MiniStatistics loading={loading} icon={<WalletOutlined />} title="Chi phí quảng cáo" value="45M" prefix="₫" growth={-2.4} />
+    <div className="flex flex-col gap-5 mt-3">
+
+      {/* --- HÀNG 1: THỐNG KÊ (Mini Stats) --- */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+        <MiniStatistics
+          loading={loading}
+          icon={<BarChartOutlined />}
+          title="Doanh thu"
+          value="350.400"
+          prefix="₫"
+          growth={12.5}
+        />
+        <MiniStatistics
+          loading={loading}
+          icon={<ShoppingCartOutlined />}
+          title="Đơn hàng"
+          value="64"
+          growth={-2.4}
+        />
+        <MiniStatistics
+          loading={loading}
+          icon={<UsergroupAddOutlined />}
+          title="Khách hàng"
+          value="1,203"
+          growth={8.2}
+        />
+        <MiniStatistics
+          loading={loading}
+          icon={<WalletOutlined />}
+          title="Số dư ví"
+          value="12M"
+          prefix="₫"
+        />
       </div>
 
-      {/* --- HÀNG 2: CÁC BIỂU ĐỒ CHÍNH (Chia 3 phần: 2 phần trái, 1 phần phải) --- */}
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-        
-        {/* Cột TRÁI (Lớn - chiếm 2/3): Biểu đồ doanh thu tuần */}
-        <CardBox title="Doanh thu tuần này" extraClass="lg:col-span-2 h-[400px]">
-           <div className="flex justify-end mb-4">
-                <button className="bg-light-primary text-brand-500 p-2 rounded-lg hover:bg-gray-100"><CalendarOutlined /></button>
-           </div>
-           <div className="h-[300px]">
-             <ResponsiveContainer width="100%" height="100%">
-               <BarChart data={chartData}>
-                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#A3AED0', fontSize: 12}} />
-                 <Tooltip cursor={{fill: 'transparent'}} contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 10px 20px rgba(0,0,0,0.1)'}} />
-                 <Bar dataKey="rev" fill="#4318FF" radius={[20, 20, 20, 20]} barSize={24} />
-               </BarChart>
-             </ResponsiveContainer>
-           </div>
+      {/* --- HÀNG 2: BIỂU ĐỒ DOANH THU & WIDGET --- */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+
+        {/* Biểu đồ cột (Chiếm 2 phần) */}
+        <CardBox title="Doanh thu tuần này" extraClass="lg:col-span-2 min-h-[350px]">
+          {/* SỬA LỖI 2: Thêm style cứng minHeight để tránh lỗi width(-1) */}
+          <div className="h-[300px] w-full" style={{ minHeight: '300px' }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData}>
+                <XAxis
+                  dataKey="name"
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fill: '#A3AED0', fontSize: 12 }}
+                  dy={10}
+                />
+                <Tooltip
+                  cursor={{ fill: 'transparent' }}
+                  contentStyle={{
+                    borderRadius: '12px',
+                    border: 'none',
+                    boxShadow: '0 10px 20px rgba(0,0,0,0.1)'
+                  }}
+                />
+                <Bar
+                  dataKey="revenue"
+                  fill="#4318FF"
+                  radius={[10, 10, 10, 10]}
+                  barSize={20}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         </CardBox>
 
-        {/* Cột PHẢI (Nhỏ - chiếm 1/3): Chứa các widget xếp chồng */}
+        {/* Các Widget bên phải (Chiếm 1 phần) */}
         <div className="flex flex-col gap-5">
-            {/* Placeholder: Biểu đồ tròn (Pie Chart) */}
-            <CardBox title="Tỷ lệ loại hoa bán ra" extraClass="h-[240px] flex items-center justify-center bg-gray-50 border-dashed border-2 border-gray-200">
-                <span className="text-gray-400 font-medium">[Vị trí Pie Chart]</span>
-            </CardBox>
-            
-            {/* Placeholder: Lịch hoặc danh sách nhỏ */}
-            <CardBox title="Lịch giao hàng sắp tới" extraClass="h-[240px] flex items-center justify-center bg-gray-50 border-dashed border-2 border-gray-200">
-                 <span className="text-gray-400 font-medium">[Vị trí Mini Calendar]</span>
-            </CardBox>
+          <CardBox title="Loại hoa bán chạy" extraClass="flex-1 flex flex-col justify-center">
+            <div className="flex items-center gap-4 py-4">
+              <div className="w-16 h-16 rounded-full border-4 border-brand-500 flex items-center justify-center text-xs font-bold text-navy-700">
+                65%
+              </div>
+              <div>
+                <h5 className="font-bold text-navy-700">Hoa Hồng Đỏ</h5>
+                <p className="text-xs text-gray-400">Doanh số cao nhất</p>
+              </div>
+            </div>
+          </CardBox>
+
+          <CardBox title="Lịch sự kiện" extraClass="flex-1 flex flex-col justify-center">
+            <div className="flex items-center gap-3 py-4">
+              <div className="bg-green-100 p-3 rounded-xl text-green-600 font-bold text-center leading-tight">
+                24<br /><span className="text-xs font-normal">Jan</span>
+              </div>
+              <div>
+                <h5 className="font-bold text-navy-700">Giao hoa hội nghị</h5>
+                <p className="text-xs text-gray-400">10:00 AM - Quận 1</p>
+              </div>
+            </div>
+          </CardBox>
         </div>
       </div>
 
-      {/* --- HÀNG 3: BẢNG DỮ LIỆU PHỨC TẠP (Full width) --- */}
-      <CardBox title="Đơn hàng cần xử lý gấp" extraClass="min-h-[300px] flex items-center justify-center bg-gray-50 border-dashed border-2 border-gray-200">
-           <span className="text-gray-400 font-medium text-lg">[Vị trí Complex Table - Sẽ làm sau]</span>
+      {/* --- HÀNG 3: BẢNG SẢN PHẨM (Top Products) --- */}
+      <CardBox
+        title="Sản phẩm nổi bật"
+        extraClass="overflow-hidden"
+      >
+        <ComplexTable />
       </CardBox>
 
     </div>
