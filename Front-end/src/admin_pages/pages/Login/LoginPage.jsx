@@ -1,93 +1,94 @@
-import React from 'react';
-import { Form, Input, Checkbox, Button, message } from 'antd';
+import React, { useState } from 'react';
+import { Form, Input, Button, Checkbox, message } from 'antd';
+import { UserOutlined, LockOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
+import authService from '../../../services/authService';
 
 const LoginPage = () => {
-    const navigate = useNavigate();
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
 
-    const onFinish = (values) => {
-        if (values.email === 'admin' && values.password === '123') {
-            message.success('Xin chào Admin!');
-            navigate('/admin/dashboard');
-        } else {
-            message.error('Tài khoản không có quyền truy cập hoặc sai mật khẩu!');
-        }
-    };
+  const onFinish = async (values) => {
+    setLoading(true);
+    try {
+      // Gọi API đăng nhập
+      const response = await authService.login(values.email, values.password);
+
+      // Kiểm tra kết quả (Back-end trả về success: true)
+      if (response.success) {
+        message.success('Đăng nhập thành công!');
+        
+        // Lưu thông tin User + Token vào LocalStorage
+        // Dữ liệu này sẽ được dùng ở AdminLayout và axiosClient
+        localStorage.setItem('user', JSON.stringify(response.data));
+
+        // Chuyển hướng vào trang Dashboard
+        navigate('/admin/dashboard');
+      } else {
+        message.error(response.message || 'Đăng nhập thất bại!');
+      }
+    } catch (error) {
+      // Xử lý lỗi từ server (sai pass, lỗi mạng)
+      const errorMsg = error.response?.data?.message || 'Có lỗi xảy ra, vui lòng thử lại';
+      message.error(errorMsg);
+    } finally {
+      setLoading(false);
+    }
+  };
 
     return (
-        <div className="min-h-screen w-full flex items-center justify-center bg-[#F4F7FE] px-4 font-sans">
-            {/* Card Container */}
-            <div className="max-w-[420px] w-full bg-white rounded-[30px] shadow-sm p-8 md:p-12">
-
-                {/* Header */}
-                <div className="mb-10 text-left">
-                    <h1 className="text-4xl font-bold text-navy-700 mb-2 tracking-tight">Admin Login</h1>
-                    <p className="text-gray-400 text-sm font-medium">
-                        Nhập email và mật khẩu để truy cập hệ thống quản trị.
-                    </p>
-                </div>
-
-                {/* Form */}
-                <Form
-                    name="login"
-                    layout="vertical"
-                    onFinish={onFinish}
-                    autoComplete="off"
-                    size="large"
-                    className="flex flex-col"
-                >
-                    {/* Email Field */}
-                    <Form.Item
-                        label={<span className="text-navy-700 font-bold text-sm ml-1 mb-2 block">Email*</span>}
-                        name="email"
-                        rules={[
-                            { required: true, message: 'Vui lòng nhập Email!' },
-                            { type: 'email', message: 'Email không hợp lệ!' } // kiểm tra validate email chặt chẽ
-                        ]}
-                        className="mb-6"
-                    >
-                        <Input
-                            placeholder="admin@flower.shop"
-                            className="h-[50px] rounded-2xl border-none bg-[#F4F7FE] px-5 text-navy-700 font-medium placeholder:text-gray-400 focus:bg-white focus:ring-2 focus:ring-brand-500 hover:bg-[#F4F7FE]"
-                        />
-                    </Form.Item>
-
-                    {/* Password Field */}
-                    <Form.Item
-                        label={<span className="text-navy-700 font-bold text-sm ml-1 mb-2 block">Password*</span>}
-                        name="password"
-                        rules={[{ required: true, message: 'Vui lòng nhập mật khẩu!' }]}
-                        className="mb-6"
-                    >
-                        <Input.Password
-                            placeholder="Nhập mật khẩu quản trị"
-                            className="h-[50px] rounded-2xl border-none bg-[#F4F7FE] px-5 text-navy-700 font-medium placeholder:text-gray-400 focus:bg-white focus:ring-2 focus:ring-brand-500 hover:bg-[#F4F7FE]"
-                        />
-                    </Form.Item>
-
-                    {/* Checkbox & Forgot Password */}
-                    <div className="flex justify-between items-center mb-8">
-                        <Form.Item name="remember" valuePropName="checked" noStyle>
-                            <Checkbox className="text-navy-700 font-medium custom-checkbox">Ghi nhớ tôi</Checkbox>
-                        </Form.Item>
-
-                    </div>
-
-                    {/* Submit Button */}
-                    <Form.Item className="mb-0">
-                        <Button
-                            type="primary"
-                            htmlType="submit"
-                            className="w-full h-[54px] rounded-2xl bg-brand-500 hover:!bg-brand-600 border-none font-bold text-base shadow-xl shadow-brand-500/20"
-                        >
-                            Đăng Nhập
-                        </Button>
-                    </Form.Item>
-                </Form>
-
-            </div>
+    <div className="flex items-center justify-center min-h-screen bg-gradient-to-tr from-blue-100 to-purple-100">
+      <div className="bg-white p-8 rounded-2xl shadow-lg w-[400px]">
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-bold text-navy-700">Flower Shop</h1>
+          <p className="text-gray-400 mt-2">Đăng nhập quản trị viên</p>
         </div>
-    );
+
+        <Form
+          name="login_form"
+          initialValues={{ remember: true }}
+          onFinish={onFinish}
+          layout="vertical"
+          size="large"
+        >
+          <Form.Item
+            name="email"
+            rules={[
+              { required: true, message: 'Vui lòng nhập Email!' },
+              { type: 'email', message: 'Email không hợp lệ!' }
+            ]}
+          >
+            <Input prefix={<UserOutlined />} placeholder="Email" />
+          </Form.Item>
+
+          <Form.Item
+            name="password"
+            rules={[{ required: true, message: 'Vui lòng nhập mật khẩu!' }]}
+          >
+            <Input.Password prefix={<LockOutlined />} placeholder="Mật khẩu" />
+          </Form.Item>
+
+          <Form.Item>
+            <Form.Item name="remember" valuePropName="checked" noStyle>
+              <Checkbox>Ghi nhớ tôi</Checkbox>
+            </Form.Item>
+            <a className="float-right text-brand-500 hover:text-brand-600" href="">Quên mật khẩu?</a>
+          </Form.Item>
+
+          <Form.Item>
+            <Button 
+              type="primary" 
+              htmlType="submit" 
+              className="w-full bg-brand-500 font-bold h-12 rounded-xl"
+              loading={loading} // Hiệu ứng quay khi đang gọi API
+            >
+              ĐĂNG NHẬP
+            </Button>
+          </Form.Item>
+        </Form>
+      </div>
+    </div>
+  );
 };
 
 export default LoginPage;

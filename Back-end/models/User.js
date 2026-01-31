@@ -14,11 +14,13 @@ const userSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 // Middleware: Tự động mã hóa mật khẩu trước khi lưu
-userSchema.pre('save', async function () {
+userSchema.pre('save', async function () { 
+  // Nếu mật khẩu không bị sửa đổi thì bỏ qua
   if (!this.isModified('password')) return;
+  
+  // Mã hóa
   const salt = await bcrypt.genSalt(10);
   this.password = await bcrypt.hash(this.password, salt);
-
 });
 
 // Hàm kiểm tra mật khẩu (Dùng khi đăng nhập)

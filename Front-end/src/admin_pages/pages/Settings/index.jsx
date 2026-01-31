@@ -142,8 +142,7 @@ const SettingsPage = () => {
   return (
     <div className="w-full">
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-navy-700">Cài đặt tài khoản</h2>
-        <p className="text-gray-500 text-sm">Quản lý thông tin cá nhân và bảo mật hệ thống</p>
+        
       </div>
 
       <div className="bg-white p-6 rounded-[20px] shadow-sm min-h-[500px]">

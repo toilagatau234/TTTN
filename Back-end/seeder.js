@@ -11,8 +11,8 @@ const importData = async () => {
     await User.deleteMany(); // Xóa dữ liệu cũ nếu có
 
     const adminUser = new User({
-      name: 'Admin System',
-      email: 'admin@flower.shop',
+      name: 'Admin',
+      email: 'admin@gmail.com',
       password: '123', // Pass này sẽ được mã hóa tự động nhờ model
       role: 'Admin',
       avatar: 'https://i.pravatar.cc/150?img=11'
