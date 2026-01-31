@@ -9,6 +9,8 @@ import NotFoundPage from '../components/NotFoundPage';
 import ProductPage from '../pages/Products';
 import CreateProduct from '../pages/Products/CreateProduct';
 import CategoryPage from '../pages/Categories';
+import MinigameListPage from '../pages/Minigame/index';
+import MinigameDetailPage from '../pages/Minigame/GameDetail';
 
 const AdminRoutes = () => {
   return (
@@ -24,6 +26,9 @@ const AdminRoutes = () => {
         <Route path="customers" element={<CustomersPage />} />
 
         <Route path="categories" element={<CategoryPage />} />
+
+        <Route path="minigames" element={<MinigameListPage />} />
+        <Route path="minigames/:id" element={<MinigameDetailPage />} />
 
         <Route path="products" element={<ProductPage />} />
         <Route path="products/create" element={<CreateProduct />} />

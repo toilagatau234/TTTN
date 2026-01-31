@@ -215,9 +215,7 @@ const ProductPage = () => {
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
         <div>
-           {/* 3. Đã thêm lại Tiêu đề bị thiếu */}
-           <h2 className="text-2xl font-bold text-navy-700">Quản lý Sản phẩm</h2>
-           <p className="text-gray-500 text-sm">Quản lý kho hoa và danh sách sản phẩm</p>
+           
         </div>
         <Button 
           type="primary" 

@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { Form, Input, InputNumber, Select, Upload, Button, message, Row, Col, Switch, Divider, Card, Breadcrumb } from 'antd';
+import { Form, Input, InputNumber, Select, Upload, Button, message, Row, Col, Switch, Divider, Card, Breadcrumb, Modal, Table, Tag } from 'antd';
 import { 
   UploadOutlined, PlusOutlined, LoadingOutlined, DollarOutlined, 
-  BarcodeOutlined, SaveOutlined, ArrowLeftOutlined, FileImageOutlined
+  BarcodeOutlined, SaveOutlined, ArrowLeftOutlined, FileImageOutlined,
+  AppstoreOutlined, SearchOutlined // Icon mới
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 
@@ -16,7 +17,44 @@ const CreateProduct = () => {
   const [imageUrl, setImageUrl] = useState(null);
   const [fileList, setFileList] = useState([]);
 
-  // --- XỬ LÝ UPLOAD ẢNH ĐẠI DIỆN ---
+  // --- LOGIC MỚI: CHỌN NHIỀU DANH MỤC ---
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [selectedCategoryKeys, setSelectedCategoryKeys] = useState([]); // Lưu ID các danh mục đã chọn
+  const [selectedCategories, setSelectedCategories] = useState([]);     // Lưu chi tiết các danh mục đã chọn
+
+  // Dữ liệu giả lập Danh mục (Sau này lấy từ API)
+  const categoryData = [
+    { key: '1', name: 'Hoa Hồng', description: 'Các loại hoa hồng', count: 120 },
+    { key: '2', name: 'Hoa Lan', description: 'Lan hồ điệp, lan rừng', count: 85 },
+    { key: '3', name: 'Hoa Sinh Nhật', description: 'Mẫu hoa tặng sinh nhật', count: 200 },
+    { key: '4', name: 'Hoa Khai Trương', description: 'Kệ hoa chúc mừng', count: 50 },
+    { key: '5', name: 'Hoa Cưới', description: 'Hoa cầm tay cô dâu', count: 30 },
+    { key: '6', name: 'Hoa Tình Yêu', description: 'Valentine, kỷ niệm', count: 150 },
+  ];
+
+  const categoryColumns = [
+    { title: 'Tên danh mục', dataIndex: 'name', key: 'name' },
+    { title: 'Mô tả', dataIndex: 'description', key: 'description', responsive: ['md'] },
+    { title: 'Số SP', dataIndex: 'count', key: 'count', render: (c) => <Tag color="blue">{c}</Tag> },
+  ];
+
+  // Xử lý khi đóng Modal chọn danh mục
+  const handleCategoryOk = () => {
+    // Tìm chi tiết các danh mục dựa trên Key đã chọn
+    const selectedItems = categoryData.filter(item => selectedCategoryKeys.includes(item.key));
+    setSelectedCategories(selectedItems);
+    
+    // Cập nhật giá trị vào Form để gửi đi
+    form.setFieldsValue({ categories: selectedCategoryKeys });
+    setIsCategoryModalOpen(false);
+  };
+
+  const rowSelection = {
+    selectedRowKeys: selectedCategoryKeys,
+    onChange: (selectedRowKeys) => setSelectedCategoryKeys(selectedRowKeys),
+  };
+  // -------------------------------------
+
   const handleAvatarChange = (info) => {
     if (info.file.status === 'uploading') {
       setLoading(true);
@@ -28,17 +66,22 @@ const CreateProduct = () => {
     setLoading(false);
   };
 
-  // --- XỬ LÝ LƯU SẢN PHẨM ---
   const onFinish = async (values) => {
     try {
       setLoading(true);
-      // Giả lập gọi API (Sau này dùng productService.add(values))
-      console.log('Success:', values);
+      
+      // Chuẩn bị dữ liệu gửi đi (bao gồm danh mục đã chọn)
+      const payload = {
+          ...values,
+          categories: selectedCategoryKeys, // Mảng ID danh mục
+      };
+      
+      console.log('Dữ liệu gửi đi:', payload);
       
       setTimeout(() => {
         message.success('Tạo sản phẩm mới thành công!');
         setLoading(false);
-        navigate('/admin/products'); // Quay về trang danh sách
+        navigate('/admin/products');
       }, 1000);
       
     } catch (error) {
@@ -56,7 +99,7 @@ const CreateProduct = () => {
 
   return (
     <div className="w-full">
-      {/* --- HEADER TÁC VỤ --- */}
+      {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
         <div className="flex flex-col gap-1">
             <Breadcrumb>
@@ -69,172 +112,152 @@ const CreateProduct = () => {
         </div>
         
         <div className="flex gap-3">
-          <Button 
-            icon={<ArrowLeftOutlined />} 
-            onClick={() => navigate('/admin/products')}
-            className="rounded-xl h-[44px] px-6 border-gray-300 text-gray-600 hover:text-navy-700 hover:border-navy-700 font-medium"
-          >
-            Hủy bỏ
-          </Button>
-          <Button 
-            type="primary" 
-            icon={<SaveOutlined />} 
-            onClick={() => form.submit()}
-            loading={loading}
-            className="rounded-xl h-[44px] px-6 bg-brand-500 border-none font-bold shadow-brand-500/50 hover:bg-brand-600"
-          >
-            Lưu sản phẩm
-          </Button>
+          <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/admin/products')} className="rounded-xl h-[44px] px-6">Hủy bỏ</Button>
+          <Button type="primary" icon={<SaveOutlined />} onClick={() => form.submit()} loading={loading} className="rounded-xl h-[44px] px-6 bg-brand-500 font-bold border-none hover:bg-brand-600">Lưu sản phẩm</Button>
         </div>
       </div>
 
-      <Form 
-        form={form} 
-        layout="vertical" 
-        onFinish={onFinish}
-        initialValues={{ stock: 100, status: true, category: 'Hoa Hồng' }}
-      >
+      <Form form={form} layout="vertical" onFinish={onFinish} initialValues={{ stock: 100, status: true }}>
         <Row gutter={24}>
           
-          {/* --- CỘT TRÁI (THÔNG TIN CHÍNH) --- */}
+          {/* CỘT TRÁI (THÔNG TIN CHÍNH) */}
           <Col span={24} lg={16}>
-            
-            {/* Card 1: Thông tin chung */}
             <Card className="rounded-[20px] shadow-sm border-none mb-6" title={<span className="font-bold text-navy-700">Thông tin chung</span>}>
-              <Form.Item 
-                name="name" 
-                label="Tên sản phẩm" 
-                rules={[{ required: true, message: 'Vui lòng nhập tên sản phẩm!' }]}
-              >
-                <Input placeholder="Ví dụ: Bó Hoa Hồng Đỏ Valentine 99 Bông" className="rounded-xl h-[44px] text-base" />
+              <Form.Item name="name" label="Tên sản phẩm" rules={[{ required: true, message: 'Vui lòng nhập tên!' }]}>
+                <Input placeholder="Ví dụ: Bó Hoa Hồng Đỏ..." className="rounded-xl h-[44px] text-base" />
               </Form.Item>
-
               <Form.Item name="description" label="Mô tả sản phẩm">
-                <TextArea 
-                  rows={6} 
-                  placeholder="Mô tả chi tiết về ý nghĩa, hướng dẫn chăm sóc..." 
-                  className="rounded-xl p-3 text-base" 
-                />
+                <TextArea rows={6} className="rounded-xl p-3 text-base" />
               </Form.Item>
             </Card>
 
-            {/* Card 2: Giá cả & Kho hàng */}
-            <Card className="rounded-[20px] shadow-sm border-none mb-6" title={<span className="font-bold text-navy-700">Dữ liệu sản phẩm</span>}>
+            <Card className="rounded-[20px] shadow-sm border-none mb-6" title={<span className="font-bold text-navy-700">Giá cả & Kho hàng</span>}>
                <Row gutter={24}>
                  <Col span={12}>
-                    <Form.Item 
-                        name="price" 
-                        label="Giá bán (VNĐ)" 
-                        rules={[{ required: true, message: 'Nhập giá bán!' }]}
-                    >
-                      <InputNumber 
-                        style={{ width: '100%' }} 
-                        formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                        parser={value => value.replace(/\$\s?|(,*)/g, '')}
-                        className="rounded-xl h-[44px] flex items-center pt-1 font-bold text-navy-700"
-                        placeholder="0"
-                        prefix={<DollarOutlined className="text-gray-400 mr-2" />}
-                      />
+                    <Form.Item name="price" label="Giá bán (VNĐ)" rules={[{ required: true }]}>
+                      <InputNumber style={{ width: '100%' }} formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')} className="rounded-xl h-[44px] flex items-center pt-1 font-bold text-navy-700" placeholder="0" prefix={<DollarOutlined className="text-gray-400 mr-2" />} />
                     </Form.Item>
                  </Col>
                  <Col span={12}>
                     <Form.Item name="salePrice" label="Giá khuyến mãi">
-                      <InputNumber 
-                        style={{ width: '100%' }} 
-                        formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                        parser={value => value.replace(/\$\s?|(,*)/g, '')}
-                        className="rounded-xl h-[44px] flex items-center pt-1"
-                        placeholder="0"
-                      />
+                      <InputNumber style={{ width: '100%' }} formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')} className="rounded-xl h-[44px] flex items-center pt-1" placeholder="0" />
                     </Form.Item>
                  </Col>
                </Row>
-
                <Row gutter={24}>
                  <Col span={12}>
-                    <Form.Item name="sku" label="Mã SKU">
-                       <Input prefix={<BarcodeOutlined className="text-gray-400" />} placeholder="PROD-001" className="rounded-xl h-[44px]" />
-                    </Form.Item>
+                    <Form.Item name="sku" label="Mã SKU"><Input prefix={<BarcodeOutlined className="text-gray-400" />} className="rounded-xl h-[44px]" /></Form.Item>
                  </Col>
                  <Col span={12}>
-                    <Form.Item name="stock" label="Số lượng tồn kho" rules={[{ required: true }]}>
-                       <InputNumber min={0} className="w-full rounded-xl h-[44px] flex items-center pt-1" />
-                    </Form.Item>
+                    <Form.Item name="stock" label="Tồn kho" rules={[{ required: true }]}><InputNumber min={0} className="w-full rounded-xl h-[44px] flex items-center pt-1" /></Form.Item>
                  </Col>
                </Row>
             </Card>
-
           </Col>
 
-          {/* --- CỘT PHẢI (SIDEBAR) --- */}
+          {/* CỘT PHẢI (SIDEBAR) */}
           <Col span={24} lg={8}>
             
-            {/* Card 3: Media */}
+            {/* CARD 3: DANH MỤC (UPDATED) */}
+            <Card className="rounded-[20px] shadow-sm border-none mb-6" title={<span className="font-bold text-navy-700">Phân loại (Categories)</span>}>
+                
+                {/* Khu vực hiển thị danh mục đã chọn */}
+                <div className="mb-4">
+                   {selectedCategories.length > 0 ? (
+                     <div className="flex flex-wrap gap-2 mb-3">
+                       {selectedCategories.map(cat => (
+                         <Tag key={cat.key} color="blue" closable onClose={() => {
+                            const newKeys = selectedCategoryKeys.filter(k => k !== cat.key);
+                            setSelectedCategoryKeys(newKeys);
+                            setSelectedCategories(selectedCategories.filter(c => c.key !== cat.key));
+                         }}>
+                           {cat.name}
+                         </Tag>
+                       ))}
+                     </div>
+                   ) : (
+                     <div className="text-gray-400 text-sm mb-3 italic">Chưa chọn danh mục nào</div>
+                   )}
+                   
+                   <Button 
+                     type="dashed" 
+                     icon={<AppstoreOutlined />} 
+                     onClick={() => setIsCategoryModalOpen(true)}
+                     block
+                     className="rounded-xl h-[40px] text-brand-500 border-brand-500"
+                   >
+                     Chọn danh mục
+                   </Button>
+                   
+                   {/* Field ẩn để Antd Form nhận giá trị validate */}
+                   <Form.Item name="categories" hidden><Input /></Form.Item>
+                </div>
+
+                <Divider className="my-4" />
+
+                <Form.Item name="tags" label="Thẻ Tags">
+                   <Select mode="tags" placeholder="Nhập tags..." className="h-[44px] custom-select-metrix rounded-xl"><Option value="Mới">Mới</Option></Select>
+                </Form.Item>
+                
+                <div className="flex justify-between items-center p-3 bg-gray-50 rounded-xl">
+                     <span className="font-medium text-gray-600">Đang hoạt động</span>
+                     <Form.Item name="status" valuePropName="checked" noStyle><Switch /></Form.Item>
+                </div>
+            </Card>
+
             <Card className="rounded-[20px] shadow-sm border-none mb-6" title={<span className="font-bold text-navy-700">Hình ảnh</span>}>
                <Form.Item name="avatar" noStyle>
                  <div className="text-center mb-4">
                    <Upload
                       name="avatar"
                       listType="picture-card"
-                      className="avatar-uploader w-full h-[250px] overflow-hidden rounded-xl border-dashed border-2 border-gray-300 hover:border-brand-500 transition-colors bg-gray-50 flex justify-center items-center"
+                      className="avatar-uploader w-full h-[250px] overflow-hidden rounded-xl border-dashed border-2 border-gray-300 hover:border-brand-500 bg-gray-50 flex justify-center items-center"
                       showUploadList={false}
                       beforeUpload={() => false}
                       onChange={handleAvatarChange}
                     >
-                      {imageUrl ? (
-                        <img src={imageUrl} alt="avatar" className="w-full h-full object-cover" />
-                      ) : (
+                      {imageUrl ? <img src={imageUrl} alt="avatar" className="w-full h-full object-cover" /> : (
                         <div className="flex flex-col items-center justify-center text-gray-400">
-                          {loading ? <LoadingOutlined className="text-3xl mb-2" /> : <FileImageOutlined className="text-4xl mb-3" />}
-                          <div className="font-medium">Kéo thả hoặc chọn ảnh chính</div>
+                          {loading ? <LoadingOutlined className="text-3xl" /> : <FileImageOutlined className="text-4xl" />}
+                          <div className="font-medium mt-2">Ảnh chính</div>
                         </div>
                       )}
                     </Upload>
                  </div>
                </Form.Item>
-               
-               <p className="font-medium text-gray-500 mb-2">Ảnh chi tiết (Gallery)</p>
-               <Upload
-                  listType="picture-card"
-                  fileList={fileList}
-                  onChange={({ fileList: newFileList }) => setFileList(newFileList)}
-                  beforeUpload={() => false}
-                  multiple
-                >
-                  {fileList.length >= 5 ? null : uploadButton}
-                </Upload>
-            </Card>
-
-            {/* Card 4: Tổ chức */}
-            <Card className="rounded-[20px] shadow-sm border-none mb-6" title={<span className="font-bold text-navy-700">Phân loại</span>}>
-                <Form.Item name="status" valuePropName="checked" className="mb-4">
-                  <div className="flex justify-between items-center p-3 bg-gray-50 rounded-xl">
-                     <span className="font-medium text-gray-600">Đang hoạt động</span>
-                     <Switch />
-                  </div>
-                </Form.Item>
-
-                <Form.Item name="categories" label="Danh mục" rules={[{ required: true }]}>
-                  <Select mode="multiple" placeholder="Chọn các danh mục" className="h-[44px] custom-select-metrix rounded-xl text-base">
-                    <Option value="Hoa Hồng">Hoa Hồng</Option>
-                    <Option value="Hoa Lan">Hoa Lan</Option>
-                    <Option value="Hoa Sinh Nhật">Hoa Sinh Nhật</Option>
-                    <Option value="Hoa Khai Trương">Hoa Khai Trương</Option>
-                  </Select>
-                </Form.Item>
-
-                <Form.Item name="tags" label="Thẻ Tags">
-                   <Select mode="tags" placeholder="Nhập tags..." className="h-[44px] custom-select-metrix rounded-xl" tokenSeparators={[',']}>
-                      <Option value="Mới">Mới</Option>
-                      <Option value="Bán chạy">Bán chạy</Option>
-                      <Option value="Hot">Hot</Option>
-                   </Select>
-                </Form.Item>
+               <p className="font-medium text-gray-500 mb-2">Ảnh chi tiết</p>
+               <Upload listType="picture-card" fileList={fileList} onChange={({ fileList: f }) => setFileList(f)} beforeUpload={() => false} multiple>{fileList.length >= 5 ? null : uploadButton}</Upload>
             </Card>
           </Col>
-
         </Row>
       </Form>
+
+      {/* --- MODAL CHỌN DANH MỤC --- */}
+      <Modal
+        title={<span className="text-lg font-bold text-navy-700">Chọn Danh Mục Sản Phẩm</span>}
+        open={isCategoryModalOpen}
+        onOk={handleCategoryOk}
+        onCancel={() => setIsCategoryModalOpen(false)}
+        width={700}
+        centered
+        okText="Xác nhận chọn"
+        cancelText="Đóng"
+        className="custom-modal-metrix"
+      >
+        <div className="mb-4">
+           <Input prefix={<SearchOutlined />} placeholder="Tìm kiếm danh mục..." className="rounded-xl h-[40px]" />
+        </div>
+        <Table 
+          rowSelection={rowSelection} 
+          columns={categoryColumns} 
+          dataSource={categoryData} 
+          pagination={{ pageSize: 5 }}
+          scroll={{ y: 300 }}
+          size="small"
+          className="custom-table-metrix border border-gray-100 rounded-xl"
+        />
+      </Modal>
+
     </div>
   );
 };
