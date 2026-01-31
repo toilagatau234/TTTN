@@ -5,7 +5,8 @@ import {
     UserOutlined, DashboardOutlined, ShoppingCartOutlined, FileTextOutlined,
     TeamOutlined, TagsOutlined, GiftOutlined, SettingOutlined,
     MessageOutlined, CommentOutlined, ShopOutlined, BarcodeOutlined, HistoryOutlined,
-    IdcardOutlined, PictureOutlined, ReadOutlined, AppstoreAddOutlined
+    IdcardOutlined, PictureOutlined, ReadOutlined, AppstoreAddOutlined, CarOutlined,
+    ShoppingOutlined, DatabaseOutlined, CustomerServiceOutlined, SafetyCertificateOutlined
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 
@@ -15,7 +16,6 @@ const { Header, Sider, Content } = Layout;
 
 // Giả lập hàm lấy user
 const getCurrentUser = () => {
-    // Sửa role ở đây thành 'Sale', 'Warehouse', 'Manager' để test
     const user = JSON.parse(localStorage.getItem('user'));
     return user || {"name": "Admin", "role": "Admin"};
 };
@@ -34,47 +34,114 @@ const AdminLayout = () => {
         return allowedRoles.includes(currentUser.role);
     };
 
-    // Danh sách MENU CHÍNH
+    // Hàm đệ quy lọc menu con 
+    const filterMenuItems = (items) => {
+        return items
+            .filter(item => checkPermission(item.key))
+            .map(item => {
+                if (item.children) {
+                    return { ...item, children: filterMenuItems(item.children) };
+                }
+                return item;
+            });
+    };
+
+    // --- CẤU TRÚC MENU MỚI ---
     const allMainMenuItems = [
-        { key: '/admin/dashboard', icon: <DashboardOutlined />, label: 'Dashboard' },
-        { key: '/admin/orders', icon: <ShoppingCartOutlined />, label: 'Quản lý Đơn hàng' },
-        { key: '/admin/products', icon: <FileTextOutlined />, label: 'Quản lý Sản phẩm' },
-        { key: '/admin/categories', icon: <TagsOutlined />, label: 'Quản lý Danh mục' },
-        { key: '/admin/inventory', icon: <ShopOutlined />, label: 'Quản lý Nhập kho' },
-        { key: '/admin/customers', icon: <TeamOutlined />, label: 'Quản lý Khách hàng' },
-        { key: '/admin/staff', icon: <IdcardOutlined />, label: 'Quản lý Nhân viên' },
-        { key: '/admin/vouchers', icon: <BarcodeOutlined />, label: 'Mã giảm giá' },
-        { key: '/admin/minigames', icon: <GiftOutlined />, label: 'Minigame' },
-        { key: '/admin/reviews', icon: <CommentOutlined />, label: 'Đánh giá' },
-        { key: '/admin/chat', icon: <MessageOutlined />, label: 'Hỗ trợ khách hàng' },
-        { key: '/admin/cms/banners', icon: <PictureOutlined />, label: 'Quản lý Banner' },
-        { key: '/admin/activity-logs', icon: <HistoryOutlined />, label: 'Nhật ký Hoạt động' },
+        { 
+            key: '/admin/dashboard', 
+            icon: <DashboardOutlined />, 
+            label: 'Dashboard' 
+        },
+        
+        // KINH DOANH
         {
-            key: 'sub-cms', // Key này dùng để check quyền cho cả nhóm
-            icon: <AppstoreAddOutlined />,
-            label: 'Quản lý Nội dung',
+            key: 'grp-sales',
+            icon: <ShoppingOutlined />,
+            label: 'Kinh Doanh',
             children: [
-                { key: '/admin/cms/banners', icon: <PictureOutlined />, label: 'Banner quảng cáo' },
-                { key: '/admin/cms/blogs', icon: <ReadOutlined />, label: 'Bài viết (Blog)' },
+                { key: '/admin/orders', label: 'Đơn hàng' },
+                { key: '/admin/customers', label: 'Khách hàng' },
+                { key: '/admin/vouchers', label: 'Mã giảm giá' },
+            ]
+        },
+
+        // HÀNG HÓA & KHO
+        {
+            key: 'grp-inventory',
+            icon: <DatabaseOutlined />,
+            label: 'Hàng Hóa & Kho',
+            children: [
+                { key: '/admin/products', label: 'Sản phẩm' },
+                { key: '/admin/categories', label: 'Danh mục' },
+                { key: '/admin/inventory', label: 'Nhập kho' },
+                { key: '/admin/shipping', label: 'Vận chuyển' }, // Chuyển Shipping vào đây hoặc nhóm riêng
+            ]
+        },
+
+        // CSKH & MARKETING
+        {
+            key: 'grp-marketing',
+            icon: <CustomerServiceOutlined />,
+            label: 'CSKH & Marketing',
+            children: [
+                { key: '/admin/chat', label: 'Tin nhắn (Chat)' },
+                { key: '/admin/reviews', label: 'Đánh giá' },
+                { key: '/admin/minigames', label: 'Minigame' },
+                { key: '/admin/cms/banners', label: 'Banner & Blog' }, // Gộp CMS vào đây
+            ]
+        },
+
+        // QUẢN TRỊ HỆ THỐNG
+        {
+            key: 'grp-system',
+            icon: <SafetyCertificateOutlined />,
+            label: 'Hệ Thống',
+            children: [
+                { key: '/admin/staff', label: 'Nhân viên' },
+                { key: '/admin/activity-logs', label: 'Nhật ký hoạt động' },
             ]
         },
     ];
 
     // Danh sách MENU ĐÁY
     const allBottomMenuItems = [
-        { key: '/admin/settings', icon: <SettingOutlined />, label: 'Cài đặt hệ thống' },
+        { key: '/admin/settings', icon: <SettingOutlined />, label: 'Cài đặt tài khoản' },
     ];
 
-    // --- LỌC MENU (Tạo ra danh sách menu được phép xem) ---
-    const visibleMainMenu = allMainMenuItems.filter(item => checkPermission(item.key));
-    const visibleBottomMenu = allBottomMenuItems.filter(item => checkPermission(item.key));
+    // --- LỌC MENU ---
+    const visibleMainMenu = filterMenuItems(allMainMenuItems);
+    const visibleBottomMenu = filterMenuItems(allBottomMenuItems);
 
     // Logic Active Menu & Breadcrumb
     const currentPath = location.pathname;
-    const allItems = [...allMainMenuItems, ...allBottomMenuItems];
-    const currentItem = allItems.find(item => currentPath.startsWith(item.key));
-    const currentBreadcrumb = currentItem ? currentItem.label : 'Trang chủ';
-    const activeKey = currentItem ? currentItem.key : '';
+    
+    // Hàm tìm label cho Breadcrumb
+    const findLabel = (items, path) => {
+        for (const item of items) {
+            if (item.key === path) return item.label;
+            if (item.children) {
+                const childLabel = findLabel(item.children, path);
+                if (childLabel) return childLabel;
+            }
+        }
+        return null;
+    };
+    
+    const currentBreadcrumb = findLabel([...allMainMenuItems, ...allBottomMenuItems], currentPath) || 'Trang chủ';
+    
+    // Tìm key đang active và key của SubMenu cần mở 
+    const activeKey = currentPath;
+    
+    // Xác định SubMenu nào chứa activeKey để auto-open
+    const getOpenKeys = () => {
+        for (const item of allMainMenuItems) {
+            if (item.children && item.children.find(c => c.key === activeKey)) {
+                return [item.key];
+            }
+        }
+        return [];
+    };
 
     return (
         <Layout className="min-h-screen bg-[#F4F7FE]">
@@ -104,6 +171,7 @@ const AdminLayout = () => {
                     <div className="flex-1 overflow-y-auto custom-scrollbar">
                         <Menu
                             mode="inline"
+                            defaultOpenKeys={getOpenKeys()} // Tự động mở nhóm đang active
                             selectedKeys={[activeKey]}
                             items={visibleMainMenu}
                             onClick={({ key }) => navigate(key)}

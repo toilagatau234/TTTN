@@ -29,6 +29,11 @@ import ActivityLogsPage from '../pages/ActivityLogs';
 import BannerPage from '../pages/CMS/BannerPage';
 import BlogPage from '../pages/CMS/BlogPage';
 
+import ShippingPage from '../pages/Shipping';
+import CarrierConfig from '../pages/Shipping/CarrierConfig';
+
+import StaffPage from '../pages/Staff/index';
+
 const AdminRoutes = () => {
   return (
     <Routes>
@@ -67,6 +72,11 @@ const AdminRoutes = () => {
 
         <Route path="cms/banners" element={<BannerPage />} />
         <Route path="cms/blogs" element={<BlogPage />} />
+
+        <Route path="shipping" element={<ShippingPage />} />
+        <Route path="shipping/config" element={<CarrierConfig />} />
+
+        <Route path="staff" element={<StaffPage />} />
 
         {/* Redirect mặc định về Login */}
         <Route path="/" element={<Navigate to="login" replace />} />
