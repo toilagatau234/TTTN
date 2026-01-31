@@ -13,11 +13,18 @@ import VoucherPage from '../pages/Vouchers';
 import ReviewsPage from '../pages/Reviews';
 import ChatPage from '../pages/Chat';
 
+import InventoryPage from '../pages/Inventory';
+import CreateImport from '../pages/Inventory/CreateImport';
+import Suppliers from '../pages/Inventory/Suppliers';
+import StockAdjustment from '../pages/Inventory/StockAdjustment';
+
 import ProductPage from '../pages/Products';
 import CreateProduct from '../pages/Products/CreateProduct';
 
 import MinigamePage from '../pages/Minigame'; 
 import GameDetail from '../pages/Minigame/GameDetail';
+
+import ActivityLogsPage from '../pages/ActivityLogs';
 
 const AdminRoutes = () => {
   return (
@@ -47,6 +54,13 @@ const AdminRoutes = () => {
         <Route path="reviews" element={<ReviewsPage />} />
 
         <Route path="chat" element={<ChatPage />} />
+
+        <Route path="inventory" element={<InventoryPage />} />
+        <Route path="inventory/create-import" element={<CreateImport />} />
+        <Route path="inventory/suppliers" element={<Suppliers />} />
+        <Route path="inventory/adjustment" element={<StockAdjustment />} />
+
+        <Route path="activity-logs" element={<ActivityLogsPage />} />
 
         {/* Redirect mặc định về Login */}
         <Route path="/" element={<Navigate to="login" replace />} />

@@ -7,6 +7,10 @@ import {
   ClockCircleOutlined, StarOutlined, ArrowUpOutlined
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
+
+import PermissionGate from '../../components/PermissionGate';
+import { ACTION_PERMISSIONS } from '../../../constants/roles';
+
 const { Option } = Select;
 
 // --- OVERVIEW WIDGET ---
@@ -194,10 +198,23 @@ const ProductPage = () => {
       render: (_, record) => (
         <Dropdown 
           overlay={
-            <Menu items={[
-              { key: '1', label: 'Chỉnh sửa', icon: <EditOutlined /> },
-              { key: '2', label: 'Xóa', icon: <DeleteOutlined />, danger: true, onClick: () => handleDelete(record.key) }
-            ]} />
+            <Menu>
+              <Menu.Item key="1" icon={<EditOutlined />}>
+                Chỉnh sửa
+              </Menu.Item>
+              
+              {/* Bảo vệ nút Xóa: Chỉ Admin mới thấy */}
+              <PermissionGate allowedRoles={ACTION_PERMISSIONS.CAN_DELETE}>
+                <Menu.Item 
+                  key="2" 
+                  icon={<DeleteOutlined />} 
+                  danger 
+                  onClick={() => handleDelete(record.key)}
+                >
+                  Xóa
+                </Menu.Item>
+              </PermissionGate>
+            </Menu>
           } 
           trigger={['click']}
         >
