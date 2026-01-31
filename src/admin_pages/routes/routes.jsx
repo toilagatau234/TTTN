@@ -21,10 +21,13 @@ import StockAdjustment from '../pages/Inventory/StockAdjustment';
 import ProductPage from '../pages/Products';
 import CreateProduct from '../pages/Products/CreateProduct';
 
-import MinigamePage from '../pages/Minigame'; 
+import MinigamePage from '../pages/Minigame';
 import GameDetail from '../pages/Minigame/GameDetail';
 
 import ActivityLogsPage from '../pages/ActivityLogs';
+
+import BannerPage from '../pages/CMS/BannerPage';
+import BlogPage from '../pages/CMS/BlogPage';
 
 const AdminRoutes = () => {
   return (
@@ -61,6 +64,9 @@ const AdminRoutes = () => {
         <Route path="inventory/adjustment" element={<StockAdjustment />} />
 
         <Route path="activity-logs" element={<ActivityLogsPage />} />
+
+        <Route path="cms/banners" element={<BannerPage />} />
+        <Route path="cms/blogs" element={<BlogPage />} />
 
         {/* Redirect mặc định về Login */}
         <Route path="/" element={<Navigate to="login" replace />} />

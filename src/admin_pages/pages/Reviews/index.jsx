@@ -119,8 +119,7 @@ const ReviewsPage = () => {
     <div className="w-full">
       <div className="flex justify-between items-center mb-6">
         <div>
-           <h2 className="text-2xl font-bold text-navy-700">Quản lý Đánh giá</h2>
-           <p className="text-gray-500 text-sm">Xem và phản hồi ý kiến khách hàng</p>
+           
         </div>
       </div>
 

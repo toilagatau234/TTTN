@@ -29,10 +29,14 @@ export const MENU_PERMISSIONS = {
   '/admin/staff':         [ROLES.ADMIN],
   '/admin/activity-logs': [ROLES.ADMIN, ROLES.MANAGER],
   '/admin/cms/banners':   [ROLES.ADMIN, ROLES.MANAGER, ROLES.STAFF],
-  '/admin/settings':      [ROLES.ADMIN]
+  '/admin/settings':      [ROLES.ADMIN],
+
+  //// Quyền cho nhóm CMS
+  'sub-cms':              [ROLES.ADMIN, ROLES.MANAGER, ROLES.STAFF], // Quyền xem menu cha
+  '/admin/cms/banners':   [ROLES.ADMIN, ROLES.MANAGER, ROLES.STAFF],
+  '/admin/cms/blogs':     [ROLES.ADMIN, ROLES.MANAGER, ROLES.STAFF],
 };
 
-// 3. Quyền hạn chi tiết (Ví dụ: Nút Xóa)
 // Ai có tên trong list này thì MỚI ĐƯỢC thực hiện hành động
 export const ACTION_PERMISSIONS = {
   CAN_DELETE: [ROLES.ADMIN], // Chỉ Admin được xóa

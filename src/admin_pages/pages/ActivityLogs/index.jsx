@@ -146,8 +146,7 @@ const ActivityLogsPage = () => {
     <div className="w-full">
       <div className="flex justify-between items-center mb-6">
         <div>
-           <h2 className="text-2xl font-bold text-navy-700">Nhật Ký Hoạt Động</h2>
-           <p className="text-gray-500 text-sm">Theo dõi mọi thay đổi trong hệ thống</p>
+           
         </div>
         <div className="flex gap-2">
            <Button icon={<ReloadOutlined />} onClick={() => setLoading(true)}>Làm mới</Button>

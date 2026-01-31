@@ -144,8 +144,7 @@ const VoucherPage = () => {
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <div>
-           <h2 className="text-2xl font-bold text-navy-700">Quản lý Mã Giảm Giá</h2>
-           <p className="text-gray-500 text-sm">Tạo và theo dõi các chương trình khuyến mãi</p>
+           
         </div>
         <Button 
           type="primary" 
