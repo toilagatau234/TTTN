@@ -233,8 +233,7 @@ const OrderPage = () => {
       {/* --- HEADER TITLE --- */}
       <div className="mb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-           <h2 className="text-2xl font-bold text-navy-700">Danh sách đơn hàng</h2>
-           <p className="text-gray-500 text-sm">Quản lý chi tiết các giao dịch</p>
+          
         </div>
         
         <div className="flex gap-3">

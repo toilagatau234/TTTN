@@ -6,6 +6,7 @@ import Dashboard from '../pages/Dashboard';
 import OrderPage from '../pages/Order';
 import CustomersPage from '../pages/Customers';
 import NotFoundPage from '../components/NotFoundPage';
+import ProductPage from '../pages/Products';
 
 const AdminRoutes = () => {
   return (
@@ -17,7 +18,8 @@ const AdminRoutes = () => {
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="orders" element={<OrderPage />} />
         <Route path="customers" element={<CustomersPage />} />
-        
+        <Route path="products" element={<ProductPage />} />
+
         {/* Redirect mặc định về Login */}
         <Route path="/" element={<Navigate to="login" replace />} />
       </Route>
