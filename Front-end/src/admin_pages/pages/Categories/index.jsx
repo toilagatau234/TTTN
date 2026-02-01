@@ -1,138 +1,147 @@
-import React, { useState } from 'react';
-import { Table, Button, Input, Select, Tag, Dropdown, Menu, message, Avatar } from 'antd';
-import { 
-  PlusOutlined, SearchOutlined, FilterOutlined, 
-  MoreOutlined, EditOutlined, DeleteOutlined, 
-  AppstoreOutlined, TagsOutlined, FolderOpenOutlined 
-} from '@ant-design/icons';
-
+import React, { useState, useEffect } from 'react';
+import { Table, Button, Input, Tag, message, Popconfirm, Avatar } from 'antd';
+import { PlusOutlined, SearchOutlined, EditOutlined, DeleteOutlined, FileImageOutlined } from '@ant-design/icons';
+import categoryService from '../../../services/categoryService'; // Import API Service
 import CreateCategoryModal from './components/CreateCategoryModal';
-
-const { Option } = Select;
-
-// Widget Thống kê
-const CategoryStatCard = ({ icon, title, value, color }) => (
-  <div className="bg-white p-5 rounded-[20px] shadow-sm flex items-center justify-between">
-    <div>
-      <p className="text-gray-400 text-sm font-medium mb-1">{title}</p>
-      <h3 className="text-2xl font-bold text-navy-700">{value}</h3>
-    </div>
-    <div className={`w-12 h-12 rounded-full flex items-center justify-center text-xl ${color}`}>
-      {icon}
-    </div>
-  </div>
-);
 
 const CategoryPage = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  
-  // Dữ liệu giả
-  const [data, setData] = useState([
-    {
-      key: '1',
-      id: 1,
-      name: 'Hoa Hồng (Roses)',
-      description: 'Biểu tượng của tình yêu và lãng mạn',
-      count: 156,
-      status: 'Active',
-      icon: 'https://images.unsplash.com/photo-1548507204-6d9b439c2e1e?auto=format&fit=crop&w=100&q=80',
-      createdAt: '12/01/2025'
-    },
-    {
-      key: '2',
-      id: 2,
-      name: 'Hoa Lan (Orchids)',
-      description: 'Vẻ đẹp sang trọng và quý phái',
-      count: 85,
-      status: 'Active',
-      icon: 'https://images.unsplash.com/photo-1566929369-1c255c5e0682?auto=format&fit=crop&w=100&q=80',
-      createdAt: '15/01/2025'
-    },
-    {
-      key: '3',
-      id: 3,
-      name: 'Hoa Cưới (Wedding)',
-      description: 'Dành cho ngày trọng đại nhất',
-      count: 42,
-      status: 'Hidden',
-      icon: 'https://images.unsplash.com/photo-1534353436294-0dbd4bdac845?auto=format&fit=crop&w=100&q=80',
-      createdAt: '20/01/2025'
-    }
-  ]);
+  const [loading, setLoading] = useState(false);
+  const [data, setData] = useState([]);
+  const [editingItem, setEditingItem] = useState(null); // Lưu item đang sửa
 
-  const handleCreate = (newItem) => {
-    setData([newItem, ...data]);
-    setIsModalOpen(false);
+  // 1. Hàm gọi API lấy danh sách
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const res = await categoryService.getAll();
+      if (res.success) {
+        // Gán key cho Table của Antd (dùng _id của MongoDB)
+        const mappedData = res.data.map(item => ({ ...item, key: item._id }));
+        setData(mappedData);
+      }
+    } catch (error) {
+      message.error("Không thể tải danh sách danh mục");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleDelete = (key) => {
-    setData(data.filter(item => item.key !== key));
-    message.success('Đã xóa danh mục');
+  // Gọi API khi component vừa chạy
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  // 2. Xử lý Thêm mới hoặc Cập nhật
+  const handleCreateOrUpdate = async (formData) => {
+    try {
+      if (editingItem) {
+        // Nếu đang sửa -> Gọi API Update
+        await categoryService.update(editingItem._id, formData);
+        message.success('Cập nhật thành công!');
+      } else {
+        // Nếu tạo mới -> Gọi API Create
+        await categoryService.create(formData);
+        message.success('Tạo danh mục mới thành công!');
+      }
+      
+      setIsModalOpen(false);
+      fetchData(); // Load lại bảng dữ liệu
+    } catch (error) {
+      message.error(error.response?.data?.message || 'Có lỗi xảy ra');
+    }
+  };
+
+  // 3. Xử lý Xóa
+  const handleDelete = async (id) => {
+    try {
+      await categoryService.delete(id);
+      message.success('Đã xóa danh mục');
+      fetchData(); // Load lại bảng
+    } catch (error) {
+      message.error('Xóa thất bại');
+    }
+  };
+
+  // 4. Mở modal ở chế độ Sửa
+  const openEditModal = (record) => {
+    setEditingItem(record);
+    setIsModalOpen(true);
+  };
+
+  // 5. Mở modal ở chế độ Thêm mới
+  const openCreateModal = () => {
+    setEditingItem(null);
+    setIsModalOpen(true);
   };
 
   const columns = [
     {
+      title: 'HÌNH ẢNH',
+      dataIndex: 'image',
+      key: 'image',
+      width: 100,
+      render: (img) => (
+        <Avatar 
+          shape="square" 
+          size={64} 
+          src={img} 
+          icon={<FileImageOutlined />} 
+          className="rounded-lg border border-gray-200 bg-gray-50"
+        />
+      ),
+    },
+    {
       title: 'TÊN DANH MỤC',
       dataIndex: 'name',
       key: 'name',
-      width: 300,
-      render: (text, record) => (
-        <div className="flex items-center gap-3">
-          <Avatar src={record.icon} shape="square" size={48} className="rounded-lg shadow-sm" />
-          <div>
-            <h5 className="font-bold text-navy-700 text-sm m-0">{text}</h5>
-            <span className="text-gray-400 text-xs">ID: {record.id}</span>
-          </div>
-        </div>
-      ),
+      render: (text) => <span className="font-bold text-navy-700">{text}</span>,
     },
     {
       title: 'MÔ TẢ',
       dataIndex: 'description',
       key: 'description',
-      render: (text) => <span className="text-gray-500 line-clamp-1 max-w-[200px]">{text}</span>,
-    },
-    {
-      title: 'SỐ SẢN PHẨM',
-      dataIndex: 'count',
-      key: 'count',
-      render: (count) => (
-        <Tag color="cyan" className="rounded-md font-bold px-2">
-           {count} sản phẩm
-        </Tag>
-      ),
-    },
-    {
-      title: 'NGÀY TẠO',
-      dataIndex: 'createdAt',
-      key: 'createdAt',
-      render: (date) => <span className="text-gray-500 font-medium">{date}</span>,
+      className: 'text-gray-500',
     },
     {
       title: 'TRẠNG THÁI',
-      dataIndex: 'status',
-      key: 'status',
-      render: (status) => (
-        <Tag color={status === 'Active' ? 'green' : 'default'} className="rounded-md font-medium">
-          {status === 'Active' ? 'Hiển thị' : 'Đã ẩn'}
+      dataIndex: 'isActive',
+      key: 'isActive',
+      width: 120,
+      render: (isActive) => (
+        <Tag color={isActive ? 'green' : 'red'} className="rounded-full px-3">
+          {isActive ? 'Active' : 'Hidden'}
         </Tag>
       ),
     },
     {
       title: 'THAO TÁC',
       key: 'action',
+      width: 120,
       render: (_, record) => (
-        <Dropdown 
-          overlay={
-            <Menu items={[
-              { key: '1', label: 'Chỉnh sửa', icon: <EditOutlined /> },
-              { key: '2', label: 'Xóa', icon: <DeleteOutlined />, danger: true, onClick: () => handleDelete(record.key) }
-            ]} />
-          } 
-          trigger={['click']}
-        >
-          <Button type="text" icon={<MoreOutlined className="text-gray-400 text-lg" />} />
-        </Dropdown>
+        <div className="flex gap-2">
+          <Button 
+            icon={<EditOutlined />} 
+            size="small" 
+            className="text-blue-500 border-blue-100 hover:bg-blue-50"
+            onClick={() => openEditModal(record)} 
+          />
+          <Popconfirm
+            title="Xóa danh mục?"
+            description="Hành động này không thể hoàn tác"
+            onConfirm={() => handleDelete(record._id)}
+            okText="Xóa"
+            cancelText="Hủy"
+            okButtonProps={{ danger: true }}
+          >
+            <Button 
+              icon={<DeleteOutlined />} 
+              size="small" 
+              danger 
+              className="border-red-100 hover:bg-red-50"
+            />
+          </Popconfirm>
+        </div>
       ),
     },
   ];
@@ -140,45 +149,35 @@ const CategoryPage = () => {
   return (
     <div className="w-full">
       {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+      <div className="flex justify-between items-center mb-6">
         <div>
-           
+          
         </div>
         <Button 
           type="primary" 
           icon={<PlusOutlined />} 
-          onClick={() => setIsModalOpen(true)}
-          className="bg-brand-500 h-10 px-6 rounded-xl font-medium shadow-brand-500/50 border-none hover:bg-brand-600"
+          onClick={openCreateModal}
+          className="bg-brand-500 h-10 px-6 rounded-xl font-bold shadow-lg shadow-brand-500/50 border-none hover:bg-brand-600"
         >
-          Thêm danh mục
+          Thêm Mới
         </Button>
-      </div>
-
-      {/* Stats Widgets */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-6">
-         <CategoryStatCard title="Tổng Danh Mục" value={data.length} icon={<AppstoreOutlined />} color="bg-light-primary text-brand-500" />
-         <CategoryStatCard title="Đang Hoạt Động" value={data.filter(c => c.status === 'Active').length} icon={<TagsOutlined />} color="bg-green-50 text-green-500" />
-         <CategoryStatCard title="Tổng Sản Phẩm" value="1,405" icon={<FolderOpenOutlined />} color="bg-blue-50 text-blue-500" />
       </div>
 
       {/* Main Table */}
       <div className="bg-white p-6 rounded-[20px] shadow-sm">
-        <div className="flex flex-wrap gap-4 mb-6 justify-between">
-           <div className="flex flex-wrap gap-3 w-full md:w-auto">
-              <Input prefix={<SearchOutlined className="text-gray-400" />} placeholder="Tìm danh mục..." className="w-[250px] rounded-xl border-none bg-[#F4F7FE] h-[40px]" />
-              <Select defaultValue="all" className="w-[150px] h-[40px] custom-select-metrix bg-[#F4F7FE] rounded-xl" bordered={false}>
-                 <Option value="all">Tất cả trạng thái</Option>
-                 <Option value="active">Hiển thị</Option>
-                 <Option value="hidden">Đã ẩn</Option>
-              </Select>
-           </div>
-           <Button icon={<FilterOutlined />} className="rounded-xl h-[40px] text-gray-500">Bộ lọc</Button>
+        <div className="flex justify-between mb-6">
+           <Input 
+             prefix={<SearchOutlined className="text-gray-400" />} 
+             placeholder="Tìm kiếm danh mục..." 
+             className="w-[300px] h-[40px] rounded-xl bg-[#F4F7FE] border-none hover:bg-gray-100 focus:bg-white transition-all" 
+           />
         </div>
 
         <Table 
           columns={columns} 
           dataSource={data} 
-          pagination={{ pageSize: 6 }} 
+          loading={loading}
+          pagination={{ pageSize: 8 }} 
           className="custom-table-metrix"
         />
       </div>
@@ -186,7 +185,8 @@ const CategoryPage = () => {
       <CreateCategoryModal 
         open={isModalOpen} 
         onCancel={() => setIsModalOpen(false)} 
-        onCreate={handleCreate} 
+        onCreate={handleCreateOrUpdate}
+        initialData={editingItem}
       />
     </div>
   );

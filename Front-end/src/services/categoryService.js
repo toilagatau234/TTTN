@@ -1,31 +1,24 @@
 import axiosClient from "./axiosClient";
 
-const CATEGORY_ENDPOINT = 'http://localhost:4000/api'; // Backend route
-
 const categoryService = {
-  // Lấy tất cả danh mục
-  getAll: (params) => {
-    return axiosClient.get(CATEGORY_ENDPOINT, { params });
+  // Lấy danh sách
+  getAll: () => {
+    return axiosClient.get('/categories');
   },
-
-  // Lấy chi tiết 1 danh mục
-  get: (id) => {
-    return axiosClient.get(`${CATEGORY_ENDPOINT}/${id}`);
-  },
-
-  // Thêm mới
-  add: (data) => {
-    return axiosClient.post(CATEGORY_ENDPOINT, data);
+  
+  // Tạo mới
+  create: (data) => {
+    return axiosClient.post('/categories', data);
   },
 
   // Cập nhật
   update: (id, data) => {
-    return axiosClient.put(`${CATEGORY_ENDPOINT}/${id}`, data);
+    return axiosClient.put(`/categories/${id}`, data);
   },
 
   // Xóa
   delete: (id) => {
-    return axiosClient.delete(`${CATEGORY_ENDPOINT}/${id}`);
+    return axiosClient.delete(`/categories/${id}`);
   }
 };
 

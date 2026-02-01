@@ -6,12 +6,16 @@ const uploadService = {
     const formData = new FormData();
     formData.append('image', file);
 
-    // Gọi API. Lưu ý set header 'multipart/form-data'
+    // Gọi API.
     return axiosClient.post('/upload', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
     });
+  },
+
+  deleteImage: (publicId) => {
+    return axiosClient.delete('/upload', { data: { publicId } });
   }
 };
 

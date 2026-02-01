@@ -4,6 +4,7 @@ const cors = require('cors');
 const connectDB = require('./config/db');
 const authRoutes = require('./routes/authRoutes');
 const uploadRoutes = require('./routes/uploadRoutes');
+const categoryRoutes = require('./routes/categoryRoutes');
 
 dotenv.config();
 connectDB();
@@ -17,6 +18,7 @@ app.use(express.json()); // Đọc dữ liệu JSON
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/upload', uploadRoutes);
+app.use('/api/categories', categoryRoutes);`  `
 
 // Cổng chạy
 const PORT = process.env.PORT || 8080;

@@ -94,8 +94,8 @@ const AdminRoutes = () => {
         <Route path="staff" element={<StaffPage />} />
         <Route path="settings" element={<SettingsPage />} />
 
-        {/* Redirect mặc định: Vào /admin thì nhảy sang dashboard */}
-        <Route path="" element={<Navigate to="dashboard" replace />} />
+        {/* Redirect mặc định: Vào /admin thì nhảy sang login */}
+        <Route path="" element={<Navigate to="login" replace />} />
       </Route>
 
       {/* Xử lý đường dẫn sai 404 */}
