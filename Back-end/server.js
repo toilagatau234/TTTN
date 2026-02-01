@@ -20,6 +20,11 @@ app.use('/api/auth', authRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/categories', categoryRoutes);`  `
 
+
+// Giới hạn kích thước payload
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
 // Cổng chạy
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
