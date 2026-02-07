@@ -24,17 +24,23 @@ router.post('/', upload.single('image'), (req, res) => {
 
 // @route   DELETE /api/upload
 // @desc    Xóa ảnh trên Cloudinary
-router.delete('/', async (req, res) => {
-  try {
-    const { publicId } = req.body; // Front-end sẽ gửi publicId lên
-    if (!publicId) return res.status(400).json({ success: false, message: 'Thiếu publicId' });
+router.delete('/remove/:public_id', async (req, res) => {
+    try {
+        const { public_id } = req.params;
+        if (!public_id) {
+            return res.status(400).json({ message: 'Thiếu public_id' });
+        }
 
-    await cloudinary.uploader.destroy(publicId);
+        const result = await cloudinary.uploader.destroy(public_id);
+        
+        if (result.result !== 'ok') {
+             return res.status(500).json({ message: 'Xóa ảnh trên Cloudinary thất bại', result });
+        }
 
-    res.json({ success: true, message: 'Đã xóa ảnh thành công' });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
+        res.json({ message: 'Đã xóa ảnh thành công' });
+    } catch (error) {
+        res.status(500).json({ message: 'Lỗi server', error: error.message });
+    }
 });
 
 module.exports = router;

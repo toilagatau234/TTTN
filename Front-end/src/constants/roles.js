@@ -25,7 +25,7 @@ export const MENU_PERMISSIONS = {
   '/admin/categories':    [ROLES.ADMIN, ROLES.MANAGER, ROLES.WAREHOUSE],
   '/admin/inventory':     [ROLES.ADMIN, ROLES.MANAGER, ROLES.WAREHOUSE],
 
-  // Nhóm Quản trị (Chỉ Admin)
+  // Nhóm Quản trị
   '/admin/staff':         [ROLES.ADMIN],
   '/admin/activity-logs': [ROLES.ADMIN, ROLES.MANAGER],
   '/admin/cms/banners':   [ROLES.ADMIN, ROLES.MANAGER, ROLES.STAFF],

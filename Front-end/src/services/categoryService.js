@@ -1,25 +1,25 @@
-import axiosClient from "./axiosClient";
+import axiosClient from './axiosClient';
 
 const categoryService = {
-  // Lấy danh sách
-  getAll: () => {
-    return axiosClient.get('/categories');
-  },
-  
-  // Tạo mới
-  create: (data) => {
-    return axiosClient.post('/categories', data);
-  },
+    // Lấy danh sách danh mục
+    getAll: () => {
+        return axiosClient.get('/categories');
+    },
 
-  // Cập nhật
-  update: (id, data) => {
-    return axiosClient.put(`/categories/${id}`, data);
-  },
+    // Thêm mới danh mục
+    createCategory: (data) => {
+        return axiosClient.post('/categories', data);
+    },
 
-  // Xóa
-  delete: (id) => {
-    return axiosClient.delete(`/categories/${id}`);
-  }
+    // Xóa danh mục
+    deleteCategory: (id) => {
+        return axiosClient.delete(`/categories/${id}`);
+    },
+    
+    // Cập nhật danh mục (nếu bạn cần sau này)
+    updateCategory: (id, data) => {
+        return axiosClient.put(`/categories/${id}`, data);
+    }
 };
 
 export default categoryService;
