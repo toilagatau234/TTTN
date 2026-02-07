@@ -8,7 +8,9 @@ const CategoryPage = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState([]);
-  const [editingItem, setEditingItem] = useState(null); // Lưu item đang sửa
+  const [filteredData, setFilteredData] = useState([]);
+  const [searchText, setSearchText] = useState('');
+  const [editingItem, setEditingItem] = useState(null);
 
   // 1. Hàm gọi API lấy danh sách
   const fetchData = async () => {
@@ -19,6 +21,7 @@ const CategoryPage = () => {
         // Gán key cho Table của Antd (dùng _id của MongoDB)
         const mappedData = res.data.map(item => ({ ...item, key: item._id }));
         setData(mappedData);
+        setFilteredData(mappedData);
       }
     } catch (error) {
       message.error("Không thể tải danh sách danh mục");
@@ -31,6 +34,19 @@ const CategoryPage = () => {
   useEffect(() => {
     fetchData();
   }, []);
+
+  // Xử lý tìm kiếm
+  useEffect(() => {
+    if (searchText.trim() === '') {
+      setFilteredData(data);
+    } else {
+      const filtered = data.filter(item =>
+        item.name.toLowerCase().includes(searchText.toLowerCase()) ||
+        (item.description && item.description.toLowerCase().includes(searchText.toLowerCase()))
+      );
+      setFilteredData(filtered);
+    }
+  }, [searchText, data]);
 
   // 2. Xử lý Thêm mới hoặc Cập nhật
   const handleCreateOrUpdate = async (formData) => {
@@ -151,7 +167,6 @@ const CategoryPage = () => {
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <div>
-
         </div>
         <Button
           type="primary"
@@ -168,16 +183,25 @@ const CategoryPage = () => {
         <div className="flex justify-between mb-6">
           <Input
             prefix={<SearchOutlined className="text-gray-400" />}
-            placeholder="Tìm kiếm danh mục..."
-            className="w-[300px] h-[40px] rounded-xl bg-[#F4F7FE] border-none hover:bg-gray-100 focus:bg-white transition-all"
+            placeholder="Tìm kiếm theo tên hoặc mô tả..."
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+            allowClear
+            className="w-[400px] h-[40px] rounded-xl bg-[#F4F7FE] border-none hover:bg-gray-100 focus:bg-white transition-all"
           />
+          <div className="text-gray-500">
+            Tổng: <span className="font-semibold text-navy-700">{filteredData.length}</span> danh mục
+          </div>
         </div>
 
         <Table
           columns={columns}
-          dataSource={data}
+          dataSource={filteredData}
           loading={loading}
-          pagination={{ pageSize: 8 }}
+          pagination={{
+            pageSize: 8,
+            showTotal: (total, range) => `${range[0]}-${range[1]} của ${total} danh mục`,
+          }}
           className="custom-table-metrix"
         />
       </div>

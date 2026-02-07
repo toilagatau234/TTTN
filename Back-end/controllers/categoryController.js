@@ -16,11 +16,12 @@ const createCategory = async (req, res) => {
   try {
     const { name, description } = req.body;
 
-    let imageUrl = '';
-    let publicId = '';
+    let imageUrl = req.body.image || ''; // Lấy từ body (nếu frontend gửi link)
+    let publicId = req.body.publicId || '';
 
+    // Nếu có file upload kèm theo (legacy/fallback) -> ghi đè
     if (req.file) {
-      imageUrl = req.file.path;      // Đây mới là chuỗi URL chuẩn (String)
+      imageUrl = req.file.path;
       publicId = req.file.filename;
     }
 
@@ -28,18 +29,20 @@ const createCategory = async (req, res) => {
       name,
       description,
       image: imageUrl,
-      publicId: publicId // Save the publicId to DB
+      publicId: publicId
     });
 
     await newCategory.save();
-    res.status(201).json(newCategory);
+    res.status(201).json({ success: true, data: newCategory });
 
   } catch (error) {
-    // Xóa ảnh trên cloudinary nếu lưu DB thất bại để tránh rác
+    // Xóa ảnh trên cloudinary nếu lưu DB thất bại (chỉ khi upload qua multer)
     if (req.file && req.file.filename) {
       await cloudinary.uploader.destroy(req.file.filename);
     }
-    res.status(500).json({ message: error.message });
+    // Nếu upload client-side, frontend tự lo hoặc ta có thể handle xóa ở đây nếu muốn (nhưng cần publicId)
+    // Tạm thời chỉ cleanup file do multer tạo ra
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -54,27 +57,34 @@ const updateCategory = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Category not found' });
     }
 
-    // Handle image update
+    // Xử lý ảnh:
+    // 1. Nếu có file upload (multer)
     if (req.file) {
-      // Delete old image if exists
+      // Xóa ảnh cũ
       if (category.publicId) {
         await cloudinary.uploader.destroy(category.publicId);
-      } else if (category.image) {
-        // Try to extract publicId from url if not saved in DB (legacy data)
-        try {
-          const publicId = category.image.split('/').slice(-1)[0].split('.')[0];
-          await cloudinary.uploader.destroy(publicId);
-        } catch (e) {
-          console.log("Could not extract publicId from image url", e);
-        }
       }
-
       category.image = req.file.path;
       category.publicId = req.file.filename;
     }
+    // 2. Nếu có image URL từ body (client-side upload) VÀ khác ảnh cũ
+    else if (req.body.image && req.body.image !== category.image) {
+      // Xóa ảnh cũ trước khi cập nhật mới
+      if (category.publicId) {
+        await cloudinary.uploader.destroy(category.publicId);
+      }
+      category.image = req.body.image;
+      category.publicId = req.body.publicId || '';
+    }
+    // 3. Nếu image = "" (muốn xóa ảnh)
+    else if (req.body.image === "" && category.publicId) {
+      await cloudinary.uploader.destroy(category.publicId);
+      category.image = "";
+      category.publicId = "";
+    }
 
     category.name = name || category.name;
-    category.description = description || category.description;
+    category.description = description !== undefined ? description : category.description;
     if (isActive !== undefined) category.isActive = isActive;
 
     const updatedCategory = await category.save();

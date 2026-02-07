@@ -5,6 +5,7 @@ const connectDB = require('./config/db');
 const authRoutes = require('./routes/authRoutes');
 const uploadRoutes = require('./routes/uploadRoutes');
 const categoryRoutes = require('./routes/categoryRoutes');
+const productRoutes = require('./routes/productRoutes');
 
 dotenv.config();
 connectDB();
@@ -18,7 +19,8 @@ app.use(express.json()); // Đọc dữ liệu JSON
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/upload', uploadRoutes);
-app.use('/api/categories', categoryRoutes);`  `
+app.use('/api/categories', categoryRoutes);
+app.use('/api/products', productRoutes);
 
 
 // Giới hạn kích thước payload
