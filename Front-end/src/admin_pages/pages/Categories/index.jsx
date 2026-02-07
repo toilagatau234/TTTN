@@ -37,14 +37,14 @@ const CategoryPage = () => {
     try {
       if (editingItem) {
         // Nếu đang sửa -> Gọi API Update
-        await categoryService.update(editingItem._id, formData);
+        await categoryService.updateCategory(editingItem._id, formData);
         message.success('Cập nhật thành công!');
       } else {
         // Nếu tạo mới -> Gọi API Create
-        await categoryService.create(formData);
+        await categoryService.createCategory(formData);
         message.success('Tạo danh mục mới thành công!');
       }
-      
+
       setIsModalOpen(false);
       fetchData(); // Load lại bảng dữ liệu
     } catch (error) {
@@ -55,7 +55,7 @@ const CategoryPage = () => {
   // 3. Xử lý Xóa
   const handleDelete = async (id) => {
     try {
-      await categoryService.delete(id);
+      await categoryService.deleteCategory(id);
       message.success('Đã xóa danh mục');
       fetchData(); // Load lại bảng
     } catch (error) {
@@ -82,11 +82,11 @@ const CategoryPage = () => {
       key: 'image',
       width: 100,
       render: (img) => (
-        <Avatar 
-          shape="square" 
-          size={64} 
-          src={img} 
-          icon={<FileImageOutlined />} 
+        <Avatar
+          shape="square"
+          size={64}
+          src={img}
+          icon={<FileImageOutlined />}
           className="rounded-lg border border-gray-200 bg-gray-50"
         />
       ),
@@ -120,11 +120,11 @@ const CategoryPage = () => {
       width: 120,
       render: (_, record) => (
         <div className="flex gap-2">
-          <Button 
-            icon={<EditOutlined />} 
-            size="small" 
+          <Button
+            icon={<EditOutlined />}
+            size="small"
             className="text-blue-500 border-blue-100 hover:bg-blue-50"
-            onClick={() => openEditModal(record)} 
+            onClick={() => openEditModal(record)}
           />
           <Popconfirm
             title="Xóa danh mục?"
@@ -134,10 +134,10 @@ const CategoryPage = () => {
             cancelText="Hủy"
             okButtonProps={{ danger: true }}
           >
-            <Button 
-              icon={<DeleteOutlined />} 
-              size="small" 
-              danger 
+            <Button
+              icon={<DeleteOutlined />}
+              size="small"
+              danger
               className="border-red-100 hover:bg-red-50"
             />
           </Popconfirm>
@@ -151,11 +151,11 @@ const CategoryPage = () => {
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <div>
-          
+
         </div>
-        <Button 
-          type="primary" 
-          icon={<PlusOutlined />} 
+        <Button
+          type="primary"
+          icon={<PlusOutlined />}
           onClick={openCreateModal}
           className="bg-brand-500 h-10 px-6 rounded-xl font-bold shadow-lg shadow-brand-500/50 border-none hover:bg-brand-600"
         >
@@ -166,26 +166,26 @@ const CategoryPage = () => {
       {/* Main Table */}
       <div className="bg-white p-6 rounded-[20px] shadow-sm">
         <div className="flex justify-between mb-6">
-           <Input 
-             prefix={<SearchOutlined className="text-gray-400" />} 
-             placeholder="Tìm kiếm danh mục..." 
-             className="w-[300px] h-[40px] rounded-xl bg-[#F4F7FE] border-none hover:bg-gray-100 focus:bg-white transition-all" 
-           />
+          <Input
+            prefix={<SearchOutlined className="text-gray-400" />}
+            placeholder="Tìm kiếm danh mục..."
+            className="w-[300px] h-[40px] rounded-xl bg-[#F4F7FE] border-none hover:bg-gray-100 focus:bg-white transition-all"
+          />
         </div>
 
-        <Table 
-          columns={columns} 
-          dataSource={data} 
+        <Table
+          columns={columns}
+          dataSource={data}
           loading={loading}
-          pagination={{ pageSize: 8 }} 
+          pagination={{ pageSize: 8 }}
           className="custom-table-metrix"
         />
       </div>
 
-      <CreateCategoryModal 
-        open={isModalOpen} 
-        onCancel={() => setIsModalOpen(false)} 
-        onCreate={handleCreateOrUpdate}
+      <CreateCategoryModal
+        open={isModalOpen}
+        onCancel={() => setIsModalOpen(false)}
+        onSuccess={handleCreateOrUpdate}
         initialData={editingItem}
       />
     </div>

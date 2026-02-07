@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Modal, Form, Input, Button, Upload, message } from 'antd';
-import { UploadOutlined } from '@ant-design/icons';
+import { UploadOutlined, PictureOutlined } from '@ant-design/icons';
 import categoryService from '../../../../services/categoryService';
+import './CreateCategoryModal.css';
 
 const getBase64 = (file) =>
     new Promise((resolve, reject) => {
@@ -11,16 +12,41 @@ const getBase64 = (file) =>
         reader.onerror = (error) => reject(error);
     });
 
-const CreateCategoryModal = ({ open, onCancel, onSuccess }) => {
+const CreateCategoryModal = ({ open, onCancel, onSuccess, initialData }) => {
     const [form] = Form.useForm();
     const [loading, setLoading] = useState(false);
-    
+
     // State lưu file gốc (binary) để gửi lên server
-    const [fileList, setFileList] = useState([]); 
-    
+    const [fileList, setFileList] = useState([]);
+
     const [previewOpen, setPreviewOpen] = useState(false);
     const [previewImage, setPreviewImage] = useState('');
     const [previewTitle, setPreviewTitle] = useState('');
+
+    // Effect để load data khi sửa
+    React.useEffect(() => {
+        if (open) {
+            if (initialData) {
+                form.setFieldsValue({
+                    name: initialData.name,
+                    description: initialData.description
+                });
+                if (initialData.image) {
+                    setFileList([{
+                        uid: '-1',
+                        name: 'image.png',
+                        status: 'done',
+                        url: initialData.image,
+                    }]);
+                } else {
+                    setFileList([]);
+                }
+            } else {
+                form.resetFields();
+                setFileList([]);
+            }
+        }
+    }, [open, initialData, form]);
 
     // Hàm xử lý khi chọn ảnh
     const handleUploadChange = ({ fileList: newFileList }) => {
@@ -30,6 +56,16 @@ const CreateCategoryModal = ({ open, onCancel, onSuccess }) => {
 
     // Chặn hành động upload tự động mặc định của Ant Design
     const beforeUpload = (file) => {
+        const isImage = file.type.startsWith('image/');
+        if (!isImage) {
+            message.error('Bạn chỉ có thể upload file ảnh!');
+            return Upload.LIST_IGNORE;
+        }
+        const isLt5M = file.size / 1024 / 1024 < 5;
+        if (!isLt5M) {
+            message.error('Kích thước ảnh phải nhỏ hơn 5MB!');
+            return Upload.LIST_IGNORE;
+        }
         return false;
     };
 
@@ -52,20 +88,20 @@ const CreateCategoryModal = ({ open, onCancel, onSuccess }) => {
             formData.append('name', values.name);
             formData.append('description', values.description || '');
 
-            if (fileList.length > 0) {
+            if (fileList.length > 0 && fileList[0].originFileObj) {
                 formData.append('image', fileList[0].originFileObj);
             }
 
-            await categoryService.createCategory(formData);
+            // Gọi hàm submit từ prop (Create hoặc Update)
+            await onSuccess(formData);
 
-            message.success('Thêm danh mục thành công!');
             form.resetFields();
             setFileList([]); // Reset file
-            onSuccess(); // Refresh lại bảng danh mục
             onCancel();  // Đóng modal
 
         } catch (error) {
-            message.error('Có lỗi xảy ra: ' + (error.response?.data?.message || error.message));
+            // Lỗi sẽ được catch ở parent, nhưng nếu có lỗi ở đây thì log ra
+            console.error("Submit error", error);
         } finally {
             setLoading(false);
         }
@@ -73,56 +109,99 @@ const CreateCategoryModal = ({ open, onCancel, onSuccess }) => {
 
     return (
         <>
-        <Modal
-            title="Thêm mới danh mục"
-            open={open}
-            onCancel={onCancel}
-            footer={null}
-        >
-            <Form form={form} layout="vertical" onFinish={onFinish}>
-                <Form.Item
-                    label="Tên danh mục"
-                    name="name"
-                    rules={[{ required: true, message: 'Vui lòng nhập tên!' }]}
-                >
-                    <Input placeholder="Nhập tên danh mục..." />
-                </Form.Item>
-
-                <Form.Item label="Mô tả" name="description">
-                    <Input.TextArea rows={3} placeholder="Nhập mô tả..." />
-                </Form.Item>
-
-                <Form.Item label="Hình ảnh">
-                    {/* Upload Component của AntD */}
-                    <Upload
-                        listType="picture-card"
-                        fileList={fileList}
-                        onPreview={handlePreview}
-                        onChange={handleUploadChange}
-                        beforeUpload={beforeUpload}
-                        maxCount={1}
-                        accept="image/*"
+            <Modal
+                title={
+                    <div className="modal-header-custom">
+                        <PictureOutlined className="modal-icon" />
+                        <span>{initialData ? "Cập nhật danh mục" : "Thêm mới danh mục"}</span>
+                    </div>
+                }
+                open={open}
+                onCancel={onCancel}
+                footer={null}
+                className="category-modal"
+                width={600}
+                centered
+                destroyOnClose
+            >
+                <Form form={form} layout="vertical" onFinish={onFinish} className="category-form">
+                    <Form.Item
+                        label={<span className="form-label">Tên danh mục</span>}
+                        name="name"
+                        rules={[{ required: true, message: 'Vui lòng nhập tên danh mục!' }]}
                     >
-                        {fileList.length < 1 && (
-                            <div>
-                                <UploadOutlined />
-                                <div style={{ marginTop: 8 }}>Chọn ảnh</div>
-                            </div>
-                        )}
-                    </Upload>
-                </Form.Item>
+                        <Input
+                            placeholder="Nhập tên danh mục..."
+                            size="large"
+                            className="form-input"
+                        />
+                    </Form.Item>
 
-                <div className="flex justify-end gap-2 mt-4">
-                    <Button onClick={onCancel}>Hủy</Button>
-                    <Button type="primary" htmlType="submit" loading={loading}>
-                        Lưu lại
-                    </Button>
-                </div>
-            </Form>
-        </Modal>
-        <Modal open={previewOpen} title={previewTitle} footer={null} onCancel={handleCancelPreview}>
-            <img alt="example" style={{ width: '100%' }} src={previewImage} />
-        </Modal>
+                    <Form.Item
+                        label={<span className="form-label">Mô tả</span>}
+                        name="description"
+                    >
+                        <Input.TextArea
+                            rows={3}
+                            placeholder="Nhập mô tả..."
+                            className="form-input"
+                        />
+                    </Form.Item>
+
+                    <Form.Item label={<span className="form-label">Hình ảnh</span>}>
+                        <div className="upload-container">
+                            <Upload
+                                listType="picture-card"
+                                fileList={fileList}
+                                onPreview={handlePreview}
+                                onChange={handleUploadChange}
+                                beforeUpload={beforeUpload}
+                                maxCount={1}
+                                accept="image/*"
+                                className="custom-upload"
+                            >
+                                {fileList.length < 1 && (
+                                    <div className="upload-placeholder">
+                                        <UploadOutlined className="upload-icon" />
+                                        <div className="upload-text">Chọn ảnh</div>
+                                        <div className="upload-hint">PNG, JPG, WEBP (tối đa 5MB)</div>
+                                    </div>
+                                )}
+                            </Upload>
+                        </div>
+                    </Form.Item>
+
+                    <div className="form-footer">
+                        <Button
+                            onClick={onCancel}
+                            size="large"
+                            className="btn-cancel"
+                        >
+                            Hủy
+                        </Button>
+                        <Button
+                            type="primary"
+                            htmlType="submit"
+                            loading={loading}
+                            size="large"
+                            className="btn-submit"
+                        >
+                            {loading ? 'Đang lưu...' : 'Lưu lại'}
+                        </Button>
+                    </div>
+                </Form>
+            </Modal>
+
+            <Modal
+                open={previewOpen}
+                title={previewTitle}
+                footer={null}
+                onCancel={handleCancelPreview}
+                className="preview-modal"
+                centered
+            >
+                <img alt="preview" style={{ width: '100%' }} src={previewImage} />
+            </Modal>
         </>
     );
 };
