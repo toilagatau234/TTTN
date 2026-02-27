@@ -1,0 +1,58 @@
+# Dependencies & Environments
+node_modules/
+venv/
+env/
+.env
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# IDEs & System
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Build & Distribution
+dist/
+build/
+out/
+.next/
+.vite/
+**/android/
+**/ios/
+**/bin/
+**/obj/
+
+# Notebooks & Temporary
+.ipynb_checkpoints
+*.ipynb
+tmp/
+temp/
+logs/
+*.log
+
+# AI Models & Large Binaries
+*.pt
+*.pth
+*.weights
+*.h5
+*.onnx
+*.pb
+*.bin
+*.npy
+*.npz
+*.joblib
+model_weights/
+data/
+*.zip
+*.rar
+*.7z
+*.tar
+*.gz
+*.mp4
+*.exe
+*.dll

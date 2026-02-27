@@ -1,3 +1,4 @@
 {
-    "cmake.sourceDirectory": "D:/TTTN/mobile_app/linux"
+    "cmake.sourceDirectory": "D:/TTTN/mobile_app/linux",
+    "git.ignoreLimitWarning": true
 }
