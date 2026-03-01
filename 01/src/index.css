@@ -1,0 +1,410 @@
+@import "tailwindcss";
+@plugin "daisyui";
+
+/* footer*/
+.flower {
+  position: absolute;
+  top: -120px;
+  width: 40px;
+  opacity: 0;
+  animation: fallFloat linear infinite;
+}
+
+/* từng hoa vị trí + tốc độ khác nhau */
+
+.flower1 {
+  left: 10%;
+  animation-duration: 8s;
+  animation-delay: 0s;
+}
+
+.flower2 {
+  left: 30%;
+  width: 35px;
+  animation-duration: 8s;
+  animation-delay: 2s;
+}
+
+.flower3 {
+  left: 55%;
+  width: 45px;
+  animation-duration: 8s;
+  animation-delay: 4s;
+}
+
+.flower4 {
+  left: 75%;
+  width: 38px;
+  animation-duration: 8s;
+  animation-delay: 1s;
+}
+
+.flower5 {
+  left: 90%;
+  width: 32px;
+  animation-duration: 8s;
+  animation-delay: 3s;
+}
+
+@keyframes fallFloat {
+  0% {
+    transform: translateY(0px) translateX(0px) rotate(0deg);
+    opacity: 0;
+  }
+
+  15% {
+    opacity: 1;
+  }
+
+  50% {
+    transform: translateY(350px) translateX(40px) rotate(180deg);
+  }
+
+  100% {
+    transform: translateY(700px) translateX(-40px) rotate(360deg);
+    opacity: 0;
+  }
+}
+
+/* banner*/
+/* Fade up */
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fadeUp {
+  animation: fadeUp 1s ease forwards;
+}
+
+/* Hoa lơ lửng */
+@keyframes floatBanner {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-20px); }
+  100% { transform: translateY(0px); }
+}
+
+@keyframes floatBanner2 {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(15px); }
+  100% { transform: translateY(0px); }
+}
+
+.animate-floatBanner {
+  animation: floatBanner 4s ease-in-out infinite;
+}
+
+.animate-floatBanner2 {
+  animation: floatBanner2 4s ease-in-out infinite;
+}
+
+/* Ảnh nổi nhẹ */
+@keyframes floatImage {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-15px); }
+  100% { transform: translateY(0px); }
+}
+
+.animate-floatImage {
+  animation: floatImage 5s ease-in-out infinite;
+}
+
+/* Google font */
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap');
+
+@theme{
+  --font-inter:"Inter", sans-serif;
+}
+
+.banner_lide_item {
+  display: flex !important;
+  justify-content: space-between;
+  align-items: center;
+}
+
+
+/*shop*/
+/* ===== CARD ===== */
+
+.product-card {
+  background: #ffffff;
+  border-radius: 28px;
+  padding: 20px;
+  text-align: center;
+  transition: all 0.4s ease;
+  position: relative;
+}
+
+.product-card:hover {
+  transform: translateY(-8px);
+}
+
+/* ===== IMAGE WRAPPER ===== */
+
+.image-wrapper {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 220px;
+}
+
+/* Ánh sáng phía sau */
+.light-glow {
+  position: absolute;
+  width: 160px;
+  height: 160px;
+  background: radial-gradient(circle, #f45aaf 0%, transparent 70%);
+  border-radius: 50%;
+  filter: blur(40px);
+  opacity: 0.6;
+}
+
+/* Ảnh treo lơ lửng */
+.product-image {
+  height: 180px;
+  object-fit: contain;
+  position: relative;
+  z-index: 2;
+}
+
+/* Hiệu ứng treo */
+@keyframes float {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+  100% { transform: translateY(0px); }
+}
+
+/* Heart */
+.heart-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: white;
+  padding: 6px;
+  border-radius: 50%;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+.heart-btn:hover {
+  transform: scale(1.1);
+}
+
+/* ===== CONTENT ===== */
+
+.product-title {
+  font-size: 14px;
+  color: #555;
+  margin-top: 10px;
+  min-height: 40px;
+}
+
+.old-price {
+  color: #bbb;
+  text-decoration: line-through;
+  font-size: 13px;
+}
+
+.new-price {
+  color: #ec4899;
+  font-weight: bold;
+  font-size: 18px;
+}
+
+.product-meta {
+  font-size: 12px;
+  color: #999;
+  margin-bottom: 10px;
+}
+
+/* ===== BUTTON ===== */
+
+.button-group {
+  margin-top: 10px;
+  
+}
+
+.btn-cart {
+  width: 100%;
+  background: #edffc5;
+  color: #2f5d3a;
+  border: none;
+  padding: 10px;
+  border-radius: 14px;
+  transition: all 0.3s ease;
+  font-weight: 500;
+}
+
+.btn-cart:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(16, 185, 129, 0.3);
+}
+
+.btn-buy {
+  width: 100%;
+  margin-top: 8px;
+  border: 1px solid #ec4899;
+  color: #ec4899;
+  background: white;
+  padding: 9px;
+  border-radius: 20px;
+  transition: all 0.3s ease;
+}
+
+.btn-buy:hover {
+  background: #ec4899;
+  color: white;
+  transform: scale(1.05);
+}
+
+
+
+
+/*rating-shop*/
+.star-wrapper {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  background: #fef9c3; 
+  border-radius: 50%;
+  margin-right: 6px;
+}
+
+.star-icon {
+  color: #f59e0b; 
+  stroke-width: 2;
+  fill: none; 
+}
+
+.rating-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-size: 13px;
+  color: #555; 
+}
+
+
+
+.shop-sub {
+  font-size: 14px;
+  color: #f472b6;
+  margin-top: 8px;
+}
+
+
+
+.shop-wrapper {
+  position: relative;
+}
+/*hoa roi ben shop*/
+.floweru {
+    position: fixed;   
+    top: -50px;
+    width: 40px;
+    opacity: 1;
+    pointer-events: none;
+    animation: fall linear infinite;
+  }
+
+  /* từng hoa có vị trí & tốc độ khác nhau */
+
+  .f1 {
+    left: 10%;
+    animation-duration: 8s;
+  }
+
+  .f2 {
+    left: 30%;
+    animation-duration: 10s;
+    animation-delay: 2s;
+  }
+
+  .f3 {
+    left: 55%;
+    animation-duration: 9s;
+    animation-delay: 1s;
+  }
+
+  .f4 {
+    left: 75%;
+    animation-duration: 11s;
+    animation-delay: 3s;
+  }
+
+  .f5 {
+    left: 90%;
+    animation-duration: 7s;
+    animation-delay: 4s;
+  }
+
+  @keyframes fall {
+    0% {
+      transform: translateY(0) rotate(0deg);
+    }
+    100% {
+      transform: translateY(110vh) rotate(360deg);
+    }
+  }
+
+
+  /*hoa roi ben yeuthich*/
+.floweruy {
+    position: fixed;   
+    top: -50px;
+    width: 40px;
+    opacity: 1;
+    pointer-events: none;
+    animation: fall linear infinite;
+  }
+
+  /* từng hoa có vị trí & tốc độ khác nhau */
+
+  .f1 {
+    left: 10%;
+    animation-duration: 8s;
+  }
+
+  .f2 {
+    left: 30%;
+    animation-duration: 10s;
+    animation-delay: 2s;
+  }
+
+  .f3 {
+    left: 55%;
+    animation-duration: 9s;
+    animation-delay: 1s;
+  }
+
+  .f4 {
+    left: 75%;
+    animation-duration: 11s;
+    animation-delay: 3s;
+  }
+
+  .f5 {
+    left: 90%;
+    animation-duration: 7s;
+    animation-delay: 4s;
+  }
+
+  @keyframes fall {
+    0% {
+      transform: translateY(0) rotate(0deg);
+    }
+    100% {
+      transform: translateY(110vh) rotate(360deg);
+    }
+  }
