@@ -1,6 +1,7 @@
 import { Outlet } from "react-router-dom";
 import Navbar from "../components/common/user/Navbar/Navbar";
 import Footer from "../components/common/user/Footer/Footer";
+import ChatWidget from "../components/common/user/ChatWidget/ChatWidget";
 
 /**
  * UserLayout — giao diện khách hàng.
@@ -13,6 +14,8 @@ const UserLayout = () => {
             <Navbar />
             <Outlet />
             <Footer />
+            {/* Tích hợp Chatbot AI vào toàn bộ các trang của Client */}
+            <ChatWidget />
         </>
     );
 };

@@ -1,12 +1,12 @@
 const express = require('express');
 const router = express.Router();
-const aiController = require('../controllers/aiController');
+const irisController = require('../controllers/iris.controller');
 const hydrangeaController = require('../controllers/hydrangeaController');
 
-// Route xử lý toàn bộ hội thoại với chatbot AI
-router.post('/chat', aiController.chatWithAI);
+// Route xử lý hội thoại với chatbot Iris (CSKH - Widget popup)
+router.post('/iris/chat', irisController.chatWithIris);
 
-// Route xử lý toàn bộ hội thoại với chatbot Hydrangea
-router.post('/chat', hydrangeaController.processChat);
+// Route xử lý hội thoại với chatbot Hydrangea (Thiết kế giỏ hoa)
+router.post('/hydrangea/chat', hydrangeaController.processChat);
 
 module.exports = router;

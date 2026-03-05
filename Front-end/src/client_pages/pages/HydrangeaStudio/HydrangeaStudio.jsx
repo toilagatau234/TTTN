@@ -1,0 +1,240 @@
+import React, { useState, useRef, useEffect } from 'react';
+import axios from 'axios';
+import { Send, Image as ImageIcon, Sparkles, CheckCircle, RefreshCcw, ShoppingCart } from 'lucide-react';
+
+const HydrangeaStudio = () => {
+    // ---- State ----
+    const [messages, setMessages] = useState([
+        { role: 'bot', text: 'Chào mừng bạn đến với Studio Thiết Kế của Rosee! Tớ là Hydrangea 🌸. Bạn muốn thiết kế giỏ hoa tông màu gì, và bạn thích loại hoa nào nhất?' }
+    ]);
+    const [inputText, setInputText] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
+    const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+    const [generatedImage, setGeneratedImage] = useState(null);
+    const [currentEntities, setCurrentEntities] = useState({});
+    const [showConfirmBtn, setShowConfirmBtn] = useState(false);
+    const [sessionId] = useState(() => `sess_${Math.random().toString(36).substring(2, 9)}`); // Auto generate a simple session ID
+
+    const chatEndRef = useRef(null);
+
+    // Auto scroll chat
+    useEffect(() => {
+        chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, [messages]);
+
+    // ---- Handlers ----
+    const handleSendMessage = async (e) => {
+        e.preventDefault();
+        if (!inputText.trim() || isLoading || isGeneratingImage) return;
+
+        const userMsg = { role: 'user', text: inputText };
+        setMessages(prev => [...prev, userMsg]);
+        setInputText('');
+        setIsLoading(true);
+
+        try {
+            const response = await axios.post('http://localhost:8080/api/ai/hydrangea/chat', {
+                sessionId: sessionId,
+                message: userMsg.text
+            });
+
+            const { success, reply, extractedEntities } = response.data;
+
+            if (success) {
+                setMessages(prev => [...prev, { role: 'bot', text: reply }]);
+                if (extractedEntities) {
+                    setCurrentEntities(extractedEntities);
+                }
+
+                // Hiển thị nút xác nhận nếu bot hỏi (kiểm tra dấu hiệu từ bot reply - Có chữ "Xác nhận")
+                if (reply.toLowerCase().includes("nhấn xác nhận")) {
+                    setShowConfirmBtn(true);
+                } else {
+                    setShowConfirmBtn(false);
+                }
+            } else {
+                setMessages(prev => [...prev, { role: 'bot', text: 'Có lỗi xảy ra, mong bạn thử lại sau.' }]);
+            }
+        } catch (error) {
+            console.error("Hydrangea API Error:", error);
+            setMessages(prev => [...prev, { role: 'bot', text: 'Máy chủ đang mệt, bạn thông cảm nhé!' }]);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleConfirmDesign = async () => {
+        setShowConfirmBtn(false);
+        setIsGeneratingImage(true);
+        setMessages(prev => [...prev, { role: 'user', text: '(Click) Tôi xác nhận bản phác thảo này!' }]);
+        setMessages(prev => [...prev, { role: 'bot', text: 'Đang kết nối tới Họa sĩ AI Gemini để vẽ tác phẩm của bạn. Vui lòng đợi nhé... 🎨' }]);
+
+        try {
+            const response = await axios.post('http://localhost:8080/api/ai/hydrangea/chat', {
+                sessionId: sessionId,
+                isConfirming: true
+            });
+
+            const { success, reply, image } = response.data;
+            if (success) {
+                setMessages(prev => [...prev, { role: 'bot', text: reply }]);
+                if (image) {
+                    setGeneratedImage(image);
+                }
+            } else {
+                setMessages(prev => [...prev, { role: 'bot', text: 'Rất tiếc, tác phẩm vẽ bị lỗi.' }]);
+            }
+        } catch (error) {
+            console.error("Gemini Image API Error:", error);
+            setMessages(prev => [...prev, { role: 'bot', text: 'Lỗi sinh ảnh từ Gemini, bạn vui lòng thử lại sau.' }]);
+        } finally {
+            setIsGeneratingImage(false);
+        }
+    };
+
+    return (
+        <div className="min-h-screen bg-[#FDFBF7] pt-24 pb-12">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+
+                {/* Tiêu đề & Giới thiệu */}
+                <div className="text-center mb-10">
+                    <h1 className="text-4xl font-extrabold text-pink-600 tracking-tight flex items-center justify-center gap-2">
+                        <Sparkles className="text-yellow-400" /> Hydrangea Studio <Sparkles className="text-yellow-400" />
+                    </h1>
+                    <p className="mt-3 text-lg text-gray-600 max-w-2xl mx-auto">
+                        Mô tả giỏ hoa trong mơ của bạn, AI của Rosee sẽ lựa hoa thật từ kho và vẽ bản phác thảo 3D dành riêng cho bạn!
+                    </p>
+                </div>
+
+                {/* Main Dashboard Layout (Chia 2 cột) */}
+                <div className="flex flex-col lg:flex-row gap-8 bg-white rounded-3xl shadow-xl overflow-hidden border border-pink-100">
+
+                    {/* Cột 1: Chat Interface */}
+                    <div className="w-full lg:w-1/2 flex flex-col border-r border-pink-50 min-h-[600px] h-[70vh]">
+                        {/* Chat Header */}
+                        <div className="p-5 border-b border-pink-50 bg-pink-50/30 flex items-center gap-4">
+                            <div className="w-12 h-12 rounded-full overflow-hidden bg-white shadow-sm border border-pink-200">
+                                <img src="/logo-rosee.png" alt="Hydrangea AI" className="w-full h-full object-contain" onError={(e) => { e.target.src = "https://ui-avatars.com/api/?name=IA&background=EC4899&color=fff"; }} />
+                            </div>
+                            <div>
+                                <h2 className="font-bold text-gray-800">Trợ Lý Hydrangea</h2>
+                                <p className="text-xs text-green-500 font-medium tracking-wide">● Sẵn sàng phục vụ ({currentEntities.flower ? `Đã nhận diện: ${currentEntities.flower}` : 'Đang xử lý'})</p>
+                            </div>
+                        </div>
+
+                        {/* Chat Messages */}
+                        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                            {messages.map((msg, idx) => (
+                                <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                    <div className={`max-w-[85%] rounded-2xl px-5 py-3 ${msg.role === 'user'
+                                        ? 'bg-pink-500 text-white rounded-tr-sm shadow-md'
+                                        : 'bg-gray-50 text-gray-800 border border-gray-100 rounded-tl-sm shadow-sm'
+                                        }`}>
+                                        <p className="leading-relaxed">{msg.text}</p>
+                                    </div>
+                                </div>
+                            ))}
+
+                            {/* Nút Confirm (Thỉnh thoảng hiện ra khi AI kích hoạt) */}
+                            {showConfirmBtn && !isGeneratingImage && !generatedImage && (
+                                <div className="flex justify-start pt-2">
+                                    <button
+                                        onClick={handleConfirmDesign}
+                                        className="bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-full shadow-lg font-semibold tracking-wide transition-all transform hover:-translate-y-1 flex items-center gap-2 animate-bounce-slow"
+                                    >
+                                        <CheckCircle size={18} /> Xác Nhận Thiết Kế & Vẽ Mẫu
+                                    </button>
+                                </div>
+                            )}
+
+                            {/* Loading State */}
+                            {(isLoading || isGeneratingImage) && (
+                                <div className="flex justify-start items-center gap-2">
+                                    <div className="w-2 h-2 rounded-full bg-pink-300 animate-pulse"></div>
+                                    <div className="w-2 h-2 rounded-full bg-pink-300 animate-pulse delay-75"></div>
+                                    <div className="w-2 h-2 rounded-full bg-pink-300 animate-pulse delay-150"></div>
+                                    <span className="text-xs text-gray-400 ml-2 italic">
+                                        {isGeneratingImage ? "Đang gọi Gemini AI API..." : "Đang kết nối PhoBERT NLP..."}
+                                    </span>
+                                </div>
+                            )}
+                            <div ref={chatEndRef} />
+                        </div>
+
+                        {/* Chat Input */}
+                        <div className="p-4 bg-white border-t border-pink-50">
+                            <form onSubmit={handleSendMessage} className="relative flex items-center">
+                                <input
+                                    type="text"
+                                    disabled={isLoading || isGeneratingImage}
+                                    placeholder="Thử nhập: Một giỏ hoa hồng phấn lãng mạn cỡ 500k..."
+                                    className="w-full bg-gray-50 border border-gray-200 text-gray-800 px-6 py-4 rounded-full pr-16 focus:outline-none focus:ring-2 focus:ring-pink-300 transition-all shadow-inner"
+                                    value={inputText}
+                                    onChange={(e) => setInputText(e.target.value)}
+                                />
+                                <button
+                                    type="submit"
+                                    disabled={!inputText.trim() || isLoading || isGeneratingImage}
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 bg-pink-500 hover:bg-pink-600 disabled:bg-gray-300 text-white rounded-full flex justify-center items-center shadow transition-colors"
+                                >
+                                    <Send size={18} className="translate-x-[1px] translate-y-[1px]" />
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+
+                    {/* Cột 2: Right Panel (Image Preview & Checkout) */}
+                    <div className="w-full lg:w-1/2 bg-pink-50/20 p-8 flex flex-col items-center justify-center relative min-h-[600px]">
+                        {/* Decorative background */}
+                        <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-20">
+                            <svg className="absolute left-[10%] top-[10%] w-64 h-64 text-pink-300 transform -rotate-12" fill="currentColor" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" /></svg>
+                        </div>
+
+                        {generatedImage ? (
+                            <div className="relative z-10 w-full max-w-sm mx-auto animate-fade-in-up">
+                                <div className="bg-white p-4 pb-6 rounded-2xl shadow-xl border border-pink-100 transform rotate-1 transition-transform hover:rotate-0">
+                                    <div className="rounded-xl overflow-hidden shadow-inner bg-gray-100 aspect-square relative">
+                                        <img src={generatedImage} alt="Generative Bouquet" className="w-full h-full object-cover" />
+                                        <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-sm text-white text-[10px] uppercase font-bold px-3 py-1 rounded-full flex items-center gap-1">
+                                            <Sparkles size={10} /> AI Generated
+                                        </div>
+                                    </div>
+                                    <div className="mt-6 text-center">
+                                        <h3 className="font-bold text-gray-800 text-xl font-serif italic">Exclusive Custom Bouquet</h3>
+                                        <p className="text-pink-500 font-medium mt-1">Sản phẩm độc bản</p>
+                                    </div>
+
+                                    <div className="mt-6 space-y-3">
+                                        <button className="w-full bg-pink-600 hover:bg-pink-700 text-white font-semibold py-3.5 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 group">
+                                            <ShoppingCart size={20} className="group-hover:scale-110 transition-transform" />
+                                            Thêm Mẫu Này Vào Giỏ
+                                        </button>
+                                        <button
+                                            onClick={() => setGeneratedImage(null)}
+                                            className="w-full bg-white hover:bg-gray-50 text-gray-600 border border-gray-200 font-semibold py-3.5 rounded-xl transition-all flex items-center justify-center gap-2"
+                                        >
+                                            <RefreshCcw size={18} /> Thiết Lại Giỏ Khác
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="relative z-10 text-center flex flex-col items-center max-w-sm px-6">
+                                <div className="w-24 h-24 bg-white rounded-full shadow-lg flex items-center justify-center text-pink-300 mb-6 border border-pink-50">
+                                    <ImageIcon size={40} />
+                                </div>
+                                <h3 className="text-xl font-bold text-gray-800 mb-2">Bức Tranh Chưa Hoàn Thiện</h3>
+                                <p className="text-gray-500 leading-relaxed text-sm">
+                                    Hãy trò chuyện với Hydrangea ở bên tay trái để mường tượng ra tác phẩm của bạn. Bức ảnh từ AI sẽ xuất hiện tại đây khi bạn chốt ý tưởng!
+                                </p>
+                            </div>
+                        )}
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    );
+};
+
+export default HydrangeaStudio;
