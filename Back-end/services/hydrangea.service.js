@@ -1,83 +1,86 @@
-/**
- * @fileoverview Hydrangea Service - Xử lý mạch quản lý State Machine (Multi-turn hội thoại).
- */
+const axios = require('axios');
+// Nếu bạn đã làm file gemini.service, hãy require nó. Nếu chưa có, ta mock (giả lập) trước để test
+// const geminiService = require('./gemini.service');
 
-const sessionService = require('./session.service');
-const nlpService = require('./nlp.service');
-const geminiService = require('./gemini.service');
-const Product = require('../models/Product');
+// Quản lý session hội thoại (Trong thực tế nên dùng Redis, đồ án dùng Map() là ổn)
+const sessions = new Map();
 
-/**
- * Xử lý luồng Chat của Hydrangea.
- * 
- * @param {string} userId - Định danh của người dùng (Session ID).
- * @param {string} message - Tin nhắn đầu vào.
- * @param {boolean} isConfirming - Cờ cho biết người dùng có đang nhấn "Xác nhận tạo giỏ hoa" không.
- * @returns {Promise<{botReply: string, imageUrl: string|null, entities: object}>}
- */
-async function processChatMessage(userId, message, isConfirming) {
-    // 1. Lấy Session hiện tại (State & Entities)
-    const session = sessionService.getSession(userId);
-    let replyText = "";
-    let imageUrl = null;
+class HydrangeaService {
+    
+    // ĐÂY CHÍNH LÀ HÀM MÀ CONTROLLER ĐANG TÌM KIẾM
+    async processChat(sessionId, message, isConfirming, incomingEntities) {
+        
+        // 1. Nếu user bấm nút "Xác Nhận Thiết Kế & Vẽ Mẫu"
+        if (isConfirming) {
+            try {
+                // Gọi API Gemini để sinh ảnh (Giả lập hoặc gọi thật tùy bạn đã code tới đâu)
+                // const imageResult = await geminiService.generateFlowerImage(incomingEntities);
+                
+                // MOCK DATA (Dùng tạm ảnh này để test UI Frontend trước, nếu Gemini chưa sẵn sàng)
+                const mockImageUrl = "https://images.unsplash.com/photo-1563241527-3004b7be0ffd?q=80&w=1000&auto=format&fit=crop";
 
-    // 2. Nếu người dùng đang bấm Xác Nhận (nghĩa là State đã đầy đủ)
-    if (isConfirming) {
-        const prompt = geminiService.buildGeminiPrompt(session.entities);
-        try {
-            imageUrl = await geminiService.generateImage(prompt);
-            replyText = "Hydrangea đã phác thảo xong giỏ hoa độc bản của bạn. Bạn xem có ưng ý không nhé!";
-
-            // Clear session (hoặc cho phép chỉnh sửa tiếp)
-            // sessionService.clearSession(userId);
-        } catch (error) {
-            replyText = "Xin lỗi bạn, lúc này Họa sĩ AI của Rosee đang bận vẽ ảnh cho vị khách khác rồi. Bạn vui lòng quay lại sau ít phút nha 🥲";
+                return {
+                    success: true,
+                    reply: "Tác phẩm của bạn đã hoàn thành! Bạn thấy sao?",
+                    image: mockImageUrl // Thay bằng imageResult.imageUrl khi nối Gemini
+                };
+            } catch (error) {
+                console.error("Gemini Error:", error);
+                throw new Error("Lỗi khi vẽ ảnh Gemini");
+            }
         }
 
-        return { botReply: replyText, imageUrl, entities: session.entities };
+        // 2. Nếu là tin nhắn chat bình thường (User đang mô tả)
+        // Khởi tạo session nếu chưa có
+        if (!sessions.has(sessionId)) {
+            sessions.set(sessionId, { entities: {} });
+        }
+        const currentSession = sessions.get(sessionId);
+
+        let extractedEntities = {};
+
+        try {
+            // GỌI SANG PYTHON SERVICE (FastAPI) ĐỂ BÓC TÁCH NER
+            // Cần đảm bảo Python server đang chạy ở port 8000
+            const nerResponse = await axios.post('http://localhost:8000/api/hydrangea/extract', { text: message });
+            extractedEntities = nerResponse.data.entities || {};
+            
+        } catch (error) {
+            console.warn("Python AI Service chưa bật hoặc lỗi, sử dụng fallback (Giả lập Regex)...");
+            // FALLBACK TẠM THỜI ĐỂ BẠN TEST WEB KHÔNG BỊ CHẾT KHI CHƯA BẬT PYTHON
+            if (message.toLowerCase().includes('hồng')) extractedEntities.flower = 'Hoa hồng';
+            if (message.toLowerCase().includes('đỏ')) extractedEntities.color = 'Đỏ';
+            if (message.toLowerCase().includes('sinh nhật')) extractedEntities.occasion = 'Sinh nhật';
+        }
+
+        // Merge entities mới vào session cũ
+        currentSession.entities = { ...currentSession.entities, ...extractedEntities };
+
+        // 3. Logic Dialog Manager (Kiểm tra thiếu thông tin)
+        let reply = "";
+        let isReadyToDraw = false;
+
+        const { flower, color } = currentSession.entities;
+
+        if (!flower && !color) {
+            reply = "Bạn thích loài hoa nào và tông màu chủ đạo là gì nhỉ?";
+        } else if (!flower) {
+            reply = `Tông màu ${color} rất đẹp! Vậy bạn muốn dùng loài hoa chính nào? (VD: hoa hồng, hướng dương...)`;
+        } else if (!color) {
+            reply = `Giỏ ${flower} thì tuyệt vời. Bạn muốn phối theo tông màu gì? (VD: đỏ, pastel, trắng...)`;
+        } else {
+            reply = `Mình đã ghi nhận: Giỏ hoa tông màu ${color}, hoa chủ đạo là ${flower}. Bạn có muốn thêm yêu cầu gì không, hay chúng ta nhấn XÁC NHẬN để AI phác thảo ngay nhé?`;
+            isReadyToDraw = true;
+        }
+
+        // Trả về cho Frontend
+        return {
+            success: true,
+            reply: reply,
+            extractedEntities: extractedEntities, // Gửi về để cập nhật dấu chấm xanh trên UI
+            isReady: isReadyToDraw
+        };
     }
-
-    // 3. Nếu không phải xác nhận, thì tiến hành phân tích tin nhắn (NLP)
-    const { intent, entities: newEntities } = await nlpService.analyzeText(message);
-
-    // 4. Update các Entities mới tìm được vào Session
-    const updatedSession = sessionService.updateSession(userId, { entities: newEntities });
-    const entities = updatedSession.entities;
-
-    // 5. State Machine: Kiểm tra xem đã đủ thông tin cốt lõi chưa?
-    // Yêu cầu: Bắt buộc tối thiểu phải biết 1 loại hoa HOẶC 1 màu sắc.
-    if (!entities.flower && !entities.color) {
-        replyText = "Bạn muốn giỏ hoa của mình có tone màu chủ đạo nào, hay mix các loại hoa cụ thể nào ạ? (Ví dụ: 'Tôi thích hoa hồng tone đỏ mộng mơ')";
-        return { botReply: replyText, imageUrl: null, entities: entities };
-    }
-
-    // 6. Nếu đã có 1 trong 2 thông tin cốt lõi, tiến hành RAG query kho hoa
-    const availableProducts = await _queryInventory(entities);
-
-    // 7. Sinh Context Text phản hồi
-    if (availableProducts.length === 0) {
-        replyText = `Hiện tại kho Rosee đang tạm hết loại ${entities.flower || ''} màu ${entities.color || ''}. Bạn có muốn đổi sang tông màu khác không ạ? Mình vẫn sẵn sàng hỗ trợ bạn đổi nha!`;
-    } else {
-        const flowerNames = availableProducts.map(p => p.name).join(", ");
-        replyText = `Tuyệt vời! Hydrangea vừa kiểm tra kho, hiện Rosee có sẵn các loại nguyên liệu mộc mạc và xinh xắn này hợp với ý của bạn: ${flowerNames}. Bạn có muốn nâng cấp thêm phụ kiện gì không, hay để mình bắt đầu lên bản phác thảo thiết kế 3D cho giỏ hoa này nhé? (Nhấn xác nhận nếu bạn đã đồng ý)`;
-    }
-
-    return { botReply: replyText, imageUrl: null, entities: entities };
 }
 
-/**
- * Trình truy vấn động kho RAG nội bộ
- */
-async function _queryInventory(entities) {
-    const query = {};
-    if (entities.flower) query.name = { $regex: new RegExp(entities.flower, 'i') };
-    // Để search màu chính xác, Model cần có trường 'color' (hoặc tìm text matching)
-    // if (entities.color) query.color = entities.color; 
-
-    const products = await Product.find(query).limit(3).lean();
-    return products;
-}
-
-module.exports = {
-    processChatMessage
-};
+module.exports = new HydrangeaService();
