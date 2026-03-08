@@ -10,10 +10,12 @@ const HydrangeaStudio = () => {
     const [inputText, setInputText] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+    const [isAddingToCart, setIsAddingToCart] = useState(false); // State mới cho Add To Cart
+
     const [generatedImage, setGeneratedImage] = useState(null);
     const [currentEntities, setCurrentEntities] = useState({});
     const [showConfirmBtn, setShowConfirmBtn] = useState(false);
-    const [sessionId] = useState(() => `sess_${Math.random().toString(36).substring(2, 9)}`); // Auto generate a simple session ID
+    const [sessionId] = useState(() => `sess_${Math.random().toString(36).substring(2, 9)}`); 
 
     const chatEndRef = useRef(null);
 
@@ -43,11 +45,11 @@ const HydrangeaStudio = () => {
             if (success) {
                 setMessages(prev => [...prev, { role: 'bot', text: reply }]);
                 if (extractedEntities) {
-                    setCurrentEntities(extractedEntities);
+                    setCurrentEntities(prev => ({ ...prev, ...extractedEntities })); // Merge entities cũ và mới
                 }
 
-                // Hiển thị nút xác nhận nếu bot hỏi (kiểm tra dấu hiệu từ bot reply - Có chữ "Xác nhận")
-                if (reply.toLowerCase().includes("nhấn xác nhận")) {
+                // Hiển thị nút xác nhận nếu AI đã thu thập đủ thông tin
+                if (reply.toLowerCase().includes("nhấn xác nhận") || reply.toLowerCase().includes("đồng ý")) {
                     setShowConfirmBtn(true);
                 } else {
                     setShowConfirmBtn(false);
@@ -57,7 +59,7 @@ const HydrangeaStudio = () => {
             }
         } catch (error) {
             console.error("Hydrangea API Error:", error);
-            setMessages(prev => [...prev, { role: 'bot', text: 'Máy chủ đang mệt, bạn thông cảm nhé!' }]);
+            setMessages(prev => [...prev, { role: 'bot', text: 'Máy chủ đang bảo trì, bạn thông cảm nhé!' }]);
         } finally {
             setIsLoading(false);
         }
@@ -67,12 +69,13 @@ const HydrangeaStudio = () => {
         setShowConfirmBtn(false);
         setIsGeneratingImage(true);
         setMessages(prev => [...prev, { role: 'user', text: '(Click) Tôi xác nhận bản phác thảo này!' }]);
-        setMessages(prev => [...prev, { role: 'bot', text: 'Đang kết nối tới Họa sĩ AI Gemini để vẽ tác phẩm của bạn. Vui lòng đợi nhé... 🎨' }]);
+        setMessages(prev => [...prev, { role: 'bot', text: 'Đang kết nối tới Họa sĩ AI Gemini để vẽ tác phẩm của bạn. Vui lòng đợi trong giây lát... 🎨' }]);
 
         try {
             const response = await axios.post('http://localhost:8080/api/ai/hydrangea/chat', {
                 sessionId: sessionId,
-                isConfirming: true
+                isConfirming: true,
+                entities: currentEntities // Gửi kèm entities để Gemini vẽ
             });
 
             const { success, reply, image } = response.data;
@@ -82,14 +85,57 @@ const HydrangeaStudio = () => {
                     setGeneratedImage(image);
                 }
             } else {
-                setMessages(prev => [...prev, { role: 'bot', text: 'Rất tiếc, tác phẩm vẽ bị lỗi.' }]);
+                setMessages(prev => [...prev, { role: 'bot', text: 'Rất tiếc, quá trình vẽ tác phẩm bị lỗi.' }]);
             }
         } catch (error) {
             console.error("Gemini Image API Error:", error);
-            setMessages(prev => [...prev, { role: 'bot', text: 'Lỗi sinh ảnh từ Gemini, bạn vui lòng thử lại sau.' }]);
+            setMessages(prev => [...prev, { role: 'bot', text: 'Lỗi kết nối bộ sinh ảnh, bạn vui lòng thử lại sau.' }]);
         } finally {
             setIsGeneratingImage(false);
         }
+    };
+
+    // Hàm gọi API thêm vào giỏ hàng
+    const handleAddToCart = async () => {
+        setIsAddingToCart(true);
+        try {
+            // Lấy token từ LocalStorage/Cookies (Tuỳ thuộc kiến trúc Frontend của bạn)
+            const token = localStorage.getItem('token'); 
+            
+            const response = await axios.post('http://localhost:8080/api/cart/custom-add', {
+                entities: currentEntities,
+                imageUrl: generatedImage
+            }, {
+                headers: { Authorization: `Bearer ${token}` } // Thêm token xác thực
+            });
+
+            if (response.data.success) {
+                alert(`🎉 Thêm thành công! Giỏ hoa dự kiến giá: ${response.data.data.price.toLocaleString()} VNĐ`);
+                // Ở đây bạn có thể dùng thư viện react-toastify thay vì alert cho đẹp
+            }
+        } catch (error) {
+            console.error("Add to cart error:", error);
+            alert("Vui lòng đăng nhập để thêm vào giỏ hàng!");
+        } finally {
+            setIsAddingToCart(false);
+        }
+    };
+
+    // Hàm reset để vẽ lại
+    const handleReset = () => {
+        setGeneratedImage(null);
+        setMessages(prev => [...prev, { role: 'bot', text: 'Bạn muốn thay đổi chi tiết nào so với bản cũ nhỉ? Hãy nói cho mình biết nhé!' }]);
+    };
+
+    // Helper hiển thị Entities
+    const renderEntitiesInfo = () => {
+        const parts = [];
+        if (currentEntities.flower) parts.push(`Hoa: ${currentEntities.flower}`);
+        if (currentEntities.color) parts.push(`Màu: ${currentEntities.color}`);
+        if (currentEntities.occasion) parts.push(`Dịp: ${currentEntities.occasion}`);
+        
+        if (parts.length === 0) return 'Đang chờ thông tin...';
+        return `Đã nhận diện: ${parts.join(' | ')}`;
     };
 
     return (
@@ -106,7 +152,7 @@ const HydrangeaStudio = () => {
                     </p>
                 </div>
 
-                {/* Main Dashboard Layout (Chia 2 cột) */}
+                {/* Main Dashboard Layout */}
                 <div className="flex flex-col lg:flex-row gap-8 bg-white rounded-3xl shadow-xl overflow-hidden border border-pink-100">
 
                     {/* Cột 1: Chat Interface */}
@@ -114,11 +160,14 @@ const HydrangeaStudio = () => {
                         {/* Chat Header */}
                         <div className="p-5 border-b border-pink-50 bg-pink-50/30 flex items-center gap-4">
                             <div className="w-12 h-12 rounded-full overflow-hidden bg-white shadow-sm border border-pink-200">
-                                <img src="/logo-rosee.png" alt="Hydrangea AI" className="w-full h-full object-contain" onError={(e) => { e.target.src = "https://ui-avatars.com/api/?name=IA&background=EC4899&color=fff"; }} />
+                                <img src="/logo-rosee.png" alt="Hydrangea AI" className="w-full h-full object-cover p-1" onError={(e) => { e.target.src = "https://ui-avatars.com/api/?name=AI&background=EC4899&color=fff"; }} />
                             </div>
                             <div>
                                 <h2 className="font-bold text-gray-800">Trợ Lý Hydrangea</h2>
-                                <p className="text-xs text-green-500 font-medium tracking-wide">● Sẵn sàng phục vụ ({currentEntities.flower ? `Đã nhận diện: ${currentEntities.flower}` : 'Đang xử lý'})</p>
+                                <p className="text-xs text-green-500 font-medium tracking-wide flex items-center gap-1">
+                                    <span className="w-2 h-2 rounded-full bg-green-500 inline-block animate-pulse"></span>
+                                    {renderEntitiesInfo()}
+                                </p>
                             </div>
                         </div>
 
@@ -130,19 +179,19 @@ const HydrangeaStudio = () => {
                                         ? 'bg-pink-500 text-white rounded-tr-sm shadow-md'
                                         : 'bg-gray-50 text-gray-800 border border-gray-100 rounded-tl-sm shadow-sm'
                                         }`}>
-                                        <p className="leading-relaxed">{msg.text}</p>
+                                        <p className="leading-relaxed whitespace-pre-wrap">{msg.text}</p>
                                     </div>
                                 </div>
                             ))}
 
-                            {/* Nút Confirm (Thỉnh thoảng hiện ra khi AI kích hoạt) */}
+                            {/* Nút Confirm */}
                             {showConfirmBtn && !isGeneratingImage && !generatedImage && (
                                 <div className="flex justify-start pt-2">
                                     <button
                                         onClick={handleConfirmDesign}
-                                        className="bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-full shadow-lg font-semibold tracking-wide transition-all transform hover:-translate-y-1 flex items-center gap-2 animate-bounce-slow"
+                                        className="bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-full shadow-lg font-semibold tracking-wide transition-all transform hover:-translate-y-1 flex items-center gap-2 animate-bounce"
                                     >
-                                        <CheckCircle size={18} /> Xác Nhận Thiết Kế & Vẽ Mẫu
+                                        <CheckCircle size={18} /> Chốt Thiết Kế & Vẽ Mẫu 🎨
                                     </button>
                                 </div>
                             )}
@@ -150,11 +199,11 @@ const HydrangeaStudio = () => {
                             {/* Loading State */}
                             {(isLoading || isGeneratingImage) && (
                                 <div className="flex justify-start items-center gap-2">
-                                    <div className="w-2 h-2 rounded-full bg-pink-300 animate-pulse"></div>
-                                    <div className="w-2 h-2 rounded-full bg-pink-300 animate-pulse delay-75"></div>
-                                    <div className="w-2 h-2 rounded-full bg-pink-300 animate-pulse delay-150"></div>
+                                    <div className="w-2 h-2 rounded-full bg-pink-300 animate-bounce"></div>
+                                    <div className="w-2 h-2 rounded-full bg-pink-300 animate-bounce delay-75"></div>
+                                    <div className="w-2 h-2 rounded-full bg-pink-300 animate-bounce delay-150"></div>
                                     <span className="text-xs text-gray-400 ml-2 italic">
-                                        {isGeneratingImage ? "Đang gọi Gemini AI API..." : "Đang kết nối PhoBERT NLP..."}
+                                        {isGeneratingImage ? "Đang render ảnh 8K..." : "Đang bóc tách yêu cầu..."}
                                     </span>
                                 </div>
                             )}
@@ -167,8 +216,8 @@ const HydrangeaStudio = () => {
                                 <input
                                     type="text"
                                     disabled={isLoading || isGeneratingImage}
-                                    placeholder="Thử nhập: Một giỏ hoa hồng phấn lãng mạn cỡ 500k..."
-                                    className="w-full bg-gray-50 border border-gray-200 text-gray-800 px-6 py-4 rounded-full pr-16 focus:outline-none focus:ring-2 focus:ring-pink-300 transition-all shadow-inner"
+                                    placeholder="Một giỏ hoa hồng phấn lãng mạn cỡ 500k..."
+                                    className="w-full bg-gray-50 border border-gray-200 text-gray-800 px-6 py-4 rounded-full pr-16 focus:outline-none focus:ring-2 focus:ring-pink-300 transition-all shadow-inner disabled:bg-gray-100"
                                     value={inputText}
                                     onChange={(e) => setInputText(e.target.value)}
                                 />
@@ -191,36 +240,45 @@ const HydrangeaStudio = () => {
                         </div>
 
                         {generatedImage ? (
-                            <div className="relative z-10 w-full max-w-sm mx-auto animate-fade-in-up">
-                                <div className="bg-white p-4 pb-6 rounded-2xl shadow-xl border border-pink-100 transform rotate-1 transition-transform hover:rotate-0">
-                                    <div className="rounded-xl overflow-hidden shadow-inner bg-gray-100 aspect-square relative">
-                                        <img src={generatedImage} alt="Generative Bouquet" className="w-full h-full object-cover" />
-                                        <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-sm text-white text-[10px] uppercase font-bold px-3 py-1 rounded-full flex items-center gap-1">
-                                            <Sparkles size={10} /> AI Generated
+                            <div className="relative z-10 w-full max-w-sm mx-auto transition-all duration-500 ease-in-out">
+                                <div className="bg-white p-4 pb-6 rounded-2xl shadow-2xl border border-pink-100">
+                                    <div className="rounded-xl overflow-hidden shadow-inner bg-gray-100 aspect-square relative group">
+                                        <img src={generatedImage} alt="Generative Bouquet" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                                        <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-sm text-white text-[10px] uppercase font-bold px-3 py-1 rounded-full flex items-center gap-1 shadow-md">
+                                            <Sparkles size={10} className="text-yellow-300"/> AI Generated
                                         </div>
                                     </div>
                                     <div className="mt-6 text-center">
                                         <h3 className="font-bold text-gray-800 text-xl font-serif italic">Exclusive Custom Bouquet</h3>
-                                        <p className="text-pink-500 font-medium mt-1">Sản phẩm độc bản</p>
+                                        <p className="text-pink-500 font-medium mt-1">Sản phẩm độc bản của riêng bạn</p>
                                     </div>
 
                                     <div className="mt-6 space-y-3">
-                                        <button className="w-full bg-pink-600 hover:bg-pink-700 text-white font-semibold py-3.5 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 group">
-                                            <ShoppingCart size={20} className="group-hover:scale-110 transition-transform" />
-                                            Thêm Mẫu Này Vào Giỏ
+                                        <button 
+                                            onClick={handleAddToCart}
+                                            disabled={isAddingToCart}
+                                            className="w-full bg-pink-600 hover:bg-pink-700 disabled:bg-pink-300 text-white font-semibold py-3.5 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 group"
+                                        >
+                                            {isAddingToCart ? (
+                                                <RefreshCcw size={20} className="animate-spin" />
+                                            ) : (
+                                                <ShoppingCart size={20} className="group-hover:-translate-y-1 transition-transform" />
+                                            )}
+                                            {isAddingToCart ? 'Đang xử lý...' : 'Dùng hoa thật làm giỏ này ngay'}
                                         </button>
                                         <button
-                                            onClick={() => setGeneratedImage(null)}
+                                            onClick={handleReset}
+                                            disabled={isAddingToCart}
                                             className="w-full bg-white hover:bg-gray-50 text-gray-600 border border-gray-200 font-semibold py-3.5 rounded-xl transition-all flex items-center justify-center gap-2"
                                         >
-                                            <RefreshCcw size={18} /> Thiết Lại Giỏ Khác
+                                            <RefreshCcw size={18} /> Chỉnh sửa / Vẽ lại
                                         </button>
                                     </div>
                                 </div>
                             </div>
                         ) : (
                             <div className="relative z-10 text-center flex flex-col items-center max-w-sm px-6">
-                                <div className="w-24 h-24 bg-white rounded-full shadow-lg flex items-center justify-center text-pink-300 mb-6 border border-pink-50">
+                                <div className="w-24 h-24 bg-white rounded-full shadow-lg flex items-center justify-center text-pink-300 mb-6 border border-pink-50 transition-transform hover:scale-110">
                                     <ImageIcon size={40} />
                                 </div>
                                 <h3 className="text-xl font-bold text-gray-800 mb-2">Bức Tranh Chưa Hoàn Thiện</h3>

@@ -9,12 +9,11 @@ const irisController = require('../controllers/iris.controller'); // Nếu bạn
 // ==========================================
 // 1. Routes cho Trợ lý Hydrangea (AI Tạo Giỏ Hoa)
 // ==========================================
-// Đảm bảo chỗ này gọi đúng hydrangeaController.chatWithHydrangea
 router.post('/hydrangea/chat', hydrangeaController.chatWithHydrangea);
 
 // ==========================================
-// 2. Routes cho Trợ lý Iris (AI CSKH) - Nếu có
+// 2. Routes cho Trợ lý Iris (AI CSKH)
 // ==========================================
-// router.post('/iris/chat', irisController.chatWithIris);
+router.post('/iris/chat', irisController.chatWithIris);
 
 module.exports = router;

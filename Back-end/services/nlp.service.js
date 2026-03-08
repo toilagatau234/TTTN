@@ -1,44 +1,35 @@
-/**
- * @fileoverview NLP Service cho Hydrangea AI Chatbot.
- *
- * Service này chịu trách nhiệm giao tiếp với Microservice Python NLP Engine
- * (chạy ở cổng 8000) để phân tích Intent và trích xuất Entities (NER) từ văn bản.
- */
-
+// Back-end/services/nlp.service.js
 const axios = require('axios');
 
-// Địa chỉ của Python NLP Engine
-const NLP_ENGINE_URL = process.env.NLP_ENGINE_URL || 'http://127.0.0.1:8000/api/nlp/analyze';
+class NlpService {
+    constructor() {
+        this.PYTHON_API_URL = 'http://localhost:8000';
+    }
 
-/**
- * Gửi văn bản tới Python NLP Engine để phân tích ý định (Intent) và thực thể (Entities).
- *
- * @param {string} text - Tin nhắn đầu vào của người dùng.
- * @returns {Promise<{intent: string, entities: object}>} Kết quả phân tích (Fallback về 'unknown' nếu lỗi).
- */
-async function analyzeText(text) {
-  try {
-    const response = await axios.post(NLP_ENGINE_URL, { text });
+    /**
+     * Gửi text sang Python Engine để lấy về cả Ý định (Intent) và Thực thể (Entities)
+     * @param {string} text 
+     * @returns {Promise<{intent: string, entities: object}>}
+     */
+    async analyzeText(text) {
+        try {
+            // Sử dụng Promise.all để gọi song song 2 mô hình AI cùng lúc (Tối ưu tốc độ)
+            const [intentResponse, nerResponse] = await Promise.all([
+                axios.post(`${this.PYTHON_API_URL}/api/iris/intent`, { text }),
+                axios.post(`${this.PYTHON_API_URL}/api/hydrangea/extract`, { text }).catch(() => ({ data: { entities: {} } })) 
+                // Catch lỗi ở NER để lỡ mô hình NER có sập thì Intent vẫn chạy được
+            ]);
 
-    // Lấy intent và entities từ response, đảm bảo fallback entities là object {} nếu bị undefined
-    const { intent, entities = {} } = response.data;
-
-    return {
-      intent: intent || 'unknown',
-      entities,
-    };
-  } catch (error) {
-    // Log lỗi để debug nhưng không quăng lỗi ra ngoài làm crash luồng ứng dụng
-    console.error(`[NLPService] Lỗi kết nối đến Python NLP Engine: ${error.message}`);
-
-    // Fallback result khi Microservice Python sập hoặc phản hồi lỗi
-    return {
-      intent: 'unknown',
-      entities: {},
-    };
-  }
+            return {
+                intent: intentResponse.data.intent,
+                entities: nerResponse.data.entities || {}
+            };
+        } catch (error) {
+            console.error("[NLP Service Error]: Call to Python Engine failed", error.message);
+            // Trả về Fallback an toàn nếu Python AI tắt
+            return { intent: "OUT_OF_DOMAIN", entities: {} };
+        }
+    }
 }
 
-module.exports = {
-  analyzeText,
-};
+module.exports = new NlpService();

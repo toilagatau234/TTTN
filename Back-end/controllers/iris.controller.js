@@ -11,18 +11,18 @@ exports.chatWithIris = async (req, res) => {
             return res.status(400).json({ success: false, message: 'Message is required' });
         }
 
-        // 1. Phân tích văn bản bằng Python NLP Engine
+        // 1. Gọi Python NLP Engine lấy Intent + Entities (qua nlp.service.js)
         const { intent, entities } = await nlpService.analyzeText(userText);
 
-        // 2. Dựa vào Intent và Entities để sinh câu trả lời tự nhiên & query Database
-        const { botReply, responseData } = await irisService.processIntent(intent, entities);
+        // 2. Gửi Intent + Entities cho Iris Service để sinh câu trả lời + query DB
+        const result = await irisService.handleIntent(intent, entities, userText);
 
-        // 3. Trả về cho Frontend React/Flutter
+        // 3. Trả về cho Frontend
         return res.status(200).json({
             success: true,
             intent: intent,
-            message: botReply,
-            data: responseData
+            message: result.reply,
+            data: result.responseData
         });
 
     } catch (error) {
