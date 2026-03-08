@@ -33,34 +33,20 @@ import ShippingPage from '../pages/Shipping';
 import CarrierConfig from '../pages/Shipping/CarrierConfig';
 
 import StaffPage from '../pages/Staff/index';
-
-// --- 1. Component Bảo vệ (Guard) ---
-// Nhiệm vụ: Kiểm tra xem có token trong localStorage không?
-const ProtectedRoute = ({ children }) => {
-  const user = JSON.parse(localStorage.getItem('user'));
-  
-  // Nếu không có user hoặc không có token -> Đá về Login
-  if (!user || !user.token) {
-    return <Navigate to="/admin/login" replace />;
-  }
-  
-  // Nếu đã login -> Cho phép truy cập (Render nội dung bên trong)
-  return children;
-};
+import PermissionGate from '../components/PermissionGate';
 
 const AdminRoutes = () => {
   return (
     <Routes>
-      {/* --- Route Công khai (Public) --- */}
+      {/* Route công khai — không cần đăng nhập */}
       <Route path="login" element={<LoginPage />} />
 
-      {/* --- Route Được Bảo Vệ (Private) --- */}
-      {/* Bọc AdminLayout bằng ProtectedRoute */}
+      {/* Các Routes cần bảo vệ (bọc trong PermissionGate) */}
       <Route
         element={
-          <ProtectedRoute>
+          <PermissionGate>
             <AdminLayout />
-          </ProtectedRoute>
+          </PermissionGate>
         }
       >
         <Route path="dashboard" element={<Dashboard />} />
@@ -93,12 +79,12 @@ const AdminRoutes = () => {
         <Route path="activity-logs" element={<ActivityLogsPage />} />
         <Route path="staff" element={<StaffPage />} />
         <Route path="settings" element={<SettingsPage />} />
-
-        {/* Redirect mặc định: Vào /admin thì nhảy sang login */}
-        <Route path="" element={<Navigate to="login" replace />} />
       </Route>
 
-      {/* Xử lý đường dẫn sai 404 */}
+      {/* Mặc định: /admin → chuyển về /admin/login */}
+      <Route index element={<Navigate to="login" replace />} />
+
+      {/* 404 cho admin */}
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
   );

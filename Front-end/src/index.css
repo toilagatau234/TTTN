@@ -1,12 +1,32 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap');
 @import "tailwindcss";
-@plugin "daisyui";
+/* @plugin "daisyui"; */
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+    'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
+    'Noto Color Emoji';
+}
+
+/* Fix lỗi Tailwind làm mất background mặc định của AntD Layout */
+.ant-layout {
+  background: #f0f2f5;
+}
+
+/* Đảm bảo các menu không bị dính style list của Tailwind */
+ul.ant-menu {
+  list-style: none;
+  padding: 0;
+}
 
 /* ============================================================ */
 /* ADMIN CUSTOM THEME — chuyển từ tailwind.config.js sang v4    */
 /* ============================================================ */
 @theme {
   /* Brand (purple/violet) */
-  --color-brand-50:  #E9E3FF;
+  --color-brand-50: #E9E3FF;
   --color-brand-100: #C0B0FA;
   --color-brand-200: #9E85F5;
   --color-brand-300: #7B5BEF;
@@ -18,7 +38,7 @@
   --color-brand-900: #180765;
 
   /* Navy (dark blue) */
-  --color-navy-50:  #ECEFF8;
+  --color-navy-50: #ECEFF8;
   --color-navy-100: #D8DEEE;
   --color-navy-200: #B4C0DE;
   --color-navy-300: #8F9FB9;
@@ -30,20 +50,17 @@
   --color-navy-900: #111C44;
 
   /* Light (neutral backgrounds) */
-  --color-light-primary:   #F4F7FE;
+  --color-light-primary: #F4F7FE;
   --color-light-secondary: #FFFFFF;
 
   /* Fonts */
-  --font-sans:  "DM Sans", sans-serif;
+  --font-sans: "DM Sans", sans-serif;
   --font-inter: "Inter", sans-serif;
 }
 
 /* ============================================================ */
 /* USER (CLIENT) SECTION — từ 01/src/index.css                  */
 /* ============================================================ */
-
-/* Google Font */
-@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap');
 
 /* ---- Footer: hoa rơi ---- */
 .flower {
@@ -54,42 +71,124 @@
   animation: fallFloat linear infinite;
 }
 
-.flower1 { left: 10%; animation-duration: 8s; animation-delay: 0s; }
-.flower2 { left: 30%; width: 35px; animation-duration: 8s; animation-delay: 2s; }
-.flower3 { left: 55%; width: 45px; animation-duration: 8s; animation-delay: 4s; }
-.flower4 { left: 75%; width: 38px; animation-duration: 8s; animation-delay: 1s; }
-.flower5 { left: 90%; width: 32px; animation-duration: 8s; animation-delay: 3s; }
+.flower1 {
+  left: 10%;
+  animation-duration: 8s;
+  animation-delay: 0s;
+}
+
+.flower2 {
+  left: 30%;
+  width: 35px;
+  animation-duration: 8s;
+  animation-delay: 2s;
+}
+
+.flower3 {
+  left: 55%;
+  width: 45px;
+  animation-duration: 8s;
+  animation-delay: 4s;
+}
+
+.flower4 {
+  left: 75%;
+  width: 38px;
+  animation-duration: 8s;
+  animation-delay: 1s;
+}
+
+.flower5 {
+  left: 90%;
+  width: 32px;
+  animation-duration: 8s;
+  animation-delay: 3s;
+}
 
 @keyframes fallFloat {
-  0%   { transform: translateY(0px) translateX(0px) rotate(0deg); opacity: 0; }
-  15%  { opacity: 1; }
-  50%  { transform: translateY(350px) translateX(40px) rotate(180deg); }
-  100% { transform: translateY(700px) translateX(-40px) rotate(360deg); opacity: 0; }
+  0% {
+    transform: translateY(0px) translateX(0px) rotate(0deg);
+    opacity: 0;
+  }
+
+  15% {
+    opacity: 1;
+  }
+
+  50% {
+    transform: translateY(350px) translateX(40px) rotate(180deg);
+  }
+
+  100% {
+    transform: translateY(700px) translateX(-40px) rotate(360deg);
+    opacity: 0;
+  }
 }
 
 /* ---- Banner animations ---- */
 @keyframes fadeUp {
-  from { opacity: 0; transform: translateY(40px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(40px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
-.animate-fadeUp { animation: fadeUp 1s ease forwards; }
+
+.animate-fadeUp {
+  animation: fadeUp 1s ease forwards;
+}
 
 @keyframes floatBanner {
-  0%, 100% { transform: translateY(0px); }
-  50%       { transform: translateY(-20px); }
+
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+
+  50% {
+    transform: translateY(-20px);
+  }
 }
+
 @keyframes floatBanner2 {
-  0%, 100% { transform: translateY(0px); }
-  50%       { transform: translateY(15px); }
+
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+
+  50% {
+    transform: translateY(15px);
+  }
 }
-.animate-floatBanner  { animation: floatBanner  4s ease-in-out infinite; }
-.animate-floatBanner2 { animation: floatBanner2 4s ease-in-out infinite; }
+
+.animate-floatBanner {
+  animation: floatBanner 4s ease-in-out infinite;
+}
+
+.animate-floatBanner2 {
+  animation: floatBanner2 4s ease-in-out infinite;
+}
 
 @keyframes floatImage {
-  0%, 100% { transform: translateY(0px); }
-  50%       { transform: translateY(-15px); }
+
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+
+  50% {
+    transform: translateY(-15px);
+  }
 }
-.animate-floatImage { animation: floatImage 5s ease-in-out infinite; }
+
+.animate-floatImage {
+  animation: floatImage 5s ease-in-out infinite;
+}
 
 /* Banner slide item */
 .banner_lide_item {
@@ -107,7 +206,10 @@
   transition: all 0.4s ease;
   position: relative;
 }
-.product-card:hover { transform: translateY(-8px); }
+
+.product-card:hover {
+  transform: translateY(-8px);
+}
 
 .image-wrapper {
   position: relative;
@@ -135,8 +237,15 @@
 }
 
 @keyframes float {
-  0%, 100% { transform: translateY(0px); }
-  50%       { transform: translateY(-10px); }
+
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+
+  50% {
+    transform: translateY(-10px);
+  }
 }
 
 .heart-btn {
@@ -146,18 +255,43 @@
   background: white;
   padding: 6px;
   border-radius: 50%;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   cursor: pointer;
   transition: 0.3s;
 }
-.heart-btn:hover { transform: scale(1.1); }
 
-.product-title  { font-size: 14px; color: #555; margin-top: 10px; min-height: 40px; }
-.old-price      { color: #bbb; text-decoration: line-through; font-size: 13px; }
-.new-price      { color: #ec4899; font-weight: bold; font-size: 18px; }
-.product-meta   { font-size: 12px; color: #999; margin-bottom: 10px; }
+.heart-btn:hover {
+  transform: scale(1.1);
+}
 
-.button-group   { margin-top: 10px; }
+.product-title {
+  font-size: 14px;
+  color: #555;
+  margin-top: 10px;
+  min-height: 40px;
+}
+
+.old-price {
+  color: #bbb;
+  text-decoration: line-through;
+  font-size: 13px;
+}
+
+.new-price {
+  color: #ec4899;
+  font-weight: bold;
+  font-size: 18px;
+}
+
+.product-meta {
+  font-size: 12px;
+  color: #999;
+  margin-bottom: 10px;
+}
+
+.button-group {
+  margin-top: 10px;
+}
 
 .btn-cart {
   width: 100%;
@@ -169,7 +303,11 @@
   transition: all 0.3s ease;
   font-weight: 500;
 }
-.btn-cart:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(16,185,129,0.3); }
+
+.btn-cart:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(16, 185, 129, 0.3);
+}
 
 .btn-buy {
   width: 100%;
@@ -181,7 +319,12 @@
   border-radius: 20px;
   transition: all 0.3s ease;
 }
-.btn-buy:hover { background: #ec4899; color: white; transform: scale(1.05); }
+
+.btn-buy:hover {
+  background: #ec4899;
+  color: white;
+  transform: scale(1.05);
+}
 
 /* ---- Shop: Rating ---- */
 .star-wrapper {
@@ -194,13 +337,35 @@
   border-radius: 50%;
   margin-right: 6px;
 }
-.star-icon   { color: #f59e0b; stroke-width: 2; fill: none; }
-.rating-row  { display: flex; align-items: center; justify-content: center; gap: 4px; font-size: 13px; color: #555; }
-.shop-sub    { font-size: 14px; color: #f472b6; margin-top: 8px; }
-.shop-wrapper { position: relative; }
+
+.star-icon {
+  color: #f59e0b;
+  stroke-width: 2;
+  fill: none;
+}
+
+.rating-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-size: 13px;
+  color: #555;
+}
+
+.shop-sub {
+  font-size: 14px;
+  color: #f472b6;
+  margin-top: 8px;
+}
+
+.shop-wrapper {
+  position: relative;
+}
 
 /* ---- Shop / Wishlist: hoa rơi cố định ---- */
-.floweru, .floweruy {
+.floweru,
+.floweruy {
   position: fixed;
   top: -50px;
   width: 40px;
@@ -209,13 +374,41 @@
   animation: fall linear infinite;
 }
 
-.f1 { left: 10%; animation-duration: 8s; }
-.f2 { left: 30%; animation-duration: 10s; animation-delay: 2s; }
-.f3 { left: 55%; animation-duration: 9s;  animation-delay: 1s; }
-.f4 { left: 75%; animation-duration: 11s; animation-delay: 3s; }
-.f5 { left: 90%; animation-duration: 7s;  animation-delay: 4s; }
+.f1 {
+  left: 10%;
+  animation-duration: 8s;
+}
+
+.f2 {
+  left: 30%;
+  animation-duration: 10s;
+  animation-delay: 2s;
+}
+
+.f3 {
+  left: 55%;
+  animation-duration: 9s;
+  animation-delay: 1s;
+}
+
+.f4 {
+  left: 75%;
+  animation-duration: 11s;
+  animation-delay: 3s;
+}
+
+.f5 {
+  left: 90%;
+  animation-duration: 7s;
+  animation-delay: 4s;
+}
 
 @keyframes fall {
-  0%   { transform: translateY(0) rotate(0deg); }
-  100% { transform: translateY(110vh) rotate(360deg); }
+  0% {
+    transform: translateY(0) rotate(0deg);
+  }
+
+  100% {
+    transform: translateY(110vh) rotate(360deg);
+  }
 }
