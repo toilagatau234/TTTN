@@ -8,14 +8,15 @@ const {
     deleteProduct
 } = require('../controllers/productController');
 const upload = require('../config/cloudinary');
+const { protect, authorize } = require('../middleware/auth');
 
-// Public routes
+// Public routes — Ai cũng xem được
 router.get('/', getProducts);
 router.get('/:id', getProductById);
 
-// Keep upload.array in case of server-side upload fallback
-router.post('/', upload.array('images', 10), createProduct);
-router.put('/:id', upload.array('images', 10), updateProduct);
-router.delete('/:id', deleteProduct);
+// Protected routes — Chỉ Admin/Manager/Staff mới được thao tác
+router.post('/', protect, authorize('Admin', 'Manager'), upload.array('images', 10), createProduct);
+router.put('/:id', protect, authorize('Admin', 'Manager'), upload.array('images', 10), updateProduct);
+router.delete('/:id', protect, authorize('Admin', 'Manager'), deleteProduct);
 
 module.exports = router;
