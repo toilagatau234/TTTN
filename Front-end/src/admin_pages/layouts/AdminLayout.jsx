@@ -17,7 +17,7 @@ const getCurrentUser = () => {
         const user = JSON.parse(localStorage.getItem('user'));
         return user || { "name": "Admin", "role": "Admin" };
     } catch (error) {
-        return { "name": "Admin", "role": "Admin" };
+        return { "name": "Admin", "role": "staff" };
     }
 };
 

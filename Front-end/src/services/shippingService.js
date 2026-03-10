@@ -22,6 +22,11 @@ const shippingService = {
   // Đồng bộ trạng thái mới nhất từ hãng
   syncStatus: (trackingCode) => {
     return axiosClient.post(`${SHIPPING_ENDPOINT}/sync`, { trackingCode });
+  },
+
+  // Tính phí ship cho người mua lúc checkout
+  calculateFee: (data) => {
+    return axiosClient.post(`${SHIPPING_ENDPOINT}/calculate`, data);
   }
 };
 

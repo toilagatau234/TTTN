@@ -14,6 +14,9 @@ const voucherService = {
   },
   delete: (id) => {
     return axiosClient.delete(`${VOUCHER_ENDPOINT}/${id}`);
+  },
+  applyVoucher: (code, orderValue) => {
+    return axiosClient.post(`${VOUCHER_ENDPOINT}/apply`, { code, orderValue });
   }
 };
 

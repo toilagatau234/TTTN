@@ -1,9 +1,47 @@
 import { useState } from "react"
-import { Link } from "react-router-dom"
-import { Mail, Lock, Eye, EyeOff } from "lucide-react"
+import { Link, useNavigate } from "react-router-dom"
+import { Mail, Lock, Eye, EyeOff, Loader2 } from "lucide-react"
+import { message } from "antd"
+import authService from "../../../../services/authService"
 
 const Login = () => {
+  const navigate = useNavigate()
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
+  const [loading, setLoading] = useState(false)
+
+  const handleLogin = async (e) => {
+    e.preventDefault()
+
+    if (!email || !password) {
+      message.warning("Vui lòng nhập email và mật khẩu")
+      return
+    }
+
+    setLoading(true)
+    try {
+      const res = await authService.login(email, password)
+
+      if (res.success) {
+        // Lưu user + token vào localStorage
+        authService.saveUser(res.data)
+        message.success("Đăng nhập thành công!")
+
+        // Redirect dựa trên role
+        if (["Admin", "Manager", "Staff"].includes(res.data.role)) {
+          navigate("/admin")
+        } else {
+          navigate("/")
+        }
+      }
+    } catch (error) {
+      const msg = error?.response?.data?.message || "Đăng nhập thất bại"
+      message.error(msg)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center 
@@ -17,11 +55,11 @@ const Login = () => {
             Đăng nhập
           </h2>
           <p className="text-sm text-gray-400 mt-2">
-            Chào mừng bạn quay trở lại 
+            Chào mừng bạn quay trở lại
           </p>
         </div>
 
-        <div className="space-y-6">
+        <form onSubmit={handleLogin} className="space-y-6">
 
           {/* Email */}
           <div>
@@ -31,6 +69,8 @@ const Login = () => {
               <input
                 type="email"
                 placeholder="Nhập email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 className="w-full border border-pink-100 pl-12 pr-4 py-3 
                 rounded-2xl focus:outline-none focus:ring-2 focus:ring-pink-200"
               />
@@ -45,6 +85,8 @@ const Login = () => {
               <input
                 type={showPassword ? "text" : "password"}
                 placeholder="Nhập mật khẩu"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
                 className="w-full border border-pink-100 pl-12 pr-12 py-3 
                 rounded-2xl focus:outline-none focus:ring-2 focus:ring-pink-200"
               />
@@ -58,9 +100,15 @@ const Login = () => {
             </div>
           </div>
 
-          <button className="w-full bg-pink-400 hover:bg-pink-500 
-          text-white py-3 rounded-2xl transition shadow-md hover:shadow-lg">
-            Đăng nhập
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-pink-400 hover:bg-pink-500 disabled:opacity-60
+            text-white py-3 rounded-2xl transition shadow-md hover:shadow-lg
+            flex items-center justify-center gap-2"
+          >
+            {loading && <Loader2 size={18} className="animate-spin" />}
+            {loading ? "Đang đăng nhập..." : "Đăng nhập"}
           </button>
 
           <div className="text-center text-sm text-gray-500">
@@ -70,7 +118,7 @@ const Login = () => {
             </Link>
           </div>
 
-        </div>
+        </form>
       </div>
     </div>
   )
