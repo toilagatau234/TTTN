@@ -118,9 +118,8 @@ const createProduct = async (req, res) => {
     } catch (error) {
         // Cleanup images if save fails (only for multer uploads, client-side verified separately)
         if (req.files && req.files.length > 0) {
-            for (const file of req.files) {
-                await cloudinary.uploader.destroy(file.filename);
-            }
+            const destroyPromises = req.files.map(file => cloudinary.uploader.destroy(file.filename));
+            await Promise.all(destroyPromises);
         }
         res.status(500).json({ success: false, message: error.message });
     }
@@ -144,10 +143,12 @@ const updateProduct = async (req, res) => {
             const oldImages = product.images;
             const newImagePublicIds = newImages.map(img => img.publicId);
 
-            for (const img of oldImages) {
-                if (!newImagePublicIds.includes(img.publicId)) {
-                    await cloudinary.uploader.destroy(img.publicId);
-                }
+            const destroyPromises = oldImages
+                .filter(img => !newImagePublicIds.includes(img.publicId))
+                .map(img => cloudinary.uploader.destroy(img.publicId));
+
+            if (destroyPromises.length > 0) {
+                await Promise.all(destroyPromises);
             }
 
             updateData.images = newImages;
@@ -184,10 +185,12 @@ const deleteProduct = async (req, res) => {
 
         // Xóa toàn bộ ảnh của sản phẩm trên Cloudinary
         if (product.images && product.images.length > 0) {
-            for (const img of product.images) {
-                if (img.publicId) {
-                    await cloudinary.uploader.destroy(img.publicId);
-                }
+            const destroyPromises = product.images
+                .filter(img => img.publicId)
+                .map(img => cloudinary.uploader.destroy(img.publicId));
+
+            if (destroyPromises.length > 0) {
+                await Promise.all(destroyPromises);
             }
         }
 

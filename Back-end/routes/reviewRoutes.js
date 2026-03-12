@@ -8,6 +8,9 @@ const {
     toggleApproveReview,
 } = require('../controllers/reviewController');
 const { protect, authorize } = require('../middleware/auth');
+const validateObjectId = require('../middleware/validateObjectId');
+
+router.param('id', validateObjectId);
 
 // Public: xem đánh giá theo sản phẩm
 router.get('/product/:productId', getProductReviews);

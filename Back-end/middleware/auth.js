@@ -21,6 +21,7 @@ const protect = async (req, res, next) => {
             req.user = await User.findById(decoded.id).select('-password');
 
             if (!req.user) {
+                console.error('Auth middleware error: User không tồn tại (Token ID:', decoded.id, ')');
                 return res.status(401).json({
                     success: false,
                     message: 'Token không hợp lệ — User không tồn tại',
@@ -29,7 +30,7 @@ const protect = async (req, res, next) => {
 
             next();
         } catch (error) {
-            console.error('Auth middleware error:', error.message);
+            console.error('Auth middleware error (verify):', error.message);
             return res.status(401).json({
                 success: false,
                 message: 'Token không hợp lệ hoặc đã hết hạn',
@@ -38,6 +39,8 @@ const protect = async (req, res, next) => {
     }
 
     if (!token) {
+        console.error('Auth middleware error: Không có token trong header');
+        console.error('Headers nhận được:', req.headers);
         return res.status(401).json({
             success: false,
             message: 'Không có quyền truy cập — Vui lòng đăng nhập',

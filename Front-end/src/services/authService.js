@@ -11,6 +11,16 @@ const authService = {
     return axiosClient.post('/auth/register', { name, email, password });
   },
 
+  // Gửi mã OTP về email
+  sendOtp: (email) => {
+    return axiosClient.post('/auth/send-otp', { email });
+  },
+
+  // Xác nhận mã OTP
+  verifyOtp: (email, code) => {
+    return axiosClient.post('/auth/verify-otp', { email, code });
+  },
+
   // Lấy thông tin user hiện tại (từ token)
   getMe: () => {
     return axiosClient.get('/auth/me');
@@ -19,6 +29,7 @@ const authService = {
   // Đăng xuất
   logout: () => {
     localStorage.removeItem('user');
+    localStorage.removeItem('loginTime'); // Thêm dòng này để xoá loginTime
   },
 
   // Lấy user từ localStorage
@@ -40,6 +51,7 @@ const authService = {
   // Lưu user vào localStorage
   saveUser: (userData) => {
     localStorage.setItem('user', JSON.stringify(userData));
+    localStorage.setItem('loginTime', Date.now().toString()); // Thêm dòng này để đánh dấu
   },
 };
 

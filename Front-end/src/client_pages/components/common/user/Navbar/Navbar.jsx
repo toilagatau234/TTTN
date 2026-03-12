@@ -1,15 +1,21 @@
-import { Link } from "react-router-dom"
+import { Link, useNavigate } from "react-router-dom"
 import { useState, useEffect } from "react"
-import { Heart, ShoppingCart, User, Search } from "lucide-react"
+import { Heart, ShoppingCart, User, Search, LogOut } from "lucide-react"
 import { MessageCircle } from "lucide-react"
 import { Bell, Gift, Tag, Sparkles, X } from "lucide-react"
 import { Home, Flower, LayoutGrid, Shapes } from "lucide-react"
+import { message } from "antd"
 import cartService from "../../../../../services/cartService"
+import authService from "../../../../../services/authService"
 
 const Navbar = () => {
+  const navigate = useNavigate()
   const [openMenu, setOpenMenu] = useState(null)
   const [showAll, setShowAll] = useState(false)
   const [cartCount, setCartCount] = useState(0)
+
+  // Lấy thông tin tài khoản đang login
+  const currentUser = authService.getCurrentUser()
 
   const fetchCartCount = async () => {
     try {
@@ -32,6 +38,15 @@ const Navbar = () => {
     window.addEventListener("cartUpdated", fetchCartCount);
     return () => window.removeEventListener("cartUpdated", fetchCartCount);
   }, [])
+
+  // Xử lý Đăng xuất
+  const handleLogout = () => {
+    authService.logout()
+    window.dispatchEvent(new Event("cartUpdated")) // Reset cart badge
+    message.success("Đã đăng xuất thành công")
+    setOpenMenu(null)
+    navigate("/login")
+  }
 
   return (
     <header className="shadow-sm sticky top-0 z-50 bg-white">
@@ -68,7 +83,7 @@ const Navbar = () => {
                 </button>
 
                 {openMenu === "notify" && (
-                  <div className="absolute right-0 top-full mt-3 w-80 bg-white shadow-2xl rounded-3xl p-6 border border-pink-100 animate-in fade-in zoom-in-95 duration-200">
+                  <div className="absolute right-0 top-full mt-3 w-80 bg-white shadow-2xl rounded-3xl p-6 border border-pink-100 transition-all duration-200 opacity-100 translate-y-0 z-50">
                     <div className="flex items-center justify-between mb-5">
                       <p className="text-pink-400 font-semibold text-sm">
                         Thông báo
@@ -164,16 +179,42 @@ const Navbar = () => {
                 />
               </Link>
               {openMenu === "account" && (
-                <div className="absolute right-0 mt-3 w-40 bg-white shadow-lg rounded-xl p-3 text-fuchsia-400">
-                  <Link
-                    to="/profile"
-                    className="block py-2 text-sm hover:text-[#f472b6]"
-                  >
-                    Tài khoản
-                  </Link>
-                  <button className="block w-full text-left py-2 text-sm hover:text-red-500">
-                    Đăng xuất
-                  </button>
+                <div className="absolute right-0 mt-3 w-56 bg-white shadow-xl border border-pink-50 rounded-2xl p-2 text-gray-600 transition-all duration-200 opacity-100 translate-y-0 z-50">
+                  {currentUser ? (
+                    <>
+                      <div className="px-3 py-2 border-b border-pink-50 mb-2">
+                        <p className="text-sm font-semibold text-gray-800 line-clamp-1">{currentUser.name}</p>
+                        <p className="text-xs text-gray-400 truncate">{currentUser.email}</p>
+                      </div>
+                      <Link
+                        to="/profile"
+                        className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-pink-50 hover:text-pink-500 rounded-xl transition"
+                      >
+                        <User size={16} /> Tài khoản của tôi
+                      </Link>
+                      <button
+                        onClick={handleLogout}
+                        className="flex items-center gap-2 w-full text-left px-3 py-2 mt-1 text-sm text-red-500 hover:bg-red-50 rounded-xl transition"
+                      >
+                        <LogOut size={16} /> Đăng xuất
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <Link
+                        to="/login"
+                        className="block w-full text-center py-2 text-sm bg-pink-50 text-pink-500 font-medium hover:bg-pink-100 rounded-xl transition mb-1"
+                      >
+                        Đăng nhập
+                      </Link>
+                      <Link
+                        to="/register"
+                        className="block w-full text-center py-2 text-sm text-gray-500 hover:text-pink-500 hover:bg-pink-50 rounded-xl transition"
+                      >
+                        Đăng ký
+                      </Link>
+                    </>
+                  )}
                 </div>
               )}
             </div>
@@ -198,11 +239,11 @@ const Navbar = () => {
               Hoa tươi
             </span>
             {openMenu === "hoatuoi" && (
-              <div className="absolute top-full left-0 mt-2 bg-white shadow-xl rounded-2xl p-4 w-48 border border-pink-100 text-pink-500">
-                <Link to="/" className="block py-2 hover:text-pink-400">Hoa hồng</Link>
-                <Link to="/" className="block py-2 hover:text-pink-400">Hoa tulip</Link>
-                <Link to="/" className="block py-2 hover:text-pink-400">Hoa hướng dương</Link>
-                <Link to="/" className="block py-2 hover:text-pink-400">Hoa lan</Link>
+              <div className="absolute top-full left-0 mt-2 bg-white shadow-xl rounded-2xl p-4 w-48 border border-pink-100 text-pink-500 transition-all duration-200 opacity-100 translate-y-0 z-50">
+                <Link to="/" className="block py-2 hover:text-pink-400 hover:translate-x-1 transition-transform">Hoa hồng</Link>
+                <Link to="/" className="block py-2 hover:text-pink-400 hover:translate-x-1 transition-transform">Hoa tulip</Link>
+                <Link to="/" className="block py-2 hover:text-pink-400 hover:translate-x-1 transition-transform">Hoa hướng dương</Link>
+                <Link to="/" className="block py-2 hover:text-pink-400 hover:translate-x-1 transition-transform">Hoa lan</Link>
               </div>
             )}
           </div>
@@ -214,11 +255,11 @@ const Navbar = () => {
               Chủ đề
             </span>
             {openMenu === "chude" && (
-              <div className="absolute top-full left-0 mt-2 bg-white shadow-xl rounded-2xl p-4 w-48 border border-pink-100 text-pink-500">
-                <Link to="/" className="block py-2 hover:text-pink-400">Hoa cưới</Link>
-                <Link to="/" className="block py-2 hover:text-pink-400">Hoa sinh nhật</Link>
-                <Link to="/" className="block py-2 hover:text-pink-400">Hoa tốt nghiệp</Link>
-                <Link to="/" className="block py-2 hover:text-pink-400">Hoa khai trương</Link>
+              <div className="absolute top-full left-0 mt-2 bg-white shadow-xl rounded-2xl p-4 w-48 border border-pink-100 text-pink-500 transition-all duration-200 opacity-100 translate-y-0 z-50">
+                <Link to="/" className="block py-2 hover:text-pink-400 hover:translate-x-1 transition-transform">Hoa cưới</Link>
+                <Link to="/" className="block py-2 hover:text-pink-400 hover:translate-x-1 transition-transform">Hoa sinh nhật</Link>
+                <Link to="/" className="block py-2 hover:text-pink-400 hover:translate-x-1 transition-transform">Hoa tốt nghiệp</Link>
+                <Link to="/" className="block py-2 hover:text-pink-400 hover:translate-x-1 transition-transform">Hoa khai trương</Link>
               </div>
             )}
           </div>

@@ -1,9 +1,85 @@
 const User = require('../models/User');
+const Otp = require('../models/Otp');
 const jwt = require('jsonwebtoken');
+const { sendOtpEmail } = require('../utils/sendEmail');
+
+const OTP_EXPIRES_MINUTES = 5;
 
 // Hàm tạo Token
 const generateToken = (id, role) => {
   return jwt.sign({ id, role }, process.env.JWT_SECRET, { expiresIn: '30d' });
+};
+
+// @desc    Gửi mã OTP xác nhận email
+// @route   POST /api/auth/send-otp
+const sendOtp = async (req, res) => {
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({ success: false, message: 'Vui lòng nhập email' });
+  }
+
+  // Kiểm tra email đã tồn tại
+  const existingUser = await User.findOne({ email });
+  if (existingUser) {
+    return res.status(400).json({ success: false, message: 'Email này đã được đăng ký' });
+  }
+
+  try {
+    // Sinh mã OTP 6 số ngẫu nhiên
+    const code = String(Math.floor(100000 + Math.random() * 900000));
+
+    // Xoá OTP cũ (nếu có) rồi tạo mới
+    await Otp.deleteByEmail(email);
+    await Otp.create({
+      email: email.toLowerCase().trim(),
+      code,
+      expiresAt: new Date(Date.now() + OTP_EXPIRES_MINUTES * 60 * 1000),
+    });
+
+    // Gửi email
+    await sendOtpEmail(email, code, OTP_EXPIRES_MINUTES);
+
+    res.json({ success: true, message: `Mã OTP đã được gửi đến ${email}` });
+  } catch (error) {
+    console.error('Send OTP error:', error.message);
+    res.status(500).json({ success: false, message: 'Không thể gửi email. Vui lòng thử lại.' });
+  }
+};
+
+// @desc    Xác nhận mã OTP
+// @route   POST /api/auth/verify-otp
+const verifyOtp = async (req, res) => {
+  const { email, code } = req.body;
+
+  if (!email || !code) {
+    return res.status(400).json({ success: false, message: 'Thiếu email hoặc mã OTP' });
+  }
+
+  try {
+    const otp = await Otp.findOne({ email: email.toLowerCase().trim() });
+
+    if (!otp) {
+      return res.status(400).json({ success: false, message: 'Mã OTP không tồn tại hoặc đã hết hạn' });
+    }
+
+    if (otp.expiresAt < new Date()) {
+      await otp.deleteOne();
+      return res.status(400).json({ success: false, message: 'Mã OTP đã hết hạn. Vui lòng gửi lại.' });
+    }
+
+    if (otp.code !== String(code).trim()) {
+      return res.status(400).json({ success: false, message: 'Mã OTP không đúng' });
+    }
+
+    // Xoá OTP sau khi xác nhận thành công
+    await otp.deleteOne();
+
+    res.json({ success: true, message: 'Xác nhận email thành công' });
+  } catch (error) {
+    console.error('Verify OTP error:', error.message);
+    res.status(500).json({ success: false, message: 'Lỗi server' });
+  }
 };
 
 // @desc    Đăng ký user mới
@@ -12,7 +88,6 @@ const registerUser = async (req, res) => {
   const { name, email, password } = req.body;
 
   try {
-    // Kiểm tra các trường bắt buộc
     if (!name || !email || !password) {
       return res.status(400).json({
         success: false,
@@ -20,7 +95,6 @@ const registerUser = async (req, res) => {
       });
     }
 
-    // Kiểm tra mật khẩu tối thiểu 6 ký tự
     if (password.length < 6) {
       return res.status(400).json({
         success: false,
@@ -28,7 +102,6 @@ const registerUser = async (req, res) => {
       });
     }
 
-    // Kiểm tra email đã tồn tại chưa
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(400).json({
@@ -37,7 +110,6 @@ const registerUser = async (req, res) => {
       });
     }
 
-    // Tạo user mới (password sẽ tự động hash bởi middleware trong User model)
     const user = await User.create({ name, email, password });
 
     res.status(201).json({
@@ -63,10 +135,8 @@ const loginUser = async (req, res) => {
   const { email, password } = req.body;
 
   try {
-    // Tìm user trong DB
     const user = await User.findOne({ email });
 
-    // Kiểm tra user và mật khẩu
     if (user && (await user.matchPassword(password))) {
       res.json({
         success: true,
@@ -94,7 +164,6 @@ const loginUser = async (req, res) => {
 // @route   GET /api/auth/me
 const getMe = async (req, res) => {
   try {
-    // req.user đã được set bởi middleware protect
     const user = await User.findById(req.user._id).select('-password');
 
     if (!user) {
@@ -120,4 +189,4 @@ const getMe = async (req, res) => {
   }
 };
 
-module.exports = { registerUser, loginUser, getMe };
+module.exports = { sendOtp, verifyOtp, registerUser, loginUser, getMe };

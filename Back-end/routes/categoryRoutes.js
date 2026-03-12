@@ -3,6 +3,9 @@ const router = express.Router();
 const { createCategory, getCategories, updateCategory, deleteCategory } = require('../controllers/categoryController');
 const upload = require('../config/cloudinary');
 const { protect, authorize } = require('../middleware/auth');
+const validateObjectId = require('../middleware/validateObjectId');
+
+router.param('id', validateObjectId);
 
 // Public routes — Ai cũng xem được
 router.get('/', getCategories);

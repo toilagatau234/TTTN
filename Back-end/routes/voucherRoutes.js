@@ -9,6 +9,9 @@ const {
     applyVoucher,
 } = require('../controllers/voucherController');
 const { protect, authorize } = require('../middleware/auth');
+const validateObjectId = require('../middleware/validateObjectId');
+
+router.param('id', validateObjectId);
 
 // User: áp dụng voucher (cần đăng nhập)
 router.post('/apply', protect, applyVoucher);

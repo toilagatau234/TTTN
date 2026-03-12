@@ -10,6 +10,9 @@ const {
     calculateShippingFee,
 } = require('../controllers/shippingController');
 const { protect, authorize } = require('../middleware/auth');
+const validateObjectId = require('../middleware/validateObjectId');
+
+router.param('id', validateObjectId);
 
 // Public/User: tính phí ship (dùng ở checkout)
 router.post('/calculate', protect, calculateShippingFee);
