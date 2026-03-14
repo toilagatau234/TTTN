@@ -13,6 +13,7 @@ import PermissionGate from '../../components/PermissionGate';
 import { ACTION_PERMISSIONS } from '../../../constants/roles';
 import productService from '../../../services/productService';
 import categoryService from '../../../services/categoryService';
+import statsService from '../../../services/statsService';
 import CreateProductModal from './components/CreateProductModal';
 
 const { Option } = Select;
@@ -45,9 +46,11 @@ const ProductOverviewWidget = ({ total, active }) => {
           <div>
             <p className="text-gray-500 text-xs font-bold uppercase mb-1">Đang hoạt động</p>
             <h3 className="text-2xl font-bold text-navy-700">{active || 0}</h3>
-            <p className="text-xs font-bold text-navy-700 flex items-center gap-1">
-              98% <span className="text-gray-400 font-medium">trên tổng số</span>
-            </p>
+            {total > 0 && (
+              <p className="text-xs font-bold text-navy-700 flex items-center gap-1">
+                {Math.round((active / total) * 100)}% <span className="text-gray-400 font-medium">trên tổng số</span>
+              </p>
+            )}
           </div>
         </div>
       </div>
@@ -56,32 +59,20 @@ const ProductOverviewWidget = ({ total, active }) => {
 };
 
 // --- ALERT WIDGET ---
-const ProductAlertWidget = () => {
-  const [filter, setFilter] = useState('today');
-
-  const alerts = [
-    { label: 'Low Stock', value: 5, icon: <WarningOutlined />, color: 'text-orange-500', bg: 'bg-orange-50' },
-    { label: 'Expired', value: 2, icon: <ClockCircleOutlined />, color: 'text-red-500', bg: 'bg-red-50' },
-    { label: '1 Star Rating', value: 1, icon: <StarOutlined />, color: 'text-yellow-500', bg: 'bg-yellow-50' },
+const ProductAlertWidget = ({ alerts }) => {
+  const alertData = [
+    { label: 'Sắp hết hàng', value: alerts?.lowStock || 0, icon: <WarningOutlined />, color: 'text-orange-500', bg: 'bg-orange-50' },
+    { label: 'Hết hàng', value: alerts?.outOfStock || 0, icon: <ClockCircleOutlined />, color: 'text-red-500', bg: 'bg-red-50' },
+    { label: 'Đánh giá thấp', value: alerts?.lowRating || 0, icon: <StarOutlined />, color: 'text-yellow-500', bg: 'bg-yellow-50' },
   ];
 
   return (
     <div className="bg-white rounded-[20px] shadow-sm p-6 h-full flex flex-col">
       <div className="flex justify-between items-center mb-6">
         <h4 className="text-lg font-bold text-navy-700">Cần chú ý (Alerts)</h4>
-        <Select
-          value={filter}
-          onChange={setFilter}
-          bordered={false}
-          className="bg-[#F4F7FE] rounded-lg font-bold text-gray-600 min-w-[110px]"
-        >
-          <Option value="today">Hôm nay</Option>
-          <Option value="yesterday">Hôm qua</Option>
-          <Option value="week">Tuần này</Option>
-        </Select>
       </div>
       <div className="flex justify-between gap-4 flex-1 items-center">
-        {alerts.map((item, index) => (
+        {alertData.map((item, index) => (
           <div key={index} className="flex flex-col items-center flex-1 text-center p-3 rounded-xl hover:bg-gray-50 transition-colors cursor-pointer group">
             <div className={`w-10 h-10 rounded-full ${item.bg} ${item.color} flex items-center justify-center text-xl mb-2 transition-transform group-hover:scale-110`}>
               {item.icon}
@@ -115,6 +106,13 @@ const ProductPage = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
 
+  // Widget State
+  const [productStats, setProductStats] = useState({
+    totalProducts: 0,
+    activeProducts: 0,
+    alerts: { outOfStock: 0, lowStock: 0, lowRating: 0 }
+  });
+
   // Load Categories for Filter
   useEffect(() => {
     const fetchCategories = async () => {
@@ -130,7 +128,7 @@ const ProductPage = () => {
     fetchCategories();
   }, []);
 
-  // Fetch Products
+  // Fetch Products & Stats
   const fetchProducts = async (page = 1, pageSize = 10) => {
     setLoading(true);
     try {
@@ -141,7 +139,11 @@ const ProductPage = () => {
         category: categoryFilter
       };
 
-      const res = await productService.getAll(params);
+      const [res, statsRes] = await Promise.all([
+        productService.getAll(params),
+        statsService.getProductStats()
+      ]);
+
       if (res.success) {
         setData(res.data);
         setPagination({
@@ -150,8 +152,12 @@ const ProductPage = () => {
           total: res.pagination.total
         });
       }
+      
+      if (statsRes.success) {
+        setProductStats(statsRes.data);
+      }
     } catch (error) {
-      message.error("Không thể tải danh sách sản phẩm");
+      message.error("Không thể tải dữ liệu sản phẩm");
     } finally {
       setLoading(false);
     }
@@ -341,8 +347,8 @@ const ProductPage = () => {
 
       {/* --- WIDGETS --- */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-6">
-        <ProductOverviewWidget total={pagination.total} active={pagination.total} />
-        <ProductAlertWidget />
+        <ProductOverviewWidget total={productStats.totalProducts} active={productStats.activeProducts} />
+        <ProductAlertWidget alerts={productStats.alerts} />
       </div>
 
       {/* --- TABLE --- */}

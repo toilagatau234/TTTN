@@ -9,28 +9,57 @@ import {
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import MiniStatistics from './components/MiniStatistics';
 import ComplexTable from './components/ComplexTable';
+import statsService from '../../../services/statsService';
 
 const Dashboard = () => {
   const [loading, setLoading] = useState(true);
+  const [statsData, setStatsData] = useState({
+    totalOrders: 0,
+    totalRevenue: 0,
+    totalUsers: 0,
+    totalProducts: 0,
+  });
+  const [chartData, setChartData] = useState([]);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setLoading(false);
-    }, 1000);
+    const fetchDashboardData = async () => {
+      setLoading(true);
+      try {
+        const [overviewRes, revenueRes] = await Promise.all([
+          statsService.getOverview(),
+          statsService.getRevenueStats({ period: 'week' })  // Lấy danh thu tuần này
+        ]);
 
-    return () => clearTimeout(timer);
+        if (overviewRes.success) {
+          setStatsData({
+            totalOrders: overviewRes.data.totalOrders,
+            totalRevenue: overviewRes.data.totalRevenue,
+            totalUsers: overviewRes.data.totalUsers,
+            totalProducts: overviewRes.data.totalProducts,
+          });
+        }
+
+        if (revenueRes.success) {
+          // Format data for Recharts (e.g., date: '2023-10-01' -> name: '01/10')
+          const formattedChart = revenueRes.data.map(item => {
+            const dateObj = new Date(item._id);
+            const dayName = dateObj.toLocaleDateString('vi-VN', { weekday: 'short' }); // T2, T3...
+            return {
+              name: dayName,
+              revenue: item.revenue
+            };
+          });
+          setChartData(formattedChart);
+        }
+      } catch (error) {
+        console.error("Failed to fetch dashboard data", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDashboardData();
   }, []);
-
-  // Dữ liệu biểu đồ giả
-  const chartData = [
-    { name: 'T2', revenue: 4000 },
-    { name: 'T3', revenue: 3000 },
-    { name: 'T4', revenue: 2000 },
-    { name: 'T5', revenue: 2780 },
-    { name: 'T6', revenue: 1890 },
-    { name: 'T7', revenue: 2390 },
-    { name: 'CN', revenue: 3490 },
-  ];
 
   const CardBox = ({ children, title, extraClass = '' }) => (
     <div className={`bg-white p-5 rounded-[20px] shadow-sm ${extraClass}`}>
@@ -55,30 +84,29 @@ const Dashboard = () => {
           loading={loading}
           icon={<BarChartOutlined />}
           title="Doanh thu"
-          value="350.400"
-          prefix="₫"
-          growth={12.5}
+          value={statsData.totalRevenue.toLocaleString()}
+          prefix="₫ "
+          growth={0}
         />
         <MiniStatistics
           loading={loading}
           icon={<ShoppingCartOutlined />}
           title="Đơn hàng"
-          value="64"
-          growth={-2.4}
+          value={statsData.totalOrders.toLocaleString()}
+          growth={0}
         />
         <MiniStatistics
           loading={loading}
           icon={<UsergroupAddOutlined />}
           title="Khách hàng"
-          value="1,203"
-          growth={8.2}
+          value={statsData.totalUsers.toLocaleString()}
+          growth={0}
         />
         <MiniStatistics
           loading={loading}
           icon={<WalletOutlined />}
-          title="Số dư ví"
-          value="12M"
-          prefix="₫"
+          title="Hoa đang bán"
+          value={statsData.totalProducts.toLocaleString()}
         />
       </div>
 

@@ -1,6 +1,7 @@
 import axiosClient from "./axiosClient";
 
 const USER_ENDPOINT = '/users';
+const UPLOAD_ENDPOINT = '/upload';
 
 const userService = {
   // --- CURRENT USER PROFILE ---
@@ -23,6 +24,15 @@ const userService = {
   },
   delete: (id) => {
     return axiosClient.delete(`${USER_ENDPOINT}/${id}`);
+  },
+
+  // --- UPLOAD ROUTES ---
+  uploadImage: (formData) => {
+    return axiosClient.post(UPLOAD_ENDPOINT, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
   }
 };
 

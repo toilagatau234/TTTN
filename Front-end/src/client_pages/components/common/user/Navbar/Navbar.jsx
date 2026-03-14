@@ -32,8 +32,6 @@ const Navbar = () => {
   }
 
   useEffect(() => {
-    fetchCartCount();
-
     // Lắng nghe event từ ProductDetail (khi thêm vào giỏ) và Cart/Checkout
     window.addEventListener("cartUpdated", fetchCartCount);
     return () => window.removeEventListener("cartUpdated", fetchCartCount);
@@ -180,6 +178,7 @@ const Navbar = () => {
               </Link>
               {openMenu === "account" && (
                 <div className="absolute right-0 mt-3 w-56 bg-white shadow-xl border border-pink-50 rounded-2xl p-2 text-gray-600 transition-all duration-200 opacity-100 translate-y-0 z-50">
+                  <div className="absolute -top-4 left-0 w-full h-4 bg-transparent" />
                   {currentUser ? (
                     <>
                       <div className="px-3 py-2 border-b border-pink-50 mb-2">
@@ -240,6 +239,7 @@ const Navbar = () => {
             </span>
             {openMenu === "hoatuoi" && (
               <div className="absolute top-full left-0 mt-2 bg-white shadow-xl rounded-2xl p-4 w-48 border border-pink-100 text-pink-500 transition-all duration-200 opacity-100 translate-y-0 z-50">
+                <div className="absolute -top-4 left-0 w-full h-4 bg-transparent" />
                 <Link to="/" className="block py-2 hover:text-pink-400 hover:translate-x-1 transition-transform">Hoa hồng</Link>
                 <Link to="/" className="block py-2 hover:text-pink-400 hover:translate-x-1 transition-transform">Hoa tulip</Link>
                 <Link to="/" className="block py-2 hover:text-pink-400 hover:translate-x-1 transition-transform">Hoa hướng dương</Link>
@@ -256,6 +256,7 @@ const Navbar = () => {
             </span>
             {openMenu === "chude" && (
               <div className="absolute top-full left-0 mt-2 bg-white shadow-xl rounded-2xl p-4 w-48 border border-pink-100 text-pink-500 transition-all duration-200 opacity-100 translate-y-0 z-50">
+                <div className="absolute -top-4 left-0 w-full h-4 bg-transparent" />
                 <Link to="/" className="block py-2 hover:text-pink-400 hover:translate-x-1 transition-transform">Hoa cưới</Link>
                 <Link to="/" className="block py-2 hover:text-pink-400 hover:translate-x-1 transition-transform">Hoa sinh nhật</Link>
                 <Link to="/" className="block py-2 hover:text-pink-400 hover:translate-x-1 transition-transform">Hoa tốt nghiệp</Link>

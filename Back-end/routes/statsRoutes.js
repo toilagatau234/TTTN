@@ -6,6 +6,7 @@ const {
     getTopProducts,
     getOrderStatusStats,
     getRecentOrders,
+    getProductStats,
 } = require('../controllers/statsController');
 const { protect, authorize } = require('../middleware/auth');
 
@@ -18,5 +19,6 @@ router.get('/revenue', getRevenueStats);
 router.get('/top-products', getTopProducts);
 router.get('/order-status', getOrderStatusStats);
 router.get('/recent-orders', getRecentOrders);
+router.get('/products', getProductStats);
 
 module.exports = router;

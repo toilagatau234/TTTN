@@ -10,6 +10,10 @@ const userSchema = new mongoose.Schema({
     enum: ['Admin', 'Manager', 'Staff', 'Warehouse', 'User'],
     default: 'User'
   },
+  phone: { type: String, default: '' },
+  address: { type: String, default: '' },
+  gender: { type: String, enum: ['Nam', 'Nữ', 'Khác'], default: 'Khác' },
+  dateOfBirth: { type: Date },
   avatar: { type: String, default: '' },
 }, { timestamps: true });
 

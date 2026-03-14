@@ -181,6 +181,10 @@ const getMe = async (req, res) => {
         email: user.email,
         role: user.role,
         avatar: user.avatar,
+        phone: user.phone,
+        address: user.address,
+        gender: user.gender,
+        dateOfBirth: user.dateOfBirth,
         createdAt: user.createdAt,
       },
     });

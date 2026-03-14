@@ -196,7 +196,7 @@ const updateProfile = async (req, res) => {
             });
         }
 
-        const { name, email, avatar, currentPassword, newPassword } = req.body;
+        const { name, email, avatar, phone, address, gender, dateOfBirth, currentPassword, newPassword } = req.body;
 
         // Đổi email → kiểm tra trùng
         if (email && email !== user.email) {
@@ -212,6 +212,10 @@ const updateProfile = async (req, res) => {
 
         if (name) user.name = name;
         if (avatar !== undefined) user.avatar = avatar;
+        if (phone !== undefined) user.phone = phone;
+        if (address !== undefined) user.address = address;
+        if (gender !== undefined) user.gender = gender;
+        if (dateOfBirth !== undefined) user.dateOfBirth = dateOfBirth;
 
         // Đổi mật khẩu (phải cung cấp mật khẩu cũ)
         if (newPassword) {
@@ -249,6 +253,10 @@ const updateProfile = async (req, res) => {
                 _id: user._id,
                 name: user.name,
                 email: user.email,
+                phone: user.phone,
+                address: user.address,
+                gender: user.gender,
+                dateOfBirth: user.dateOfBirth,
                 role: user.role,
                 avatar: user.avatar,
             },

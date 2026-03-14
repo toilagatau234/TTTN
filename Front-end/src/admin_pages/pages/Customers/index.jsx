@@ -58,12 +58,6 @@ const CustomersPage = () => {
         setIsModalOpen(false);
     };
 
-    const handleDelete = (key) => {
-        setData(data.filter(item => item.key !== key));
-        message.success('Đã xóa khách hàng');
-    };
-
-    // Render Rank Tag
     const renderRank = (rank) => {
         let color = rank === 'Gold' ? 'gold' : (rank === 'Silver' ? 'cyan' : 'orange');
         return <Tag icon={<SafetyCertificateOutlined />} color={color}>{rank} Member</Tag>;
@@ -122,7 +116,7 @@ const CustomersPage = () => {
     ];
 
     // --- NỘI DUNG DRAWER CHI TIẾT ---
-    const CustomerDetailContent = () => (
+    const renderCustomerDetailContent = () => (
         <div>
             {/* Header Profile */}
             <div className="flex items-center gap-4 mb-6 p-4 bg-gradient-to-r from-blue-50 to-white rounded-2xl">
@@ -231,7 +225,7 @@ const CustomersPage = () => {
                 width={500}
                 className="custom-drawer-metrix"
             >
-                {selectedCustomer && <CustomerDetailContent />}
+                {selectedCustomer && renderCustomerDetailContent()}
             </Drawer>
 
             <CreateCustomerModal open={isModalOpen} onCancel={() => setIsModalOpen(false)} onCreate={handleCreate} />

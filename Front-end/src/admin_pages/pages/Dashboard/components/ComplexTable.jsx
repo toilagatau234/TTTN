@@ -1,52 +1,42 @@
-import React from 'react';
-import { Table, Progress, Tooltip } from 'antd';
+import React, { useState, useEffect } from 'react';
+import { Table, Progress, Tooltip, message } from 'antd';
 import { 
   CheckCircleOutlined, 
   CloseCircleOutlined, 
   ExclamationCircleOutlined,
   InfoCircleOutlined
 } from '@ant-design/icons';
+import statsService from '../../../../services/statsService';
 
 const ComplexTable = () => {
-  
-  // Dữ liệu giả
-  const data = [
-    {
-      key: '1',
-      name: 'Bó Hoa Hồng Đỏ (Red Rose)',
-      image: 'https://images.unsplash.com/photo-1562690868-60bbe7293e94?auto=format&fit=crop&w=64&q=80',
-      status: 'Approved',
-      price: '550.000 ₫',
-      stock: 90,
-    },
-    {
-      key: '2',
-      name: 'Lẵng Hoa Hướng Dương',
-      image: 'https://images.unsplash.com/photo-1597826368522-9f4a53586d0e?auto=format&fit=crop&w=64&q=80',
-      status: 'Disable',
-      price: '850.000 ₫',
-      stock: 15, // Sắp hết
-    },
-    {
-      key: '3',
-      name: 'Hoa Tulip Hà Lan',
-      image: 'https://images.unsplash.com/photo-1588825838638-349f291350a4?auto=format&fit=crop&w=64&q=80',
-      status: 'Error',
-      price: '1.200.000 ₫',
-      stock: 0, // Hết hàng
-    },
-    {
-      key: '4',
-      name: 'Hộp Hoa Baby Blue',
-      image: 'https://images.unsplash.com/photo-1523694576728-a3672d5b61b4?auto=format&fit=crop&w=64&q=80',
-      status: 'Approved',
-      price: '450.000 ₫',
-      stock: 100,
-    },
-  ];
+  const [data, setData] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // Định nghĩa các cột
-  const columns = [
+  useEffect(() => {
+    const fetchTopProducts = async () => {
+      try {
+        const res = await statsService.getTopProducts({ limit: 5 });
+        if (res.success) {
+          // Format data for table
+          const formattedData = res.data.map((item) => ({
+            key: item._id,
+            name: item.name,
+            image: item.images?.[0]?.url || 'https://placehold.co/64',
+            status: item.stock === 0 ? 'Error' : (item.stock < 10 ? 'Disable' : 'Approved'),
+            price: `${item.price.toLocaleString()} ₫`,
+            stock: item.stock,
+          }));
+          setData(formattedData);
+        }
+      } catch (error) {
+        console.error("Failed to fetch top products", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTopProducts();
+  }, []);
     {
       title: 'TÊN SẢN PHẨM',
       dataIndex: 'name',
@@ -114,17 +104,16 @@ const ComplexTable = () => {
       title: 'TỒN KHO',
       dataIndex: 'stock',
       key: 'stock',
-      render: (percent) => (
+      render: (stockVal) => (
         <div className="w-full max-w-[140px]">
-          <div className="flex justify-between mb-1">
-             <span className="text-xs font-medium text-gray-500">{percent}%</span>
+           <div className="flex justify-between mb-1">
+             <span className="text-xs font-medium text-gray-500">{stockVal} Sp</span>
           </div>
-          <Tooltip title={`Còn lại: ${percent}%`}>
+          <Tooltip title={`Tồn kho: ${stockVal} sản phẩm`}>
             <Progress 
-              percent={percent} 
+              percent={stockVal > 100 ? 100 : stockVal} 
               showInfo={false} 
-              // Đổi màu thanh dựa trên %
-              strokeColor={percent < 20 ? "#FF4D4F" : "#4318FF"} 
+              strokeColor={stockVal < 10 ? "#FF4D4F" : "#4318FF"} 
               trailColor="#EFF4FB"
               size="small"
               strokeLinecap="round" 
@@ -141,6 +130,7 @@ const ComplexTable = () => {
         columns={columns} 
         dataSource={data} 
         pagination={false} 
+        loading={loading}
         className="custom-table-metrix"
       />
     </div>

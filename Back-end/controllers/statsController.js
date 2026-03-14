@@ -136,10 +136,47 @@ const getRecentOrders = async (req, res) => {
     }
 };
 
+// @desc    Thống kê sản phẩm (Overview & Alerts)
+// @route   GET /api/stats/products
+const getProductStats = async (req, res) => {
+    try {
+        const [
+            totalProducts,
+            activeProducts,
+            outOfStockProducts,
+            lowStockProducts,
+            lowRatingProducts,
+        ] = await Promise.all([
+            Product.countDocuments(),
+            Product.countDocuments({ status: 'active' }),
+            Product.countDocuments({ stock: 0 }),
+            Product.countDocuments({ stock: { $gt: 0, $lte: 10 } }),
+            Product.countDocuments({ averageRating: { $lt: 3, $gt: 0 } })
+        ]);
+
+        res.json({
+            success: true,
+            data: {
+                totalProducts,
+                activeProducts,
+                alerts: {
+                    outOfStock: outOfStockProducts,
+                    lowStock: lowStockProducts,
+                    lowRating: lowRatingProducts,
+                }
+            }
+        });
+    } catch (error) {
+        console.error('Get product stats error:', error.message);
+        res.status(500).json({ success: false, message: 'Lỗi server' });
+    }
+};
+
 module.exports = {
     getOverview,
     getRevenueStats,
     getTopProducts,
     getOrderStatusStats,
     getRecentOrders,
+    getProductStats,
 };
