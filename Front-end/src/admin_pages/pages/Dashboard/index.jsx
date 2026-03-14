@@ -116,7 +116,7 @@ const Dashboard = () => {
         {/* Biểu đồ cột */}
         <CardBox title="Doanh thu tuần này" extraClass="lg:col-span-2 min-h-[350px]">
           <div className="h-[300px] w-full" style={{ minHeight: '300px' }}>
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minHeight={300} minWidth={0}>
               <BarChart data={chartData}>
                 <XAxis
                   dataKey="name"

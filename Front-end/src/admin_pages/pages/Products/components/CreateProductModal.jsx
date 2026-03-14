@@ -200,7 +200,7 @@ const CreateProductModal = ({ open, onCancel, onSuccess, initialData }) => {
         footer={null}
         width={800}
         centered
-        destroyOnClose
+        destroyOnHidden
         className="product-modal"
       >
         <Form form={form} layout="vertical" onFinish={onFinish} className="mt-4">

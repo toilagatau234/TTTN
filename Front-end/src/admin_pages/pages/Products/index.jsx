@@ -367,7 +367,7 @@ const ProductPage = () => {
               value={categoryFilter}
               onChange={setCategoryFilter}
               className="w-[180px] h-[40px] custom-select-metrix bg-[#F4F7FE] rounded-xl"
-              bordered={false}
+              variant="borderless"
             >
               <Option value="all">Tất cả danh mục</Option>
               {categories.map(cat => (

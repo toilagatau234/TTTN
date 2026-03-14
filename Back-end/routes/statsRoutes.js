@@ -17,8 +17,8 @@ router.use(authorize('Admin', 'Manager'));
 router.get('/overview', getOverview);
 router.get('/revenue', getRevenueStats);
 router.get('/top-products', getTopProducts);
-router.get('/order-status', getOrderStatusStats);
-router.get('/recent-orders', getRecentOrders);
-router.get('/products', getProductStats);
+router.get('/order-status', protect, authorize, getOrderStatusStats);
+router.get('/recent-orders', protect, authorize, getRecentOrders);
+router.get('/products', protect, authorize, getProductStats);
 
 module.exports = router;
