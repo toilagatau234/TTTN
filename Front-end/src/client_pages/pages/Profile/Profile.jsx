@@ -75,8 +75,10 @@ const Profile = () => {
           address: profileRes.data.address || "",
           avatar: profileRes.data.avatar || "https://placehold.co/150",
         });
-        // Update local storage user info
-        authService.saveUser(profileRes.data);
+
+        const currentUser = authService.getCurrentUser();
+        const updatedUser = { ...profileRes.data, token: currentUser?.token };
+        authService.saveUser(updatedUser);
       }
 
       if (ordersRes.success) {
