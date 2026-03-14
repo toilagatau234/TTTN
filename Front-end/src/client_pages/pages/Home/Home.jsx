@@ -1,3 +1,4 @@
+import React, { useMemo } from 'react'
 import Features from "../../components/common/user/Features/Features"
 import ProductCard from "../../components/common/user/ProductCard/ProductCard"
 import Banner from "../../components/common/user/Banner/Banner"
@@ -6,9 +7,11 @@ import { Link } from "react-router-dom"
 
 const Home = () => {
 
-  const randomProducts = [...products]
-  .sort(() => 0.5 - Math.random())
-  .slice(0, 4)
+  const randomProducts = useMemo(() => {
+    return [...products]
+      .sort(() => 0.5 - Math.random())
+      .slice(0, 4);
+  }, []);
 
   return (
     <div className="bg-[#fffafc]">

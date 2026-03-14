@@ -33,10 +33,9 @@ export const MENU_PERMISSIONS = {
 
   //// Quyền cho nhóm CMS
   'sub-cms':              [ROLES.ADMIN, ROLES.MANAGER, ROLES.STAFF],
-  '/admin/cms/banners':   [ROLES.ADMIN, ROLES.MANAGER, ROLES.STAFF],
   '/admin/cms/blogs':     [ROLES.ADMIN, ROLES.MANAGER, ROLES.STAFF],
 
-  '/admin/staff':         [ROLES.ADMIN],
+
 
   // Nhóm Vận chuyển
   '/admin/shipping': [ROLES.ADMIN, ROLES.MANAGER, ROLES.WAREHOUSE, ROLES.SALE],

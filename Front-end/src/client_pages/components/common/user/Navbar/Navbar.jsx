@@ -32,6 +32,11 @@ const Navbar = () => {
   }
 
   useEffect(() => {
+    const init = async () => {
+      await fetchCartCount();
+    }
+    init();
+
     // Lắng nghe event từ ProductDetail (khi thêm vào giỏ) và Cart/Checkout
     window.addEventListener("cartUpdated", fetchCartCount);
     return () => window.removeEventListener("cartUpdated", fetchCartCount);

@@ -37,6 +37,8 @@ const ComplexTable = () => {
 
     fetchTopProducts();
   }, []);
+
+  const columns = [
     {
       title: 'TÊN SẢN PHẨM',
       dataIndex: 'name',
