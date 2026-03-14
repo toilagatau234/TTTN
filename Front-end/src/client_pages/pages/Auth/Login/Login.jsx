@@ -22,9 +22,10 @@ const Login = () => {
     setLoading(true)
     try {
       const res = await authService.login(email, password)
+      console.log('Client Login API Response:', res); // Log raw response
 
       if (res.success) {
-        // Lưu user + token vào localStorage
+        console.log('Client saving user data to localStorage:', res.data); // Log what's being saved
         authService.saveUser(res.data)
         message.success("Đăng nhập thành công!")
 

@@ -228,10 +228,17 @@ const AdminLayout = () => {
                 >
                     {/* Phần Trái: Breadcrumb & Title */}
                     <div className="flex flex-col mb-4 md:mb-0 w-full md:w-auto">
-                        <Breadcrumb className="text-sm text-gray-500 mb-1">
-                            <Breadcrumb.Item>Pages</Breadcrumb.Item>
-                            <Breadcrumb.Item className="text-gray-800 font-medium">{currentBreadcrumb}</Breadcrumb.Item>
-                        </Breadcrumb>
+                        <Breadcrumb 
+                            className="text-sm text-gray-500 mb-1"
+                            items={[
+                                {
+                                    title: 'pages'
+                                },
+                                {
+                                    title: <span className='text-gray-800 font-medium'>{currentBreadcrumb} </span>
+                                }
+                            ]}
+                        />
                         
                         <div className="flex items-center gap-2">
                             {/* Nút thu/phóng Menu cho Mobile (chỉ hiện trên màn hình nhỏ) */}
@@ -255,7 +262,7 @@ const AdminLayout = () => {
                             <SearchOutlined className="text-gray-400 mr-2" />
                             <Input 
                                 placeholder="Tìm kiếm..." 
-                                bordered={false} 
+                                variant="outlined" 
                                 className="p-0 text-sm bg-transparent shadow-none focus:ring-0 w-full" 
                             />
                         </div>

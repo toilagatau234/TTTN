@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Form, Input, Button, Checkbox, message } from 'antd';
 import { UserOutlined, LockOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-// import authService from '../../../services/authService'; // Nếu bạn đã có authService thì mở comment này
+import authService from '../../../services/authService';
 
 const LoginPage = () => {
     const [loading, setLoading] = useState(false);
@@ -11,27 +11,25 @@ const LoginPage = () => {
     const onFinish = async (values) => {
         setLoading(true);
         try {
-            // TODO: Kết nối API thật ở đây
-            // const response = await authService.login(values.email, values.password);
-            
-            // GIẢ LẬP ĐĂNG NHẬP THÀNH CÔNG (Tạm thời)
-            setTimeout(() => {
-                const fakeAdmin = {
-                    name: "Super Admin",
-                    role: "Admin", // Role quyết định menu nào được hiện
-                    token: "fake-jwt-token-12345"
-                };
-                
-                // Lưu vào localStorage
-                localStorage.setItem('user', JSON.stringify(fakeAdmin));
-                
-                message.success('Đăng nhập thành công!');
-                navigate('/admin/dashboard'); // Chuyển hướng vào trang quản trị
-                setLoading(false);
-            }, 1000);
+            // Gọi API đăng nhập thật
+            const response = await authService.login(values.email, values.password);
+            console.log('[Login] Raw response:', response);
 
-        } catch (error) {
-            message.error('Sai tài khoản hoặc mật khẩu!');
+            // Backend trả về { success: true, data: { token, name, role, ... } }
+            if (response && response.data) {
+                console.log('[Login] Data to save:', response.data);
+                // Lưu toàn bộ data (bao gồm token, name, role) vào localStorage
+                authService.saveUser(response.data);
+                message.success('Đăng nhập thành công!');
+                navigate('/admin/dashboard');
+            } else {
+                message.error('Phản hồi từ server không hợp lệ!');
+            }
+        }
+        catch (error) {
+            const errMsg = error?.response?.data?.message || 'Sai tài khoản hoặc mật khẩu!';
+            message.error(errMsg);
+        } finally {
             setLoading(false);
         }
     };
