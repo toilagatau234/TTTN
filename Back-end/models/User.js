@@ -10,6 +10,11 @@ const userSchema = new mongoose.Schema({
     enum: ['Admin', 'Manager', 'Staff', 'Warehouse', 'User'],
     default: 'User'
   },
+  status: {
+    type: String,
+    enum: ['Active', 'Blocked'],
+    default: 'Active'
+  },
   phone: { type: String, default: '' },
   address: { type: String, default: '' },
   gender: { type: String, enum: ['Nam', 'Nữ', 'Khác'], default: 'Khác' },

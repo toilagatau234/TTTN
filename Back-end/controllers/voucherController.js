@@ -8,10 +8,15 @@ const Voucher = require('../models/Voucher');
 // @route   GET /api/vouchers
 const getVouchers = async (req, res) => {
     try {
-        const { isActive, page = 1, limit = 20 } = req.query;
+        const { isActive, code, page = 1, limit = 20 } = req.query;
 
         const filter = {};
-        if (isActive !== undefined) filter.isActive = isActive === 'true';
+        if (isActive && isActive !== 'all') {
+            filter.isActive = isActive === 'active';
+        }
+        if (code) {
+            filter.code = { $regex: code, $options: 'i' };
+        }
 
         const total = await Voucher.countDocuments(filter);
         const vouchers = await Voucher.find(filter)

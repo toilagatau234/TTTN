@@ -122,7 +122,7 @@ const ChatPage = () => {
                <Button type="text" shape="circle" icon={<PaperClipOutlined />} className="text-gray-500" />
                <Input 
                   placeholder="Nhập tin nhắn..." 
-                  bordered={false} 
+                  variant="bordered" 
                   className="bg-transparent"
                   value={messageInput}
                   onChange={(e) => setMessageInput(e.target.value)}

@@ -140,7 +140,7 @@ const StaffPage = () => {
          <div className="flex flex-wrap gap-4 mb-6 justify-between">
             <div className="flex flex-wrap gap-3 w-full md:w-auto">
                <Input prefix={<SearchOutlined className="text-gray-400" />} placeholder="Tìm tên, email..." className="w-[250px] rounded-xl h-[40px] bg-[#F4F7FE] border-none" />
-               <Select defaultValue="all" className="w-[150px] h-[40px] custom-select-metrix bg-[#F4F7FE] rounded-xl" bordered={false}>
+               <Select defaultValue="all" className="w-[150px] h-[40px] custom-select-metrix bg-[#F4F7FE] rounded-xl" variant="bordered">
                  <Option value="all">Tất cả bộ phận</Option>
                  <Option value="sale">Kinh doanh</Option>
                  <Option value="warehouse">Kho vận</Option>

@@ -1,10 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Modal, Form, Input, Select, Button, Upload, message, Row, Col } from 'antd';
 import { 
   UserOutlined, 
   MailOutlined, 
   PhoneOutlined, 
-  LockOutlined, 
   UploadOutlined,
   LoadingOutlined
 } from '@ant-design/icons';
@@ -12,11 +11,24 @@ import userService from '../../../../services/userService';
 
 const { Option } = Select;
 
-const CreateCustomerModal = ({ open, onCancel, onCreate }) => {
+const UpdateCustomerModal = ({ open, onCancel, onUpdate, customer }) => {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [imageUrl, setImageUrl] = useState(null);
   const [uploading, setUploading] = useState(false);
+
+  useEffect(() => {
+    if (open && customer) {
+      form.setFieldsValue({
+        name: customer.name,
+        email: customer.email,
+        phone: customer.phone,
+        role: customer.role || 'User',
+        status: customer.status || 'Active',
+      });
+      setImageUrl(customer.avatar || null);
+    }
+  }, [open, customer, form]);
 
   const handleUpload = async (options) => {
     const { file, onSuccess, onError } = options;
@@ -48,12 +60,12 @@ const CreateCustomerModal = ({ open, onCancel, onCreate }) => {
       const values = await form.validateFields();
       if (imageUrl) {
         values.avatar = imageUrl;
+      } else {
+        values.avatar = null; 
       }
       setLoading(true);
 
-      await onCreate(values);
-      form.resetFields();
-      setImageUrl(null); // Reset image
+      await onUpdate(customer._id, values);
       setLoading(false);
     } catch (error) {
       console.log('Validate Failed:', error);
@@ -63,12 +75,12 @@ const CreateCustomerModal = ({ open, onCancel, onCreate }) => {
 
   return (
     <Modal
-      title={<span className="text-xl font-bold text-navy-700">Thêm Khách Hàng Mới</span>}
+      title={<span className="text-xl font-bold text-navy-700">Cập Nhật Thông Tin Khách Hàng</span>}
       open={open}
       onOk={handleOk}
       onCancel={onCancel}
       confirmLoading={loading}
-      okText="Lưu Khách Hàng"
+      okText="Lưu Thay Đổi"
       cancelText="Hủy Bỏ"
       width={700}
       centered
@@ -78,7 +90,6 @@ const CreateCustomerModal = ({ open, onCancel, onCreate }) => {
         form={form} 
         layout="vertical" 
         className="mt-6"
-        initialValues={{ role: 'User', status: 'Active' }}
       >
         
         {/* --- ẢNH ĐẠI DIỆN --- */}
@@ -131,7 +142,7 @@ const CreateCustomerModal = ({ open, onCancel, onCreate }) => {
         </Row>
 
         <Row gutter={16}>
-          <Col span={12}>
+          <Col span={24}>
             <Form.Item 
               name="email" 
               label="Email" 
@@ -143,29 +154,11 @@ const CreateCustomerModal = ({ open, onCancel, onCreate }) => {
               <Input prefix={<MailOutlined className="text-gray-400" />} placeholder="example@gmail.com" className="rounded-xl h-[44px]" />
             </Form.Item>
           </Col>
-          <Col span={12}>
-            <Form.Item 
-              name="password" 
-              label="Mật khẩu khởi tạo" 
-              rules={[{ required: true, message: 'Vui lòng nhập mật khẩu!' }]}
-            >
-              <Input.Password prefix={<LockOutlined className="text-gray-400" />} placeholder="Tối thiểu 6 ký tự" className="rounded-xl h-[44px]" />
-            </Form.Item>
-          </Col>
         </Row>
 
-        {/* --- PHÂN QUYỀN & TRẠNG THÁI --- */}
+        {/* --- TRẠNG THÁI TÀI KHOẢN --- */}
         <Row gutter={16}>
-          <Col span={12}>
-             <Form.Item name="role" label="Vai trò hệ thống">
-               <Select className="h-[44px] custom-select-metrix rounded-xl">
-                 <Option value="User">Khách hàng (User)</Option>
-                 <Option value="Admin">Quản trị viên (Admin)</Option>
-                 <Option value="Staff">Nhân viên (Staff)</Option>
-               </Select>
-             </Form.Item>
-          </Col>
-          <Col span={12}>
+          <Col span={24}>
              <Form.Item name="status" label="Trạng thái tài khoản">
                <Select className="h-[44px] custom-select-metrix rounded-xl">
                  <Option value="Active">Hoạt động (Active)</Option>
@@ -180,4 +173,4 @@ const CreateCustomerModal = ({ open, onCancel, onCreate }) => {
   );
 };
 
-export default CreateCustomerModal;
+export default UpdateCustomerModal;

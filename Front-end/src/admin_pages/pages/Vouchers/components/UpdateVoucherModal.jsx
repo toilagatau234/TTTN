@@ -1,27 +1,36 @@
-import React, { useState } from 'react';
-import { Modal, Form, Input, Select, DatePicker, InputNumber, Switch, Button, message, Row, Col, Divider } from 'antd';
-import { ReloadOutlined, PercentageOutlined, DollarOutlined } from '@ant-design/icons';
+import React, { useState, useEffect } from 'react';
+import { Modal, Form, Input, Select, DatePicker, InputNumber, Switch, Button, message, Row, Col } from 'antd';
+import { PercentageOutlined, DollarOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import voucherService from '../../../../services/voucherService';
 
 const { Option } = Select;
 const { RangePicker } = DatePicker;
 const { TextArea } = Input;
 
-const CreateVoucherModal = ({ open, onCancel, onCreate }) => {
+const UpdateVoucherModal = ({ open, onCancel, onUpdate, voucher }) => {
   const [form] = Form.useForm();
-  const [discountType, setDiscountType] = useState('percent'); // 'percent' hoặc 'fixed'
+  const [discountType, setDiscountType] = useState('percent');
   const [loading, setLoading] = useState(false);
 
-  // Hàm tạo mã ngẫu nhiên
-  const generateCode = () => {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    let code = '';
-    for (let i = 0; i < 8; i++) {
-      code += chars.charAt(Math.floor(Math.random() * chars.length));
+  useEffect(() => {
+    if (open && voucher) {
+      setDiscountType(voucher.discountType || 'percent');
+      form.setFieldsValue({
+        code: voucher.code,
+        description: voucher.description,
+        type: voucher.discountType,
+        value: voucher.discountValue,
+        maxDiscount: voucher.maxDiscount,
+        minOrder: voucher.minOrderValue,
+        limit: voucher.usageLimit,
+        time: [
+          voucher.startDate ? dayjs(voucher.startDate) : null,
+          voucher.endDate ? dayjs(voucher.endDate) : null
+        ],
+        isActive: voucher.isActive
+      });
     }
-    form.setFieldsValue({ code: `FLW-${code}` });
-  };
+  }, [open, voucher, form]);
 
   const handleOk = async () => {
     try {
@@ -32,7 +41,7 @@ const CreateVoucherModal = ({ open, onCancel, onCreate }) => {
         code: values.code.toUpperCase(),
         description: values.description,
         discountType: values.type,
-        discountValue: Number(values.value), // Ensure number
+        discountValue: Number(values.value),
         maxDiscount: values.type === 'percent' ? Number(values.maxDiscount) : null,
         minOrderValue: Number(values.minOrder) || 0,
         usageLimit: Number(values.limit) || null,
@@ -41,19 +50,13 @@ const CreateVoucherModal = ({ open, onCancel, onCreate }) => {
         isActive: values.isActive
       };
 
-      console.log('Voucher Payload:', payload); // Debug log
+      console.log('Update Voucher Payload:', payload);
 
-      const response = await voucherService.create(payload);
-      if (response && response.success) {
-        message.success('Tạo mã giảm giá thành công!');
-        form.resetFields();
-        onCreate();
-      } else {
-         message.error(response?.message || 'Tạo mã thất bại');
-      }
+      await onUpdate(voucher._id, payload);
+      message.success('Cập nhật mã giảm giá thành công!');
     } catch (error) {
-      console.error('Create Failed:', error.response?.data || error.message || error);
-      message.error(error.response?.data?.message || 'Có lỗi xảy ra khi tạo mã');
+      console.error('Update Failed:', error.response?.data || error.message || error);
+      message.error(error.response?.data?.message || 'Có lỗi xảy ra khi cập nhật');
     } finally {
       setLoading(false);
     }
@@ -61,12 +64,12 @@ const CreateVoucherModal = ({ open, onCancel, onCreate }) => {
 
   return (
     <Modal
-      title={<span className="text-xl font-bold text-navy-700">Tạo Mã Giảm Giá Mới</span>}
+      title={<span className="text-xl font-bold text-navy-700">Chỉnh Sửa Mã Giảm Giá</span>}
       open={open}
       onOk={handleOk}
       onCancel={onCancel}
       width={700}
-      okText="Lưu Mã"
+      okText="Cập nhật"
       cancelText="Hủy"
       centered
       confirmLoading={loading}
@@ -76,31 +79,24 @@ const CreateVoucherModal = ({ open, onCancel, onCreate }) => {
         form={form} 
         layout="vertical" 
         className="mt-5"
-        initialValues={{ 
-          type: 'percent', 
-          isActive: true, 
-          limit: 100 
-        }}
       >
-        {/* --- MÃ CODE & TÊN --- */}
         <Row gutter={16}>
           <Col span={12}>
              <Form.Item label="Mã Voucher (Code)" name="code" rules={[{ required: true, message: 'Cần có mã code' }]}>
                <Input 
                  placeholder="VD: TET2026" 
                  className="rounded-xl h-[40px] font-bold uppercase text-brand-500" 
-                 suffix={<ReloadOutlined onClick={generateCode} className="cursor-pointer hover:text-brand-500" />}
+                 disabled // Thường không nên đổi mã code voucher nếu đã phát hành? Hoặc có thể mở khóa nếu user muốn
                />
              </Form.Item>
           </Col>
           <Col span={12}>
-             <Form.Item label="Tên chương trình" name="name" rules={[{ required: true }]}>
+             <Form.Item label="Mô tả / Tên" name="description">
                <Input placeholder="VD: Khuyến mãi Tết" className="rounded-xl h-[40px]" />
              </Form.Item>
           </Col>
         </Row>
 
-        {/* --- CẤU HÌNH GIẢM GIÁ --- */}
         <div className="bg-gray-50 p-4 rounded-xl mb-4">
            <Row gutter={16}>
              <Col span={8}>
@@ -108,6 +104,7 @@ const CreateVoucherModal = ({ open, onCancel, onCreate }) => {
                  <Select 
                     className="rounded-xl h-[40px] custom-select-metrix" 
                     onChange={setDiscountType}
+                    disabled // Không nên đổi loại giảm giá sau khi tạo
                  >
                    <Option value="percent"><PercentageOutlined /> Theo phần trăm</Option>
                    <Option value="fixed"><DollarOutlined /> Số tiền cố định</Option>
@@ -128,7 +125,6 @@ const CreateVoucherModal = ({ open, onCancel, onCreate }) => {
                </Form.Item>
              </Col>
              
-             {/* Chỉ hiện 'Giảm tối đa' nếu chọn theo % */}
              {discountType === 'percent' && (
                <Col span={8}>
                  <Form.Item label="Giảm tối đa (VNĐ)" name="maxDiscount">
@@ -160,7 +156,6 @@ const CreateVoucherModal = ({ open, onCancel, onCreate }) => {
            </Row>
         </div>
 
-        {/* --- THỜI GIAN & TRẠNG THÁI --- */}
         <Row gutter={16}>
           <Col span={16}>
             <Form.Item label="Thời gian áp dụng" name="time" rules={[{ required: true }]}>
@@ -168,18 +163,14 @@ const CreateVoucherModal = ({ open, onCancel, onCreate }) => {
             </Form.Item>
           </Col>
           <Col span={8}>
-             <Form.Item label="Kích hoạt ngay" name="isActive" valuePropName="checked">
-               <Switch checkedChildren="Bật" unCheckedChildren="Tắt" defaultChecked />
+             <Form.Item label="Kích hoạt" name="isActive" valuePropName="checked">
+               <Switch checkedChildren="Bật" unCheckedChildren="Tắt" />
              </Form.Item>
           </Col>
         </Row>
-
-        <Form.Item name="description" label="Mô tả / Ghi chú">
-          <TextArea rows={2} placeholder="Điều kiện áp dụng..." className="rounded-xl" />
-        </Form.Item>
       </Form>
     </Modal>
   );
 };
 
-export default CreateVoucherModal;
+export default UpdateVoucherModal;

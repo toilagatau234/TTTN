@@ -105,7 +105,7 @@ const createUser = async (req, res) => {
 // @route   PUT /api/users/:id
 const updateUser = async (req, res) => {
     try {
-        const { name, email, role, avatar } = req.body;
+        const { name, email, role, avatar, phone, status } = req.body;
 
         const user = await User.findById(req.params.id);
         if (!user) {
@@ -130,6 +130,8 @@ const updateUser = async (req, res) => {
         if (name) user.name = name;
         if (role) user.role = role;
         if (avatar !== undefined) user.avatar = avatar;
+        if (phone !== undefined) user.phone = phone;
+        if (status !== undefined) user.status = status;
 
         await user.save();
 

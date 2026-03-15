@@ -103,6 +103,7 @@ const ProductPage = () => {
 
   // Filters
   const [searchText, setSearchText] = useState('');
+  const [debouncedSearchText, setDebouncedSearchText] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [categories, setCategories] = useState([]);
@@ -171,9 +172,17 @@ const ProductPage = () => {
     }
   };
 
+  // Debounce Search Text
   useEffect(() => {
-    fetchProducts(pagination.current, pagination.pageSize);
-  }, [categoryFilter, statusFilter]); // Reload when filter changes. Search is handled by explicit enter or button, or debounce (impl later)
+    const timer = setTimeout(() => {
+      setDebouncedSearchText(searchText);
+    }, 500); // 500ms delay
+    return () => clearTimeout(timer);
+  }, [searchText]);
+
+  useEffect(() => {
+    fetchProducts(1, pagination.pageSize);
+  }, [categoryFilter, statusFilter, debouncedSearchText]);
 
   // Handle Search
   const handleSearch = (e) => {
@@ -376,15 +385,8 @@ const ProductPage = () => {
               className="w-[280px] rounded-xl border-none bg-[#F4F7FE] h-[40px]"
               value={searchText}
               onChange={handleSearch}
-              onPressEnter={onSearch}
+              allowClear
             />
-            <Button 
-              icon={<SearchOutlined />} 
-              onClick={onSearch}
-              className="bg-brand-500 text-white rounded-xl h-[40px] border-none"
-            >
-              Tìm
-            </Button>
           </div>
 
           <div className="flex gap-2">
