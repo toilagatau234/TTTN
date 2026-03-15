@@ -331,10 +331,6 @@ const ProductPage = () => {
     <div className="w-full">
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-navy-700">Quản Lý Sản Phẩm</h1>
-          <p className="text-gray-500 mt-1">Quản lý kho hàng và danh sách hoa</p>
-        </div>
         <Button
           type="primary"
           icon={<PlusOutlined />}

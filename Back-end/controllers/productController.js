@@ -121,6 +121,16 @@ const createProduct = async (req, res) => {
             const destroyPromises = req.files.map(file => cloudinary.uploader.destroy(file.filename));
             await Promise.all(destroyPromises);
         }
+
+        console.error("Error creating product:", error);
+        require('fs').appendFileSync('d:\\TTTN\\Back-end\\error_log.txt', `${new Date().toISOString()} - ${error.stack}\n`);
+
+        if (error.name === 'ValidationError') {
+            return res.status(400).json({ success: false, message: error.message });
+        }
+        if (error.code === 11000) {
+            return res.status(400).json({ success: false, message: 'Tên sản phẩm hoặc slug đã tồn tại' });
+        }
         res.status(500).json({ success: false, message: error.message });
     }
 };
@@ -171,6 +181,15 @@ const updateProduct = async (req, res) => {
         res.json({ success: true, data: product });
 
     } catch (error) {
+        console.error("Error updating product:", error);
+        require('fs').appendFileSync('d:\\TTTN\\Back-end\\error_log.txt', `${new Date().toISOString()} - ${error.stack}\n`);
+
+        if (error.name === 'ValidationError') {
+            return res.status(400).json({ success: false, message: error.message });
+        }
+        if (error.code === 11000) {
+            return res.status(400).json({ success: false, message: 'Tên sản phẩm hoặc slug đã tồn tại' });
+        }
         res.status(500).json({ success: false, message: error.message });
     }
 };

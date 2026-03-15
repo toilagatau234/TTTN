@@ -15,9 +15,7 @@ const productService = {
 
   // Thêm mới (Có upload ảnh nên dùng formData)
   add: (data) => {
-    return axiosClient.post(PRODUCT_ENDPOINT, data, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    });
+    return axiosClient.post(PRODUCT_ENDPOINT, data);
   },
 
   update: (id, data) => {

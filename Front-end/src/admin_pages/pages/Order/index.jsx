@@ -45,9 +45,9 @@ const OrderStatCard = ({ title, options, icon }) => {
           defaultValue="week" 
           value={filter}
           onChange={setFilter}
-          bordered={false}
+          variant="borderless"
           className="bg-[#F4F7FE] rounded-lg text-xs font-bold text-gray-600 min-w-[100px]"
-          dropdownStyle={{ borderRadius: '12px' }}
+          styles={{ popup: { root: { borderRadius: '12px' } } }}
         >
           <Option value="today">Hôm nay</Option>
           <Option value="yesterday">Hôm qua</Option>
@@ -247,7 +247,7 @@ const OrderPage = () => {
         <div className="flex flex-wrap gap-4 mb-8 justify-between items-center">
             <div className="flex flex-wrap gap-3 w-full lg:w-auto">
                <Input prefix={<SearchOutlined className="text-gray-400" />} placeholder="Tìm đơn hàng..." className="w-full sm:w-[250px] h-[44px] rounded-xl border-none bg-[#F4F7FE] text-navy-700" />
-               <Select defaultValue="all" className="h-[44px] w-[160px] custom-select-borderless bg-[#F4F7FE] rounded-xl" bordered={false}>
+               <Select defaultValue="all" className="h-[44px] w-[160px] custom-select-borderless bg-[#F4F7FE] rounded-xl" variant="borderless">
                  <Option value="all">Tất cả trạng thái</Option>
                  <Option value="Approved">Hoàn thành</Option>
                  <Option value="Pending">Chờ xử lý</Option>

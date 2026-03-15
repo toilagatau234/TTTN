@@ -156,7 +156,7 @@ const CreateCategoryModal = ({ open, onCancel, onSuccess, initialData }) => {
                 className="category-modal"
                 width={500}
                 centered
-                destroyOnClose // Dùng destroyOnClose cho antd v4/v5 đều ổn, v5 ưu tiên destroyOnHidden
+                destroyOnHidden
             >
                 <Form form={form} layout="vertical" onFinish={onFinish} className="mt-4">
                     

@@ -295,11 +295,16 @@ const CreateProductModal = ({ open, onCancel, onSuccess, initialData }) => {
             </div>
           </div>
 
-          <Form.Item label="Mô tả chi tiết" name="description" className="mt-4">
+          <Form.Item 
+            label="Mô tả chi tiết" 
+            name="description" 
+            className="mt-4"
+            rules={[{ required: true, message: 'Vui lòng nhập mô tả sản phẩm!' }]}
+          >
             <Input.TextArea rows={4} placeholder="Mô tả chi tiết về sản phẩm..." className="rounded-lg" />
           </Form.Item>
 
-          <Divider orientation="left">Hình ảnh sản phẩm</Divider>
+          <Divider titlePlacement="left">Hình ảnh sản phẩm</Divider>
 
           <Form.Item>
             <Upload
