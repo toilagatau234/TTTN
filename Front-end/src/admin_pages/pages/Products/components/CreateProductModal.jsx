@@ -203,110 +203,139 @@ const CreateProductModal = ({ open, onCancel, onSuccess, initialData }) => {
         destroyOnHidden
         className="product-modal"
       >
-        <Form form={form} layout="vertical" onFinish={onFinish} className="mt-4">
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Name */}
-            <Form.Item
-              label="Tên sản phẩm"
-              name="name"
-              rules={[{ required: true, message: 'Vui lòng nhập tên sản phẩm!' }]}
-              className="col-span-2"
-            >
-              <Input placeholder="Ví dụ: Bó Hoa Hồng Đỏ..." size="large" className="rounded-lg" />
-            </Form.Item>
-
-            {/* Category */}
-            <Form.Item
-              label="Danh mục"
-              name="category"
-              rules={[{ required: true, message: 'Vui lòng chọn danh mục!' }]}
-            >
-              <Select placeholder="Chọn danh mục" size="large" className="rounded-lg">
-                {categories.map(cat => (
-                  <Option key={cat._id} value={cat._id}>{cat.name}</Option>
-                ))}
-              </Select>
-            </Form.Item>
-
-            {/* Status */}
-            <Form.Item
-              label="Trạng thái"
-              name="status"
-            >
-              <Select size="large" className="rounded-lg">
-                <Option value="active">Đang bán</Option>
-                <Option value="inactive">Ngừng bán</Option>
-                <Option value="out_of_stock">Hết hàng</Option>
-              </Select>
-            </Form.Item>
-
-            {/* Price */}
-            <Form.Item
-              label="Giá bán (VNĐ)"
-              name="price"
-              rules={[{ required: true, message: 'Vui lòng nhập giá bán!' }]}
-            >
-              <InputNumber
-                className="w-full rounded-lg"
-                size="large"
-                formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                parser={value => value.replace(/\$\s?|(,*)/g, '')}
-                min={0}
-              />
-            </Form.Item>
-
-            {/* Original Price */}
-            <Form.Item
-              label="Giá gốc (VNĐ)"
-              name="originalPrice"
-            >
-              <InputNumber
-                className="w-full rounded-lg"
-                size="large"
-                formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                parser={value => value.replace(/\$\s?|(,*)/g, '')}
-                min={0}
-                placeholder="Để trống nếu không giảm giá"
-              />
-            </Form.Item>
-
-            {/* Stock */}
-            <Form.Item
-              label="Tồn kho"
-              name="stock"
-              rules={[{ required: true, message: 'Vui lòng nhập số lượng!' }]}
-            >
-              <InputNumber className="w-full rounded-lg" size="large" min={0} />
-            </Form.Item>
-
-            {/* Flags */}
-            <div className="flex gap-8 items-center mt-2">
-              <Form.Item name="isHot" valuePropName="checked" noStyle>
-                <div className="flex items-center gap-2 cursor-pointer">
-                  <Switch /> <span>Sản phẩm HOT</span>
-                </div>
+        <Form form={form} layout="vertical" onFinish={onFinish} className="mt-4 space-y-6">
+          
+          {/* Section 1: Thông tin cơ bản */}
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-1 h-5 bg-brand-500 rounded-full"></div>
+              <span className="font-bold text-navy-700">Thông tin cơ bản</span>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50/40 p-4 rounded-2xl border border-gray-100/70">
+              <Form.Item
+                label="Tên sản phẩm"
+                name="name"
+                rules={[{ required: true, message: 'Vui lòng nhập tên sản phẩm!' }]}
+                className="col-span-2 mb-1"
+              >
+                <Input placeholder="Ví dụ: Bó Hoa Hồng Đỏ..." size="large" className="rounded-xl border-gray-200 bg-white" />
               </Form.Item>
-              <Form.Item name="isNewProduct" valuePropName="checked" noStyle>
-                <div className="flex items-center gap-2 cursor-pointer">
-                  <Switch defaultChecked /> <span>Sản phẩm Mới</span>
-                </div>
+
+              <Form.Item
+                label="Danh mục"
+                name="category"
+                rules={[{ required: true, message: 'Vui lòng chọn danh mục!' }]}
+                className="mb-1"
+              >
+                <Select placeholder="Chọn danh mục" size="large" className="rounded-xl">
+                  {categories.map(cat => (
+                    <Option key={cat._id} value={cat._id}>{cat.name}</Option>
+                  ))}
+                </Select>
+              </Form.Item>
+
+              <Form.Item
+                label="Trạng thái"
+                name="status"
+                className="mb-1"
+              >
+                <Select size="large" className="rounded-xl">
+                  <Option value="active">Đang bán</Option>
+                  <Option value="inactive">Ngừng bán</Option>
+                </Select>
               </Form.Item>
             </div>
           </div>
 
-          <Form.Item 
-            label="Mô tả chi tiết" 
-            name="description" 
-            className="mt-4"
-            rules={[{ required: true, message: 'Vui lòng nhập mô tả sản phẩm!' }]}
-          >
-            <Input.TextArea rows={4} placeholder="Mô tả chi tiết về sản phẩm..." className="rounded-lg" />
-          </Form.Item>
+          {/* Section 2: Giá và Kho hàng */}
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-1 h-5 bg-green-500 rounded-full"></div>
+              <span className="font-bold text-navy-700">Giá & Kho hàng</span>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-gray-50/40 p-4 rounded-2xl border border-gray-100/70">
+              <Form.Item
+                label="Giá bán (VNĐ)"
+                name="price"
+                rules={[{ required: true, message: 'Vui lòng nhập giá bán!' }]}
+                className="mb-1"
+              >
+                <InputNumber
+                  className="w-full rounded-xl border-gray-200"
+                  size="large"
+                  formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                  parser={value => value.replace(/\$\s?|(,*)/g, '')}
+                  min={0}
+                />
+              </Form.Item>
+
+              <Form.Item
+                label="Giá gốc (VNĐ)"
+                name="originalPrice"
+                className="mb-1"
+              >
+                <InputNumber
+                  className="w-full rounded-xl border-gray-200"
+                  size="large"
+                  formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                  parser={value => value.replace(/\$\s?|(,*)/g, '')}
+                  min={0}
+                  placeholder="Không giảm giá"
+                />
+              </Form.Item>
+
+              <Form.Item
+                label="Tồn kho"
+                name="stock"
+                rules={[{ required: true, message: 'Vui lòng nhập số lượng!' }]}
+                className="mb-1"
+              >
+                <InputNumber className="w-full rounded-xl border-gray-200" size="large" min={0} />
+              </Form.Item>
+            </div>
+          </div>
+
+          {/* Section 3: Đặc tính & Mô tả */}
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-1 h-5 bg-orange-500 rounded-full"></div>
+              <span className="font-bold text-navy-700">Đặc tính & Mô tả</span>
+            </div>
+            <div className="bg-gray-50/40 p-4 rounded-2xl border border-gray-100/70 flex flex-col gap-4">
+              <div className="flex gap-4 items-center bg-white p-3 rounded-xl border border-gray-100/50 shadow-sm w-fit">
+                <div className="flex items-center gap-2">
+                  <Form.Item name="isHot" valuePropName="checked" noStyle>
+                    <Switch />
+                  </Form.Item>
+                  <span className="text-sm font-semibold text-red-500 flex items-center gap-1">
+                    🔥 Sản phẩm HOT
+                  </span>
+                </div>
+                <div className="w-[1px] h-4 bg-gray-200"></div>
+                <div className="flex items-center gap-2">
+                  <Form.Item name="isNewProduct" valuePropName="checked" noStyle>
+                    <Switch />
+                  </Form.Item>
+                  <span className="text-sm font-semibold text-blue-500 flex items-center gap-1">
+                    ✨ Sản phẩm mới
+                  </span>
+                </div>
+              </div>
+
+              <Form.Item 
+                label={<span className="font-medium text-gray-700">Mô tả chi tiết</span>} 
+                name="description" 
+                rules={[{ required: true, message: 'Vui lòng nhập mô tả sản phẩm!' }]}
+                className="mb-0"
+              >
+                <Input.TextArea rows={4} placeholder="Mô tả chi tiết về sản phẩm..." className="rounded-xl border-gray-200" />
+              </Form.Item>
+            </div>
+          </div>
 
           <Divider titlePlacement="left">Hình ảnh sản phẩm</Divider>
 
-          <Form.Item>
+          <Form.Item className="mb-0">
             <Upload
               listType="picture-card"
               fileList={fileList}

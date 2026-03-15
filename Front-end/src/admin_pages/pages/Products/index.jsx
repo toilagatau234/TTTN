@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Button, Input, Select, Tag, Progress, Dropdown, Menu, message, Avatar, Popconfirm } from 'antd';
+import { Table, Button, Input, Select, Tag, Progress, Dropdown, Menu, message, Avatar, Popconfirm, Popover, Form, Badge } from 'antd';
 import {
   PlusOutlined, SearchOutlined, FilterOutlined,
   MoreOutlined, EditOutlined, DeleteOutlined,
   ShopOutlined, CheckCircleOutlined, WarningOutlined,
   ClockCircleOutlined, StarOutlined, ArrowUpOutlined,
-  FileImageOutlined
+  FileImageOutlined, FileTextOutlined
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 
@@ -15,6 +15,7 @@ import productService from '../../../services/productService';
 import categoryService from '../../../services/categoryService';
 import statsService from '../../../services/statsService';
 import CreateProductModal from './components/CreateProductModal';
+import ViewProductModal from './components/ViewProductModal';
 
 const { Option } = Select;
 
@@ -103,11 +104,14 @@ const ProductPage = () => {
   // Filters
   const [searchText, setSearchText] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [categories, setCategories] = useState([]);
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
+  const [isViewOpen, setIsViewOpen] = useState(false);
+  const [viewingItem, setViewingItem] = useState(null);
 
   // Widget State
   const [productStats, setProductStats] = useState({
@@ -139,7 +143,8 @@ const ProductPage = () => {
         page,
         limit: pageSize,
         keyword: searchText,
-        category: categoryFilter
+        category: categoryFilter !== 'all' ? categoryFilter : undefined,
+        status: statusFilter !== 'all' ? statusFilter : undefined
       };
 
       const [res, statsRes] = await Promise.all([
@@ -168,7 +173,7 @@ const ProductPage = () => {
 
   useEffect(() => {
     fetchProducts(pagination.current, pagination.pageSize);
-  }, [categoryFilter]); // Reload when filter changes. Search is handled by explicit enter or button, or debounce (impl later)
+  }, [categoryFilter, statusFilter]); // Reload when filter changes. Search is handled by explicit enter or button, or debounce (impl later)
 
   // Handle Search
   const handleSearch = (e) => {
@@ -297,6 +302,15 @@ const ProductPage = () => {
       render: (_, record) => {
         const items = [
           {
+            key: 'view',
+            icon: <FileTextOutlined />,
+            label: 'Xem chi tiết',
+            onClick: () => {
+              setViewingItem(record);
+              setIsViewOpen(true);
+            }
+          },
+          {
             key: '1',
             icon: <EditOutlined />,
             label: 'Chỉnh sửa',
@@ -354,29 +368,71 @@ const ProductPage = () => {
 
       {/* --- TABLE --- */}
       <div className="bg-white p-6 rounded-[20px] shadow-sm">
-        <div className="flex flex-wrap gap-4 mb-6 justify-between">
+        <div className="flex flex-wrap gap-4 mb-6 justify-between items-center">
           <div className="flex flex-wrap gap-3 w-full md:w-auto">
             <Input
               prefix={<SearchOutlined className="text-gray-400" />}
               placeholder="Tìm tên hoa..."
-              className="w-[250px] rounded-xl border-none bg-[#F4F7FE] h-[40px]"
+              className="w-[280px] rounded-xl border-none bg-[#F4F7FE] h-[40px]"
               value={searchText}
               onChange={handleSearch}
               onPressEnter={onSearch}
             />
-            <Select
-              value={categoryFilter}
-              onChange={setCategoryFilter}
-              className="w-[180px] h-[40px] custom-select-metrix bg-[#F4F7FE] rounded-xl"
-              variant="borderless"
+            <Button 
+              icon={<SearchOutlined />} 
+              onClick={onSearch}
+              className="bg-brand-500 text-white rounded-xl h-[40px] border-none"
             >
-              <Option value="all">Tất cả danh mục</Option>
-              {categories.map(cat => (
-                <Option key={cat._id} value={cat._id}>{cat.name}</Option>
-              ))}
-            </Select>
+              Tìm
+            </Button>
           </div>
-          <Button icon={<FilterOutlined />} className="rounded-xl h-[40px] text-gray-500" onClick={onSearch}>Lọc</Button>
+
+          <div className="flex gap-2">
+            <Popover
+              placement="bottomRight"
+              title={<div className="font-bold text-navy-700 p-2 border-b">Bộ lọc nâng cao</div>}
+              trigger="click"
+              content={
+                <Form layout="vertical" className="w-[300px] p-2">
+                  <Form.Item label="Danh mục" className="mb-3">
+                    <Select
+                      value={categoryFilter}
+                      onChange={setCategoryFilter}
+                      className="w-full"
+                    >
+                      <Option value="all">Tất cả danh mục</Option>
+                      {categories.map(cat => (
+                        <Option key={cat._id} value={cat._id}>{cat.name}</Option>
+                      ))}
+                    </Select>
+                  </Form.Item>
+
+                  <Form.Item label="Trạng thái" className="mb-4">
+                    <Select
+                      value={statusFilter}
+                      onChange={setStatusFilter}
+                      className="w-full"
+                    >
+                      <Option value="all">Tất cả trạng thái</Option>
+                      <Option value="active">Đang bán</Option>
+                      <Option value="out_of_stock">Hết hàng</Option>
+                      <Option value="inactive">Ngừng bán</Option>
+                    </Select>
+                  </Form.Item>
+
+                  <div className="flex justify-end gap-2 pt-2 border-t">
+                    <Button onClick={() => { setCategoryFilter('all'); setStatusFilter('all'); }} size="small">
+                      Reset
+                    </Button>
+                  </div>
+                </Form>
+              }
+            >
+              <Button icon={<FilterOutlined />} className="rounded-xl h-[40px] text-gray-500">
+                Bộ lọc {(categoryFilter !== 'all' || statusFilter !== 'all') && <Badge dot className="ml-1" />}
+              </Button>
+            </Popover>
+          </div>
         </div>
 
         <Table
@@ -395,6 +451,12 @@ const ProductPage = () => {
         onCancel={() => setIsModalOpen(false)}
         onSuccess={handleCreateOrUpdate}
         initialData={editingItem}
+      />
+
+      <ViewProductModal
+        open={isViewOpen}
+        onCancel={() => { setIsViewOpen(false); setViewingItem(null); }}
+        data={viewingItem}
       />
 
     </div>
