@@ -77,21 +77,19 @@ const productSchema = new mongoose.Schema({
 });
 
 // Middleware tạo slug từ tên trước khi lưu
-productSchema.pre('save', function (next) {
+productSchema.pre('save', function () {
     if (this.isModified('name')) {
         this.slug = slugify(this.name, { lower: true, strict: true });
     }
-    next();
 });
 
 // Middleware cập nhật status dựa trên stock
-productSchema.pre('save', function (next) {
+productSchema.pre('save', function () {
     if (this.stock === 0) {
         this.status = 'out_of_stock';
     } else if (this.stock > 0 && this.status === 'out_of_stock') {
         this.status = 'active';
     }
-    next();
 });
 
 module.exports = mongoose.model('Product', productSchema);

@@ -89,6 +89,9 @@ const ProductAlertWidget = ({ alerts }) => {
 const ProductPage = () => {
   const navigate = useNavigate();
 
+  // Lấy thông tin user để check quyền hiển thị thao tác
+  const user = JSON.parse(localStorage.getItem('user') || 'null');
+
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState([]);
   const [pagination, setPagination] = useState({
@@ -269,7 +272,7 @@ const ProductPage = () => {
             percent={stock > 100 ? 100 : (stock || 0)}
             showInfo={false}
             strokeColor={stock < 10 ? '#FF4D4F' : '#4318FF'}
-            trailColor="#EFF4FB"
+            railColor="#EFF4FB"
             size="small"
           />
         </div>
@@ -291,39 +294,41 @@ const ProductPage = () => {
     {
       title: 'THAO TÁC',
       key: 'action',
-      render: (_, record) => (
-        <Dropdown
-          overlay={
-            <Menu>
-              <Menu.Item key="1" icon={<EditOutlined />} onClick={() => openEditModal(record)}>
-                Chỉnh sửa
-              </Menu.Item>
-
-              {/* Bảo vệ nút Xóa: Chỉ Admin mới thấy */}
-              <PermissionGate allowedRoles={ACTION_PERMISSIONS.CAN_DELETE}>
-                <Menu.Item
-                  key="2"
-                  icon={<DeleteOutlined />}
-                  danger
-                >
-                  <Popconfirm
-                    title="Xóa sản phẩm?"
-                    description="Hành động này không thể hoàn tác"
-                    onConfirm={() => handleDelete(record._id)}
-                    okText="Xóa"
-                    cancelText="Hủy"
-                  >
-                    Xóa
-                  </Popconfirm>
-                </Menu.Item>
-              </PermissionGate>
-            </Menu>
+      render: (_, record) => {
+        const items = [
+          {
+            key: '1',
+            icon: <EditOutlined />,
+            label: 'Chỉnh sửa',
+            onClick: () => openEditModal(record)
           }
-          trigger={['click']}
-        >
-          <Button type="text" icon={<MoreOutlined className="text-gray-400 text-lg" />} />
-        </Dropdown>
-      ),
+        ];
+
+        if (user && ACTION_PERMISSIONS.CAN_DELETE.includes(user.role)) {
+          items.push({
+            key: '2',
+            icon: <DeleteOutlined />,
+            danger: true,
+            label: (
+              <Popconfirm
+                title="Xóa sản phẩm?"
+                description="Hành động này không thể hoàn tác"
+                onConfirm={() => handleDelete(record._id)}
+                okText="Xóa"
+                cancelText="Hủy"
+              >
+                <span>Xóa</span>
+              </Popconfirm>
+            )
+          });
+        }
+
+        return (
+          <Dropdown menu={{ items }} trigger={['click']}>
+            <Button type="text" icon={<MoreOutlined className="text-gray-400 text-lg" />} />
+          </Dropdown>
+        );
+      }
     },
   ];
 
