@@ -10,6 +10,7 @@ const userSchema = new mongoose.Schema({
     enum: ['Admin', 'Manager', 'Staff', 'Warehouse', 'User'],
     default: 'User'
   },
+  department: { type: String, default: '' }, // Bộ phận (Kinh doanh, Kho vận...)
   status: {
     type: String,
     enum: ['Active', 'Blocked'],

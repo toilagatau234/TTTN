@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import userService from '../../../../services/userService';
 import { Modal, Form, Input, Select, Upload, message, Row, Col, Button } from 'antd';
 import { UserOutlined, MailOutlined, PhoneOutlined, LockOutlined, IdcardOutlined, UploadOutlined } from '@ant-design/icons';
 
@@ -6,27 +7,37 @@ const { Option } = Select;
 
 const CreateStaffModal = ({ open, onCancel, onCreate }) => {
   const [form] = Form.useForm();
+  const [confirmLoading, setConfirmLoading] = useState(false);
   
   const handleOk = async () => {
     try {
       const values = await form.validateFields();
+      setConfirmLoading(true);
       
-      // Giả lập dữ liệu tạo mới
-      const newStaff = {
-        key: Date.now(),
-        id: `STF-${Math.floor(Math.random() * 1000)}`,
-        avatar: 'https://i.pravatar.cc/150?img=' + Math.floor(Math.random() * 20), // Avatar ngẫu nhiên
-        joinDate: new Date().toLocaleDateString('vi-VN'),
-        lastActive: 'Vừa xong',
-        status: 'Active',
-        ...values
-      };
+      const response = await userService.add({
+        name: values.name,
+        email: values.email,
+        password: values.password,
+        role: values.role,
+        department: values.department,
+        phone: values.phone
+      });
 
-      onCreate(newStaff);
-      form.resetFields();
-      message.success('Thêm nhân viên mới thành công!');
+      if (response.success) {
+        message.success('Thêm nhân viên mới thành công!');
+        onCreate(response.data);
+        form.resetFields();
+      } else {
+        message.error(response.message || 'Lỗi khi tạo nhân viên');
+      }
     } catch (error) {
-      console.log('Validate Failed:', error);
+      if (error.response && error.response.data) {
+         message.error(error.response.data.message || 'Lỗi khi tạo nhân viên');
+      } else {
+         console.log('Validate Failed:', error);
+      }
+    } finally {
+      setConfirmLoading(false);
     }
   };
 
@@ -36,6 +47,7 @@ const CreateStaffModal = ({ open, onCancel, onCreate }) => {
       open={open}
       onOk={handleOk}
       onCancel={onCancel}
+      confirmLoading={confirmLoading}
       width={700}
       okText="Lưu Hồ Sơ"
       cancelText="Hủy"
@@ -94,8 +106,16 @@ const CreateStaffModal = ({ open, onCancel, onCreate }) => {
             </Form.Item>
           </Col>
           <Col span={12}>
-            <Form.Item name="department" label="Bộ phận">
-               <Input prefix={<IdcardOutlined className="text-gray-400" />} placeholder="Phòng kinh doanh..." className="rounded-xl h-[40px]" />
+            <Form.Item name="department" label="Bộ phận" rules={[{ required: true, message: 'Vui lòng chọn bộ phận' }]}>
+               <Select className="h-[40px] custom-select-metrix rounded-xl" placeholder="Chọn bộ phận">
+                 <Option value="Kinh doanh">Kinh doanh</Option>
+                 <Option value="Kho vận">Kho vận</Option>
+                 <Option value="Marketing">Marketing</Option>
+                 <Option value="CSKH">CSKH</Option>
+                 <Option value="Kế toán">Kế toán</Option>
+                 <Option value="Hành chính">Hành chính Nhân sự</Option>
+                 <Option value="Ban Giám Đốc">Ban Giám Đốc</Option>
+               </Select>
             </Form.Item>
           </Col>
         </Row>

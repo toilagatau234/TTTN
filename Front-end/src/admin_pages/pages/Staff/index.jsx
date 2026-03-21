@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Table, Button, Input, Select, Tag, Avatar, Dropdown, Menu, message } from 'antd';
+import userService from '../../../services/userService';
 import { 
   PlusOutlined, SearchOutlined, MoreOutlined, 
   EditOutlined, StopOutlined, DeleteOutlined, 
@@ -7,39 +8,81 @@ import {
 } from '@ant-design/icons';
 
 import CreateStaffModal from './components/CreateStaffModal';
+import EditStaffModal from './components/EditStaffModal';
 
 const { Option } = Select;
 
 const StaffPage = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [currentEditStaff, setCurrentEditStaff] = useState(null);
 
-  // Dữ liệu giả lập ban đầu
-  const [data, setData] = useState([
-    {
-      key: '1', id: 'STF-001', name: 'Trần Quản Lý', email: 'manager@flower.shop', phone: '0912345678',
-      role: 'Manager', department: 'Ban Giám Đốc', status: 'Active',
-      avatar: 'https://i.pravatar.cc/150?img=68', joinDate: '01/01/2024', lastActive: 'Vừa xong'
-    },
-    {
-      key: '2', id: 'STF-002', name: 'Lê Thủ Kho', email: 'kho@flower.shop', phone: '0987654321',
-      role: 'Warehouse', department: 'Kho vận', status: 'Active',
-      avatar: 'https://i.pravatar.cc/150?img=12', joinDate: '15/05/2024', lastActive: '5 phút trước'
-    },
-    {
-      key: '3', id: 'STF-003', name: 'Nguyễn Sale', email: 'sale1@flower.shop', phone: '0909090909',
-      role: 'Sale', department: 'Kinh doanh', status: 'Blocked',
-      avatar: 'https://i.pravatar.cc/150?img=32', joinDate: '20/10/2024', lastActive: '3 ngày trước'
-    },
-  ]);
+  const [data, setData] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [search, setSearch] = useState('');
+  const [departmentFilter, setDepartmentFilter] = useState('all');
+
+  useEffect(() => {
+    fetchStaff();
+  }, [search, departmentFilter]);
+
+  const fetchStaff = async () => {
+    setLoading(true);
+    try {
+      const response = await userService.getAll({ 
+        type: 'staff', 
+        search: search || undefined,
+        department: departmentFilter !== 'all' ? departmentFilter : undefined
+      });
+      if (response.success) {
+        const mappedData = response.data.map(item => ({
+          ...item,
+          key: item._id
+        }));
+        setData(mappedData);
+      }
+    } catch (error) {
+      message.error('Không thể tải danh sách nhân viên');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleCreate = (newItem) => {
-    setData([newItem, ...data]);
+    fetchStaff();
     setIsModalOpen(false);
   };
 
-  const handleDelete = (key) => {
-    setData(data.filter(item => item.key !== key));
-    message.success('Đã xóa nhân viên');
+  const handleEditClick = (record) => {
+    setCurrentEditStaff(record);
+    setIsEditModalOpen(true);
+  };
+
+  const handleUpdate = (updatedItem) => {
+    fetchStaff();
+    setIsEditModalOpen(false);
+    setCurrentEditStaff(null);
+  };
+
+  const handleDelete = async (id) => {
+    try {
+      await userService.delete(id);
+      setData(data.filter(item => item._id !== id));
+      message.success('Đã xóa nhân viên');
+    } catch (error) {
+      message.error('Không thể xóa nhân viên');
+    }
+  };
+
+  const handleBlock = async (id, currentStatus) => {
+    try {
+      const newStatus = currentStatus === 'Active' ? 'Blocked' : 'Active';
+      await userService.update(id, { status: newStatus });
+      setData(data.map(item => item._id === id ? { ...item, status: newStatus } : item));
+      message.success(newStatus === 'Active' ? 'Đã kích hoạt tài khoản' : 'Đã khóa tài khoản');
+    } catch (error) {
+      message.error('Không thể cập nhật trạng thái');
+    }
   };
 
   const columns = [
@@ -50,7 +93,7 @@ const StaffPage = () => {
       width: 280,
       render: (text, record) => (
         <div className="flex items-center gap-3">
-          <Avatar src={record.avatar} size={44} shape="square" className="rounded-xl border border-gray-100" />
+          <Avatar src={record.avatar || null} size={44} shape="square" className="rounded-xl border border-gray-100" />
           <div>
             <h5 className="font-bold text-navy-700 text-sm m-0">{text}</h5>
             <div className="flex items-center text-gray-400 text-xs gap-1 mt-0.5">
@@ -95,14 +138,13 @@ const StaffPage = () => {
       key: 'action',
       render: (_, record) => (
         <Dropdown 
-          overlay={
-            <Menu items={[
-              { key: '1', label: 'Sửa hồ sơ', icon: <EditOutlined /> },
-              { key: '2', label: 'Phân quyền', icon: <UserSwitchOutlined /> },
-              { key: '3', label: 'Khóa tài khoản', icon: <StopOutlined />, danger: true },
-              { key: '4', label: 'Xóa nhân sự', icon: <DeleteOutlined />, danger: true, onClick: () => handleDelete(record.key) },
-            ]} />
-          } 
+          menu={{
+            items: [
+              { key: '1', label: 'Sửa hồ sơ', icon: <EditOutlined />, onClick: () => handleEditClick(record) },
+              { key: '3', label: record.status === 'Active' ? 'Khóa tài khoản' : 'Kích hoạt', icon: <StopOutlined />, danger: record.status === 'Active', onClick: () => handleBlock(record._id, record.status) },
+              { key: '4', label: 'Xóa nhân sự', icon: <DeleteOutlined />, danger: true, onClick: () => handleDelete(record._id) },
+            ]
+          }}
           trigger={['click']}
         >
           <Button type="text" icon={<MoreOutlined className="text-gray-400 text-lg" />} />
@@ -139,18 +181,35 @@ const StaffPage = () => {
       <div className="bg-white p-6 rounded-[20px] shadow-sm">
          <div className="flex flex-wrap gap-4 mb-6 justify-between">
             <div className="flex flex-wrap gap-3 w-full md:w-auto">
-               <Input prefix={<SearchOutlined className="text-gray-400" />} placeholder="Tìm tên, email..." className="w-[250px] rounded-xl h-[40px] bg-[#F4F7FE] border-none" />
-               <Select defaultValue="all" className="w-[150px] h-[40px] custom-select-metrix bg-[#F4F7FE] rounded-xl" variant="bordered">
-                 <Option value="all">Tất cả bộ phận</Option>
-                 <Option value="sale">Kinh doanh</Option>
-                 <Option value="warehouse">Kho vận</Option>
+               <Input 
+                 prefix={<SearchOutlined className="text-gray-400" />} 
+                 placeholder="Tìm tên, email..." 
+                 className="w-[250px] rounded-xl h-[40px] bg-[#F4F7FE] border-none" 
+                 value={search}
+                 onChange={e => setSearch(e.target.value)}
+               />
+               <Select 
+                 value={departmentFilter} 
+                 className="w-[150px] h-[40px] custom-select-metrix bg-[#F4F7FE] rounded-xl" 
+                 variant="bordered"
+                 onChange={value => setDepartmentFilter(value)}
+               >
+                  <Option value="all">Tất cả bộ phận</Option>
+                  <Option value="Kinh doanh">Kinh doanh</Option>
+                  <Option value="Kho vận">Kho vận</Option>
+                  <Option value="Marketing">Marketing</Option>
+                  <Option value="CSKH">CSKH</Option>
+                  <Option value="Kế toán">Kế toán</Option>
+                  <Option value="Hành chính">Hành chính Nhân sự</Option>
+                  <Option value="Ban Giám Đốc">Ban Giám Đốc</Option>
                </Select>
             </div>
          </div>
-         <Table columns={columns} dataSource={data} pagination={{ pageSize: 6 }} className="custom-table-metrix" />
+         <Table columns={columns} dataSource={data} loading={loading} pagination={{ pageSize: 6 }} className="custom-table-metrix" />
       </div>
 
       <CreateStaffModal open={isModalOpen} onCancel={() => setIsModalOpen(false)} onCreate={handleCreate} />
+      <EditStaffModal open={isEditModalOpen} onCancel={() => { setIsEditModalOpen(false); setCurrentEditStaff(null); }} onUpdate={handleUpdate} staff={currentEditStaff} />
     </div>
   );
 };

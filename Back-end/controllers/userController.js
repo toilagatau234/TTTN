@@ -8,10 +8,18 @@ const User = require('../models/User');
 // @route   GET /api/users
 const getAllUsers = async (req, res) => {
     try {
-        const { role, search, page = 1, limit = 20 } = req.query;
+        const { role, type, search, department, page = 1, limit = 20 } = req.query;
 
         const filter = {};
-        if (role) filter.role = role;
+        if (role) {
+            filter.role = role;
+        } else if (type === 'staff') {
+            filter.role = { $in: ['Admin', 'Manager', 'Staff', 'Warehouse'] }; // Lọc tất cả nhân viên (loại bỏ khách hàng)
+        }
+
+        if (department) {
+            filter.department = department;
+        }
         if (search) {
             filter.$or = [
                 { name: { $regex: search, $options: 'i' } },
@@ -66,7 +74,7 @@ const getUserById = async (req, res) => {
 // @route   POST /api/users
 const createUser = async (req, res) => {
     try {
-        const { name, email, password, role } = req.body;
+        const { name, email, password, role, department } = req.body;
 
         if (!name || !email || !password) {
             return res.status(400).json({
@@ -83,7 +91,13 @@ const createUser = async (req, res) => {
             });
         }
 
-        const user = await User.create({ name, email, password, role: role || 'User' });
+        const user = await User.create({ 
+            name, 
+            email, 
+            password, 
+            role: role || 'User',
+            department: department || ''
+        });
 
         res.status(201).json({
             success: true,
@@ -93,6 +107,7 @@ const createUser = async (req, res) => {
                 email: user.email,
                 role: user.role,
                 avatar: user.avatar,
+                department: user.department,
             },
         });
     } catch (error) {
@@ -105,7 +120,7 @@ const createUser = async (req, res) => {
 // @route   PUT /api/users/:id
 const updateUser = async (req, res) => {
     try {
-        const { name, email, role, avatar, phone, status } = req.body;
+        const { name, email, role, avatar, phone, status, department } = req.body;
 
         const user = await User.findById(req.params.id);
         if (!user) {
@@ -132,6 +147,7 @@ const updateUser = async (req, res) => {
         if (avatar !== undefined) user.avatar = avatar;
         if (phone !== undefined) user.phone = phone;
         if (status !== undefined) user.status = status;
+        if (department !== undefined) user.department = department;
 
         await user.save();
 
@@ -143,6 +159,7 @@ const updateUser = async (req, res) => {
                 email: user.email,
                 role: user.role,
                 avatar: user.avatar,
+                department: user.department,
             },
         });
     } catch (error) {
