@@ -1,4 +1,25 @@
 const User = require('../models/User');
+const cloudinary = require('cloudinary').v2;
+
+// Helper: Trích xuất public_id từ URL Cloudinary
+const extractPublicId = (url) => {
+    if (!url || !url.includes('cloudinary.com')) return null;
+    const parts = url.split('/');
+    const uploadIndex = parts.indexOf('upload');
+    if (uploadIndex === -1) return null;
+    
+    // Tìm index chứa phiên bản v[chữ số]
+    const versionIndex = parts.findIndex(p => /^v\d+$/.test(p));
+    if (versionIndex === -1) return null;
+    
+    const relevantParts = parts.slice(versionIndex + 1); 
+    const publicIdWithExt = relevantParts.join('/'); // 'flower-shop/xyz.jpg'
+    const publicId = publicIdWithExt.split('.')[0]; // 'flower-shop/xyz'
+    return publicId;
+};
+
+
+const { createLog } = require('./activityLogController');
 
 // =============================================
 // ADMIN ENDPOINTS
@@ -99,7 +120,17 @@ const createUser = async (req, res) => {
             department: department || ''
         });
 
+        await createLog({
+            userId: req.user._id,
+            action: 'CREATE',
+            target: 'User',
+            targetId: user._id,
+            description: `Đã tạo tài khoản nhân viên mới: ${user.name} (${user.role})`,
+            ip: req.ip
+        });
+
         res.status(201).json({
+
             success: true,
             data: {
                 _id: user._id,
@@ -151,7 +182,17 @@ const updateUser = async (req, res) => {
 
         await user.save();
 
+        await createLog({
+            userId: req.user._id,
+            action: 'UPDATE',
+            target: 'User',
+            targetId: user._id,
+            description: `Đã cập nhật hồ sơ nhân viên: ${user.name}`,
+            ip: req.ip
+        });
+
         res.json({
+
             success: true,
             data: {
                 _id: user._id,
@@ -189,9 +230,32 @@ const deleteUser = async (req, res) => {
             });
         }
 
+        // Xóa ảnh trên Cloudinary (tiết kiệm tài nguyên)
+        if (user.avatar) {
+            try {
+                const publicId = extractPublicId(user.avatar);
+                if (publicId) {
+                    await cloudinary.uploader.destroy(publicId);
+                }
+            } catch (imgError) {
+                console.error('Lỗi xóa ảnh Cloudinary khi xóa user:', imgError.message);
+                // Không reject để dọn dẹp DB vẫn diễn ra
+            }
+        }
+
         await User.findByIdAndDelete(req.params.id);
 
+        await createLog({
+            userId: req.user._id,
+            action: 'DELETE',
+            target: 'User',
+            targetId: user._id,
+            description: `Đã xóa tài khoản nhân viên: ${user.name} (${user.email})`,
+            ip: req.ip
+        });
+
         res.json({ success: true, message: 'Đã xóa user' });
+
     } catch (error) {
         console.error('Delete user error:', error.message);
         res.status(500).json({ success: false, message: 'Lỗi server' });

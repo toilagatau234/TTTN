@@ -15,6 +15,8 @@ const reviewRoutes = require('./routes/reviewRoutes');
 const wishlistRoutes = require('./routes/wishlistRoutes');
 const shippingRoutes = require('./routes/shippingRoutes');
 const statsRoutes = require('./routes/statsRoutes');
+const activityLogRoutes = require('./routes/activityLogRoutes');
+
 
 dotenv.config();
 connectDB();
@@ -40,6 +42,8 @@ app.use('/api/reviews', reviewRoutes);
 app.use('/api/wishlist', wishlistRoutes);
 app.use('/api/shipping', shippingRoutes);
 app.use('/api/stats', statsRoutes);
+app.use('/api/logs', activityLogRoutes);
+
 
 // Cổng chạy
 const PORT = process.env.PORT || 8080;

@@ -1,5 +1,7 @@
 const Product = require('../models/Product');
 const cloudinary = require('cloudinary').v2;
+const { createLog } = require('./activityLogController');
+
 
 // Helper function to build query filters
 const buildFilters = (query) => {
@@ -113,7 +115,17 @@ const createProduct = async (req, res) => {
         });
 
         await newProduct.save();
+        await createLog({
+            userId: req.user._id,
+            action: 'CREATE',
+            target: 'Product',
+            targetId: newProduct._id,
+            description: `Đã tạo sản phẩm mới: ${newProduct.name}`,
+            ip: req.ip
+        });
+
         res.status(201).json({ success: true, data: newProduct });
+
 
     } catch (error) {
         // Cleanup images if save fails (only for multer uploads, client-side verified separately)
@@ -178,7 +190,17 @@ const updateProduct = async (req, res) => {
 
         await product.save();
 
+        await createLog({
+            userId: req.user._id,
+            action: 'UPDATE',
+            target: 'Product',
+            targetId: product._id,
+            description: `Đã cập nhật thông tin sản phẩm: ${product.name}`,
+            ip: req.ip
+        });
+
         res.json({ success: true, data: product });
+
 
     } catch (error) {
         console.error("Error updating product:", error);
@@ -214,7 +236,17 @@ const deleteProduct = async (req, res) => {
         }
 
         await Product.findByIdAndDelete(req.params.id);
+        await createLog({
+            userId: req.user._id,
+            action: 'DELETE',
+            target: 'Product',
+            targetId: product._id,
+            description: `Đã xóa sản phẩm: ${product.name}`,
+            ip: req.ip
+        });
+
         res.json({ success: true, message: 'Đã xóa sản phẩm và hình ảnh liên quan' });
+
 
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });

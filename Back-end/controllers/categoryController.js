@@ -1,5 +1,7 @@
 const Category = require('../models/Category');
 const cloudinary = require('cloudinary').v2;
+const { createLog } = require('./activityLogController');
+
 
 // GET: Lấy danh sách
 const getCategories = async (req, res) => {
@@ -33,7 +35,17 @@ const createCategory = async (req, res) => {
     });
 
     await newCategory.save();
+    await createLog({
+      userId: req.user._id,
+      action: 'CREATE',
+      target: 'Category',
+      targetId: newCategory._id,
+      description: `Đã tạo danh mục mới: ${newCategory.name}`,
+      ip: req.ip
+    });
+
     res.status(201).json({ success: true, data: newCategory });
+
 
   } catch (error) {
     // Xóa ảnh trên cloudinary nếu lưu DB thất bại (chỉ khi upload qua multer)
@@ -88,7 +100,17 @@ const updateCategory = async (req, res) => {
     if (isActive !== undefined) category.isActive = isActive;
 
     const updatedCategory = await category.save();
+    await createLog({
+      userId: req.user._id,
+      action: 'UPDATE',
+      target: 'Category',
+      targetId: updatedCategory._id,
+      description: `Đã cập nhật danh mục: ${updatedCategory.name}`,
+      ip: req.ip
+    });
+
     res.json({ success: true, data: updatedCategory });
+
   } catch (error) {
     if (req.file && req.file.filename) {
       await cloudinary.uploader.destroy(req.file.filename);
@@ -122,7 +144,17 @@ const deleteCategory = async (req, res) => {
     // Xóa danh mục trong DB
     await Category.findByIdAndDelete(id);
 
+    await createLog({
+      userId: req.user._id,
+      action: 'DELETE',
+      target: 'Category',
+      targetId: category._id,
+      description: `Đã xóa danh mục: ${category.name}`,
+      ip: req.ip
+    });
+
     res.json({ message: 'Xoá danh mục và ảnh thành công' });
+
   } catch (error) {
     res.status(500).json({ message: 'Lỗi khi xoá danh mục', error: error.message });
   }
