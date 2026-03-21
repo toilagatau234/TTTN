@@ -102,7 +102,8 @@ const OrderPage = () => {
       const params = {
         page,
         limit: pageSize,
-        status: statusFilter !== 'all' ? statusFilter : undefined
+        status: statusFilter !== 'all' ? statusFilter : undefined,
+        code: debouncedSearchText ? debouncedSearchText.trim() : undefined
       };
       
       const response = await orderService.getAllOrders(params);
@@ -122,8 +123,15 @@ const OrderPage = () => {
   };
 
   useEffect(() => {
-    fetchOrders(pagination.current, pagination.pageSize);
-  }, [statusFilter]);
+    const handler = setTimeout(() => {
+      setDebouncedSearchText(searchText);
+    }, 500);
+    return () => clearTimeout(handler);
+  }, [searchText]);
+
+  useEffect(() => {
+    fetchOrders(1, pagination.pageSize);
+  }, [statusFilter, debouncedSearchText]);
 
   const handleUpdateStatus = async (id, status) => {
     try {
@@ -278,6 +286,9 @@ const OrderPage = () => {
                  prefix={<SearchOutlined className="text-gray-400" />} 
                  placeholder="Tìm đơn hàng..." 
                  className="w-full sm:w-[250px] h-[44px] rounded-xl border-none bg-[#F4F7FE] text-navy-700" 
+                 value={searchText}
+                 onChange={(e) => setSearchText(e.target.value)}
+                 allowClear
                />
                <Select 
                  value={statusFilter} 

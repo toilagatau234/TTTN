@@ -18,7 +18,7 @@ router.param('id', validateObjectId);
 router.post('/calculate', protect, calculateShippingFee);
 
 // Admin: Quản lý đối tác vận chuyển
-router.get('/carriers', protect, authorize('Admin', 'Manager'), getCarriers);
+router.get('/carriers', protect, getCarriers);
 router.post('/carriers', protect, authorize('Admin'), createCarrier);
 router.put('/carriers/:id', protect, authorize('Admin'), updateCarrier);
 

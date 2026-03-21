@@ -111,7 +111,7 @@ const Cart = () => {
                             {item.product?.name || "Sản phẩm đã bị xóa"}
                           </Link>
                           <p className="text-pink-500 font-bold mt-1">
-                            {item.price.toLocaleString()} đ
+                            {(item.price || 0).toLocaleString()} đ
                           </p>
                         </div>
 
@@ -134,7 +134,7 @@ const Cart = () => {
 
                         {/* Tổng tiền của item */}
                         <div className="w-28 text-right font-medium text-gray-700">
-                          {(item.price * item.quantity).toLocaleString()} đ
+                          {((item.price || 0) * (item.quantity || 1)).toLocaleString()} đ
                         </div>
 
                         {/* Nút xóa */}
@@ -175,7 +175,7 @@ const Cart = () => {
                             "{item.messageContent}"
                           </p>
                           <p className="text-purple-600 font-bold mt-1">
-                            {item.totalCustomPrice.toLocaleString()} đ
+                            {(item.totalCustomPrice || 0).toLocaleString()} đ
                           </p>
                         </div>
 
@@ -185,7 +185,7 @@ const Cart = () => {
                         </div>
 
                         <div className="w-28 text-right font-medium text-gray-700">
-                          {item.totalCustomPrice.toLocaleString()} đ
+                          {(item.totalCustomPrice || 0).toLocaleString()} đ
                         </div>
                       </div>
                     ))}
@@ -203,7 +203,7 @@ const Cart = () => {
                 <div className="flex justify-between">
                   <span>Tạm tính ({regularItems.length + customItems.length} loại)</span>
                   <span className="font-medium">
-                    {cart?.totalPrice?.toLocaleString()} đ
+                    {(cart?.totalPrice || 0).toLocaleString()} đ
                   </span>
                 </div>
                 <div className="flex justify-between text-emerald-500">
@@ -217,7 +217,7 @@ const Cart = () => {
                   <span className="text-gray-800 font-medium">Tổng cộng</span>
                   <div className="text-right">
                     <span className="text-3xl font-bold text-pink-500 block">
-                      {cart?.totalPrice?.toLocaleString()} đ
+                      {(cart?.totalPrice || 0).toLocaleString()} đ
                     </span>
                     <span className="text-xs text-gray-400">(Chưa bao gồm phí vận chuyển)</span>
                   </div>

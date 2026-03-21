@@ -359,6 +359,10 @@ const ProductPage = () => {
     <div className="w-full">
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+        <div>
+        
+        </div>
+        
         <Button
           type="primary"
           icon={<PlusOutlined />}

@@ -116,7 +116,7 @@ const ComplexTable = () => {
               percent={stockVal > 100 ? 100 : stockVal} 
               showInfo={false} 
               strokeColor={stockVal < 10 ? "#FF4D4F" : "#4318FF"} 
-              trailColor="#EFF4FB"
+              railColor="#EFF4FB"
               size="small"
               strokeLinecap="round" 
             />

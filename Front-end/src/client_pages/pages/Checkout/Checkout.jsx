@@ -223,9 +223,9 @@ const Checkout = () => {
   }
 
   // Tách items
-  const regularItems = cart?.items || [];
-  const customItems = cart?.customBouquets || [];
-  const subTotal = cart?.totalPrice || 0;
+  const regularItems = (cart?.items || []).filter(item => !item.isCustom);
+  const customItems = (cart?.items || []).filter(item => item.isCustom);
+  const subTotal = cart?.totalCartPrice || 0;
   const finalTotal = subTotal + shippingFee - discountAmount;
 
   return (
@@ -393,7 +393,7 @@ const Checkout = () => {
                     </div>
                     <div className="flex-1">
                       <p className="text-sm font-medium text-gray-800 line-clamp-1">{item.product?.name}</p>
-                      <p className="text-sm text-pink-500 font-bold">{(item.price * item.quantity).toLocaleString()} đ</p>
+                      <p className="text-sm text-pink-500 font-bold">{((item.product?.price || 0) * item.quantity).toLocaleString()} đ</p>
                     </div>
                   </div>
                 ))}
@@ -401,12 +401,12 @@ const Checkout = () => {
                 {customItems.map((item, i) => (
                   <div key={i} className="flex gap-4 items-center">
                     <div className="relative">
-                      <img src={item.imageUrl} className="w-16 h-16 object-cover rounded-xl" alt="" />
-                      <span className="absolute -top-2 -right-2 w-5 h-5 bg-purple-400 text-white rounded-full flex items-center justify-center text-xs font-bold">1</span>
+                      <img src={item.image} className="w-16 h-16 object-cover rounded-xl" alt="" />
+                      <span className="absolute -top-2 -right-2 w-5 h-5 bg-purple-400 text-white rounded-full flex items-center justify-center text-xs font-bold">{item.quantity}</span>
                     </div>
                     <div className="flex-1">
-                      <p className="text-sm font-medium text-gray-800 line-clamp-1">Hoa thiết kế riêng #{i + 1}</p>
-                      <p className="text-sm text-purple-500 font-bold">{item.totalCustomPrice.toLocaleString()} đ</p>
+                      <p className="text-sm font-medium text-gray-800 line-clamp-1">{item.name || `Hoa thiết kế #${i + 1}`}</p>
+                      <p className="text-sm text-purple-500 font-bold">{((item.price || 0) * item.quantity).toLocaleString()} đ</p>
                     </div>
                   </div>
                 ))}
