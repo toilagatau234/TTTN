@@ -169,8 +169,11 @@ const applyVoucher = async (req, res) => {
 
         const voucher = await Voucher.findOne({ code: code.toUpperCase() });
         if (!voucher) {
+            console.log(`[Voucher] Not found:`, code.toUpperCase());
             return res.status(404).json({ success: false, message: 'Mã voucher không tồn tại' });
         }
+
+        console.log(`[Voucher Debug] code: ${code}, isValid: ${voucher.isValid}, isActive: ${voucher.isActive}, now>=start: ${new Date() >= voucher.startDate}, now<=end: ${new Date() <= voucher.endDate}, orderTotal: ${orderTotal}, minOrder: ${voucher.minOrderValue}`);
 
         // Kiểm tra hiệu lực
         if (!voucher.isValid) {

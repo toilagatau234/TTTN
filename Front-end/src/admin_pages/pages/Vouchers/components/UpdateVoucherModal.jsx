@@ -120,7 +120,7 @@ const UpdateVoucherModal = ({ open, onCancel, onUpdate, voucher }) => {
                  <InputNumber 
                     className="w-full rounded-xl h-[40px] flex items-center pt-1 font-bold"
                     formatter={value => discountType === 'percent' ? `${value}%` : `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                    parser={value => value.replace(/%|\s?|(,*)/g, '')}
+                    parser={value => value.replace(/%|\s?|,/g, '')}
                  />
                </Form.Item>
              </Col>
@@ -131,6 +131,7 @@ const UpdateVoucherModal = ({ open, onCancel, onUpdate, voucher }) => {
                    <InputNumber 
                       className="w-full rounded-xl h-[40px] flex items-center pt-1" 
                       formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                      parser={value => value.replace(/\$\s?|(,*)/g, '')}
                       placeholder="Không giới hạn"
                    />
                  </Form.Item>
@@ -144,6 +145,7 @@ const UpdateVoucherModal = ({ open, onCancel, onUpdate, voucher }) => {
                  <InputNumber 
                     className="w-full rounded-xl h-[40px] flex items-center pt-1" 
                     formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                    parser={value => value.replace(/\$\s?|(,*)/g, '')}
                     placeholder="0"
                  />
                </Form.Item>

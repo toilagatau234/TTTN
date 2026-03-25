@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { Loader2, ArrowLeft, CheckCircle2, Ticket, Truck } from "lucide-react";
-import { message } from "antd";
+import { message, Select } from "antd";
 
 import cartService from "../../../services/cartService";
 import orderService from "../../../services/orderService";
@@ -21,9 +21,52 @@ const Checkout = () => {
   const [shippingInfo, setShippingInfo] = useState({
     fullName: "",
     phone: "",
+    street: "",
+    province: null,
+    district: null,
+    ward: null,
     address: "",
     note: "",
   });
+
+  const [provinces, setProvinces] = useState([]);
+  const [districts, setDistricts] = useState([]);
+  const [wards, setWards] = useState([]);
+
+  useEffect(() => {
+    fetch("https://provinces.open-api.vn/api/?depth=3")
+      .then(res => res.json())
+      .then(data => setProvinces(data))
+      .catch(console.error);
+  }, []);
+
+  const handleProvinceChange = (value) => {
+    const province = provinces.find(p => p.code === value);
+    setShippingInfo(prev => ({ ...prev, province, district: null, ward: null, address: "" }));
+    setDistricts(province?.districts || []);
+    setWards([]);
+  };
+
+  const handleDistrictChange = (value) => {
+    const district = districts.find(d => d.code === value);
+    setShippingInfo(prev => ({ ...prev, district, ward: null, address: "" }));
+    setWards(district?.wards || []);
+  };
+
+  const handleWardChange = (value) => {
+    const ward = wards.find(w => w.code === value);
+    setShippingInfo(prev => ({ ...prev, ward, address: "" }));
+  };
+
+  // Compute full address dynamically
+  useEffect(() => {
+    const { street, ward, district, province } = shippingInfo;
+    if (street && ward && district && province) {
+      setShippingInfo(prev => ({ ...prev, address: `${street}, ${ward.name}, ${district.name}, ${province.name}` }));
+    } else {
+      setShippingInfo(prev => ({ ...prev, address: "" }));
+    }
+  }, [shippingInfo.street, shippingInfo.ward, shippingInfo.district, shippingInfo.province]);
 
   // Carriers
   const [carriers, setCarriers] = useState([]);
@@ -103,7 +146,7 @@ const Checkout = () => {
             weightInGrams: 1000 // Tạm hardcode 1kg
           });
           if (feeRes.success) {
-            setShippingFee(feeRes.data.fee);
+            setShippingFee(feeRes.data.fee ?? 0);
           }
         } catch (error) {
           console.error("Lỗi tính phí ship:", error);
@@ -127,7 +170,13 @@ const Checkout = () => {
     if (!voucherCode.trim()) return;
 
     try {
-      const res = await voucherService.applyVoucher(voucherCode, cart.totalPrice);
+      // Calculate true subtotal locally to bypass broken Mongoose totalCartPrice
+      const currentSubTotal = (cart?.items || []).reduce((acc, item) => {
+        const p = item.isCustom ? (item.price || item.totalCustomPrice || 0) : (item.product?.price || 0);
+        return acc + p * (item.quantity || 1);
+      }, 0);
+
+      const res = await voucherService.applyVoucher(voucherCode, currentSubTotal);
       if (res.success) {
         setAppliedVoucher(res.data.voucher);
         setDiscountAmount(res.data.discountAmount);
@@ -225,7 +274,13 @@ const Checkout = () => {
   // Tách items
   const regularItems = (cart?.items || []).filter(item => !item.isCustom);
   const customItems = (cart?.items || []).filter(item => item.isCustom);
-  const subTotal = cart?.totalCartPrice || 0;
+  
+  // Calculate true subtotal locally
+  const subTotal = (cart?.items || []).reduce((acc, item) => {
+    const p = item.isCustom ? (item.price || item.totalCustomPrice || 0) : (item.product?.price || 0);
+    return acc + p * (item.quantity || 1);
+  }, 0);
+
   const finalTotal = subTotal + shippingFee - discountAmount;
 
   return (
@@ -272,16 +327,57 @@ const Checkout = () => {
                   />
                 </div>
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-600 mb-2">Địa chỉ giao hàng (Số nhà, đường, quận/huyện) *</label>
+                  <label className="block text-sm font-medium text-gray-600 mb-2">Tỉnh/Thành phố *</label>
+                  <Select
+                    className="w-full"
+                    size="large"
+                    placeholder="Chọn Tỉnh/Thành phố"
+                    value={shippingInfo.province?.code}
+                    onChange={handleProvinceChange}
+                    options={provinces.map(p => ({ label: p.name, value: p.code }))}
+                    showSearch
+                    filterOption={(input, option) => (option?.label ?? "").toLowerCase().includes(input.toLowerCase())}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-600 mb-2">Quận/Huyện *</label>
+                  <Select
+                    className="w-full"
+                    size="large"
+                    placeholder="Chọn Quận/Huyện"
+                    value={shippingInfo.district?.code}
+                    onChange={handleDistrictChange}
+                    options={districts.map(d => ({ label: d.name, value: d.code }))}
+                    disabled={!shippingInfo.province}
+                    showSearch
+                    filterOption={(input, option) => (option?.label ?? "").toLowerCase().includes(input.toLowerCase())}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-600 mb-2">Phường/Xã *</label>
+                  <Select
+                    className="w-full"
+                    size="large"
+                    placeholder="Chọn Phường/Xã"
+                    value={shippingInfo.ward?.code}
+                    onChange={handleWardChange}
+                    options={wards.map(w => ({ label: w.name, value: w.code }))}
+                    disabled={!shippingInfo.district}
+                    showSearch
+                    filterOption={(input, option) => (option?.label ?? "").toLowerCase().includes(input.toLowerCase())}
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-600 mb-2">Số nhà, Tên đường *</label>
                   <input
                     type="text"
                     required
-                    value={shippingInfo.address}
-                    onChange={(e) => setShippingInfo({ ...shippingInfo, address: e.target.value })}
+                    value={shippingInfo.street}
+                    onChange={(e) => setShippingInfo({ ...shippingInfo, street: e.target.value })}
                     className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-pink-300 focus:ring-2 focus:ring-pink-100 outline-none transition"
-                    placeholder="Nhập địa chỉ cụ thể để tính phí ship"
+                    placeholder="VD: 123 Đường Bông Hồng"
                   />
-                  {!shippingInfo.address && <p className="text-xs text-amber-500 mt-2">* Nhập địa chỉ để hệ thống tính phí vận chuyển</p>}
+                  {!shippingInfo.address && <p className="text-xs text-amber-500 mt-2">* Nhập đầy đủ 4 phần địa chỉ hệ thống mới tính phí vận chuyển</p>}
                 </div>
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-600 mb-2">Ghi chú cho shipper (Không bắt buộc)</label>
@@ -327,7 +423,7 @@ const Checkout = () => {
                       </div>
                       {selectedCarrier === carrier._id && shippingInfo.address.length > 5 ? (
                         <div className="text-right sm:text-left font-bold text-emerald-600 sm:ml-4">
-                          {shippingFee === 0 ? "Miễn phí" : `${shippingFee.toLocaleString()} đ`}
+                          {(shippingFee || 0) === 0 ? "Miễn phí" : `${(shippingFee || 0).toLocaleString()} đ`}
                         </div>
                       ) : (
                         <div className="text-right sm:text-left text-sm text-gray-400 sm:ml-4">
@@ -438,7 +534,7 @@ const Checkout = () => {
                   <div className="flex items-center justify-between bg-emerald-50 border border-emerald-200 p-3 rounded-xl">
                     <div className="flex items-center gap-2 text-emerald-600 font-medium">
                       <Ticket size={18} />
-                      {appliedVoucher.code} <span className="text-sm font-normal">(-{discountAmount.toLocaleString()}đ)</span>
+                      {appliedVoucher.code} <span className="text-sm font-normal">(-{(discountAmount || 0).toLocaleString()}đ)</span>
                     </div>
                     <button onClick={removeVoucher} type="button" className="text-emerald-400 hover:text-emerald-600 text-sm underline">Hủy bỏ</button>
                   </div>
@@ -449,16 +545,16 @@ const Checkout = () => {
               <div className="space-y-3 mb-6 text-sm text-gray-600 border-t border-gray-100 pt-6">
                 <div className="flex justify-between">
                   <span>Tạm tính ({regularItems.length + customItems.length} sản phẩm)</span>
-                  <span className="font-medium text-gray-800">{subTotal.toLocaleString()} đ</span>
+                  <span className="font-medium text-gray-800">{(subTotal || 0).toLocaleString()} đ</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Phí vận chuyển</span>
-                  <span className="font-medium text-gray-800">{shippingFee === 0 ? "Chưa tính" : `${shippingFee.toLocaleString()} đ`}</span>
+                  <span className="font-medium text-gray-800">{(shippingFee || 0) === 0 ? "Chưa tính" : `${(shippingFee || 0).toLocaleString()} đ`}</span>
                 </div>
                 {discountAmount > 0 && (
                   <div className="flex justify-between text-emerald-500 font-medium">
                     <span>Giảm giá voucher</span>
-                    <span>- {discountAmount.toLocaleString()} đ</span>
+                    <span>- {(discountAmount || 0).toLocaleString()} đ</span>
                   </div>
                 )}
               </div>

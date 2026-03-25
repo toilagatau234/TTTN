@@ -3,7 +3,7 @@ import axiosClient from './axiosClient';
 const reviewService = {
     // Lấy danh sách đánh giá của 1 sản phẩm
     getProductReviews: (productId, params) => {
-        return axiosClient.get(`/products/${productId}/reviews`, { params });
+        return axiosClient.get(`/reviews/product/${productId}`, { params });
     },
 
     // Tạo đánh giá mới (Cần đăng nhập)

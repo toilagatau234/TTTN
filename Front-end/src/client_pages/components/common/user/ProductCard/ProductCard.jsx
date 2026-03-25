@@ -1,13 +1,49 @@
 import { useEffect, useState } from "react";
 import { Heart, Star } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import wishlistService from "../../../../../services/wishlistService";
 import authService from "../../../../../services/authService";
+import cartService from "../../../../../services/cartService";
 import { message } from "antd";
 
 const ProductCard = ({ product }) => {
+  const navigate = useNavigate();
   const [liked, setLiked] = useState(false);
   const [loadingWishlist, setLoadingWishlist] = useState(false);
+
+  const handleAddToCart = async () => {
+    if (!authService.isLoggedIn()) {
+      message.warning({ content: "Vui lòng đăng nhập để mua hàng", key: "cart_auth" });
+      return;
+    }
+    try {
+      const res = await cartService.addToCart(product._id, 1);
+      if (res.success) {
+        message.success({ content: "Đã thêm vào giỏ hàng 🎉", key: "cart_success" });
+        window.dispatchEvent(new Event("cartUpdated")); // Cập nhật số lượng trên icon giỏ hàng
+      }
+    } catch (error) {
+      console.error(error);
+      message.error({ content: "Không thể thêm vào giỏ hàng", key: "cart_error" });
+    }
+  };
+
+  const handleBuyNow = async () => {
+    if (!authService.isLoggedIn()) {
+      message.warning({ content: "Vui lòng đăng nhập để mua hàng", key: "cart_auth" });
+      return;
+    }
+    // Chờ thêm vào giỏ xong rồi chuyển trang
+    try {
+      const res = await cartService.addToCart(product._id, 1);
+      if (res.success) {
+        window.dispatchEvent(new Event("cartUpdated"));
+        navigate("/cart");
+      }
+    } catch (error) {
+      message.error({ content: "Không thể xử lý mua ngay", key: "cart_error" });
+    }
+  };
 
   // Kiểm tra đã có trong wishlist chưa
   useEffect(() => {
@@ -115,11 +151,11 @@ const ProductCard = ({ product }) => {
         </div>
 
         <div className="button-group">
-          <button className="btn-cart">
+          <button className="btn-cart" onClick={handleAddToCart}>
             Thêm vào giỏ
           </button>
 
-          <button className="btn-buy">
+          <button className="btn-buy" onClick={handleBuyNow}>
             Mua ngay
           </button>
         </div>
