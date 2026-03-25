@@ -10,12 +10,13 @@ const HydrangeaStudio = () => {
     const [inputText, setInputText] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [isGeneratingImage, setIsGeneratingImage] = useState(false);
-    const [isAddingToCart, setIsAddingToCart] = useState(false); // State mới cho Add To Cart
+    const [isAddingToCart, setIsAddingToCart] = useState(false); 
 
     const [generatedImage, setGeneratedImage] = useState(null);
     const [currentEntities, setCurrentEntities] = useState({});
     const [showConfirmBtn, setShowConfirmBtn] = useState(false);
-    const [sessionId] = useState(() => `sess_${Math.random().toString(36).substring(2, 9)}`); 
+    const [summaryData, setSummaryData] = useState(null); // Lưu thông tin báo giá tạm tính
+    const [sessionId] = useState(() => `sess_${Math.random().toString(36).substring(2, 9)}`);  
 
     const chatEndRef = useRef(null);
 
@@ -45,14 +46,21 @@ const HydrangeaStudio = () => {
             if (success) {
                 setMessages(prev => [...prev, { role: 'bot', text: reply }]);
                 if (extractedEntities) {
-                    setCurrentEntities(prev => ({ ...prev, ...extractedEntities })); // Merge entities cũ và mới
+                    setCurrentEntities(prev => ({ ...prev, ...extractedEntities })); 
                 }
 
-                // Hiển thị nút xác nhận nếu AI đã thu thập đủ thông tin
-                if (reply.toLowerCase().includes("nhấn xác nhận") || reply.toLowerCase().includes("đồng ý")) {
+                // Nếu Backend yêu cầu confirm (đã đủ thông tin để ghép kho)
+                if (response.data.status === 'confirm_needed' || reply.toLowerCase().includes("xác nhận") || reply.toLowerCase().includes("đồng ý")) {
                     setShowConfirmBtn(true);
+                    if (response.data.summary) {
+                        setSummaryData({
+                            summary: response.data.summary,
+                            tempTotal: response.data.tempTotal
+                        });
+                    }
                 } else {
                     setShowConfirmBtn(false);
+                    setSummaryData(null);
                 }
             } else {
                 setMessages(prev => [...prev, { role: 'bot', text: 'Có lỗi xảy ra, mong bạn thử lại sau.' }]);
@@ -111,7 +119,8 @@ const HydrangeaStudio = () => {
 
             if (response.data.success) {
                 alert(`🎉 Thêm thành công! Giỏ hoa dự kiến giá: ${response.data.data.price.toLocaleString()} VNĐ`);
-                // Ở đây bạn có thể dùng thư viện react-toastify thay vì alert cho đẹp
+                // Chuyển hướng tới trang giỏ hàng
+                window.location.href = '/cart'; // Hoặc dùng navigate từ react-router-dom nếu có
             }
         } catch (error) {
             console.error("Add to cart error:", error);
@@ -124,6 +133,7 @@ const HydrangeaStudio = () => {
     // Hàm reset để vẽ lại
     const handleReset = () => {
         setGeneratedImage(null);
+        setShowConfirmBtn(true); // Cho phép nút hiển thị lại để user xem summary/vẽ lại
         setMessages(prev => [...prev, { role: 'bot', text: 'Bạn muốn thay đổi chi tiết nào so với bản cũ nhỉ? Hãy nói cho mình biết nhé!' }]);
     };
 
@@ -184,12 +194,35 @@ const HydrangeaStudio = () => {
                                 </div>
                             ))}
 
+                            {/* Bảng giá (Summary Card) */}
+                            {showConfirmBtn && !isGeneratingImage && !generatedImage && summaryData && (
+                                <div className="flex justify-start">
+                                    <div className="max-w-[85%] rounded-2xl p-5 bg-white border border-pink-200 shadow-md ml-0 flex flex-col gap-3">
+                                        <h3 className="font-bold text-gray-800 border-b pb-2 flex items-center gap-2">
+                                            <ShoppingCart size={16} className="text-pink-500" /> Bảng Giá Tạm Tính
+                                        </h3>
+                                        <div className="space-y-2 text-sm text-gray-700">
+                                            {summaryData.summary.map((item, i) => (
+                                                <div key={i} className="flex justify-between gap-4">
+                                                    <span>{item.qty}x {item.item}</span>
+                                                    <span className="font-medium">{item.totalPrice.toLocaleString()}đ</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <div className="flex justify-between border-t border-pink-100 pt-3 font-bold text-pink-600 text-base">
+                                            <span>Tổng cộng:</span>
+                                            <span>{summaryData.tempTotal.toLocaleString()}đ</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
                             {/* Nút Confirm */}
                             {showConfirmBtn && !isGeneratingImage && !generatedImage && (
                                 <div className="flex justify-start pt-2">
                                     <button
                                         onClick={handleConfirmDesign}
-                                        className="bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-full shadow-lg font-semibold tracking-wide transition-all transform hover:-translate-y-1 flex items-center gap-2 animate-bounce"
+                                        className="bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-full shadow-lg font-semibold tracking-wide transition-all transform hover:-translate-y-1 flex items-center gap-2 animate-bounce cursor-pointer"
                                     >
                                         <CheckCircle size={18} /> Chốt Thiết Kế & Vẽ Mẫu 🎨
                                     </button>
@@ -273,6 +306,22 @@ const HydrangeaStudio = () => {
                                         >
                                             <RefreshCcw size={18} /> Chỉnh sửa / Vẽ lại
                                         </button>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : isGeneratingImage ? (
+                            <div className="relative z-10 w-full max-w-sm mx-auto transition-all duration-500 ease-in-out">
+                                <div className="bg-white p-4 pb-6 rounded-2xl shadow-2xl border border-pink-100 animate-pulse">
+                                    <div className="rounded-xl overflow-hidden shadow-inner bg-pink-50 aspect-square relative flex items-center justify-center">
+                                        <Sparkles className="text-pink-300 w-16 h-16 animate-spin-slow" />
+                                    </div>
+                                    <div className="mt-6 space-y-3">
+                                        <div className="h-5 bg-pink-100 rounded w-3/4 mx-auto"></div>
+                                        <div className="h-4 bg-gray-100 rounded w-1/2 mx-auto"></div>
+                                    </div>
+                                    <div className="mt-8 space-y-3">
+                                        <div className="h-12 bg-pink-100 rounded-xl w-full"></div>
+                                        <div className="h-12 bg-gray-100 rounded-xl w-full"></div>
                                     </div>
                                 </div>
                             </div>

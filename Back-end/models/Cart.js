@@ -45,13 +45,17 @@ const cartItemSchema = new mongoose.Schema({
         // Giá được tính toán từ RAG tại thời điểm add to cart
         required: function() { return this.isCustom; }
     },
-    // Lưu lại danh sách nguyên liệu thật để Admin/Florist biết đường cắm hoa
-    materials: [{
-        productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' },
-        name: String,
-        quantity: Number,
-        price: Number
+    // Lưu lại chi tiết thành phần của lẵng hoa
+    components: [{
+        item: String,
+        qty: Number,
+        unitPrice: Number,
+        totalPrice: Number
     }],
+    baseFee: {
+        type: Number,
+        default: 50000
+    },
     note: {
         type: String // Ghi chú thêm (VD: "Tông màu đỏ chủ đạo")
     }

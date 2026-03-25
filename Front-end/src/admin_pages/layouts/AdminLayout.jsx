@@ -257,12 +257,6 @@ const AdminLayout = () => {
                                 type="text" 
                                 icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />} 
                                 onClick={() => setCollapsed(!collapsed)} 
-                                className="md:flex hidden bg-white shadow-sm border border-gray-100 rounded-xl hover:text-blue-600 transition-all" 
-                            />
-                            <Button 
-                                type="text" 
-                                icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />} 
-                                onClick={() => setCollapsed(!collapsed)} 
                                 className="flex md:hidden bg-white shadow-sm border border-gray-100 rounded-xl" 
                             />
                             <h2 className="text-3xl font-black text-[#2B3674] m-0 tracking-tighter capitalize">

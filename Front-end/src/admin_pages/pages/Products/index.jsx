@@ -393,7 +393,7 @@ const ProductPage = () => {
     <div className="w-full">
       {/* Header Actions */}
       <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4 px-2">
-        <h3 className="text-2xl font-black text-[#2B3674] m-0 tracking-tighter">Danh sách sản phẩm</h3>
+        <h3 className="text-2xl font-black text-[#2B3674] m-0 tracking-tighter"></h3>
         
         <Button
           type="primary"
