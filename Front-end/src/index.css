@@ -25,42 +25,58 @@ ul.ant-menu {
 /* ADMIN CUSTOM THEME — chuyển từ tailwind.config.js sang v4    */
 /* ============================================================ */
 @theme {
-  /* Brand (purple/violet) */
-  --color-brand-50: #E9E3FF;
-  --color-brand-100: #C0B0FA;
-  --color-brand-200: #9E85F5;
-  --color-brand-300: #7B5BEF;
-  --color-brand-400: #643CEB;
-  --color-brand-500: #4318FF;
-  --color-brand-600: #3A16D9;
-  --color-brand-700: #2E10B2;
-  --color-brand-800: #230C8B;
-  --color-brand-900: #180765;
+  /* Brand (Premium Pink/Rose) */
+  --color-brand-primary: #ec4899;
+  --color-brand-secondary: #f472b6;
+  --color-brand-soft: #fff1f2;
+  --color-brand-accent: #fbcfe8;
 
-  /* Navy (dark blue) */
-  --color-navy-50: #ECEFF8;
-  --color-navy-100: #D8DEEE;
-  --color-navy-200: #B4C0DE;
-  --color-navy-300: #8F9FB9;
-  --color-navy-400: #6B7E9F;
-  --color-navy-500: #475D84;
-  --color-navy-600: #334262;
-  --color-navy-700: #2B3674;
-  --color-navy-800: #1B254B;
-  --color-navy-900: #111C44;
+  /* Natural (Green/Organic) */
+  --color-nature-primary: #88a82a;
+  --color-nature-secondary: #a3b960;
+  --color-nature-soft: #f7fee7;
 
-  /* Light (neutral backgrounds) */
-  --color-light-primary: #F4F7FE;
-  --color-light-secondary: #FFFFFF;
+  /* Neutral (Sophisticated Gray) */
+  --color-neutral-50: #f9fafb;
+  --color-neutral-100: #f3f4f6;
+  --color-neutral-200: #e5e7eb;
+  --color-neutral-300: #d1d5db;
+  --color-neutral-400: #9ca3af;
+  --color-neutral-500: #6b7280;
+  --color-neutral-600: #4b5563;
+  --color-neutral-700: #374151;
+  --color-neutral-800: #111827;
+  --color-neutral-900: #030712;
+
+  /* Navy (Admin context) */
+  --color-navy-700: #2b3674;
+  --color-navy-800: #1b254b;
+
+  /* Shadows */
+  --shadow-premium: 0 10px 30px -5px rgba(0, 0, 0, 0.05), 0 4px 10px -2px rgba(0, 0, 0, 0.02);
+  --shadow-hover: 0 20px 40px -10px rgba(0, 0, 0, 0.1);
 
   /* Fonts */
-  --font-sans: "DM Sans", sans-serif;
-  --font-inter: "Inter", sans-serif;
+  --font-sans: "Inter", "system-ui", sans-serif;
+  --font-heading: "DM Sans", sans-serif;
 }
 
-/* ============================================================ */
-/* USER (CLIENT) SECTION — từ 01/src/index.css                  */
-/* ============================================================ */
+body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-sans);
+  background-color: #ffffff;
+  color: var(--color-neutral-800);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading);
+}
+
+.ant-layout {
+  background: var(--color-neutral-50);
+}
 
 /* ---- Footer: hoa rơi ---- */
 .flower {
@@ -199,16 +215,20 @@ ul.ant-menu {
 
 /* ---- Shop: Product Card ---- */
 .product-card {
-  background: #ffffff;
-  border-radius: 28px;
-  padding: 20px;
+  background: var(--color-neutral-50);
+  border-radius: 24px;
+  padding: 16px;
   text-align: center;
-  transition: all 0.4s ease;
+  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
+  border: 1px solid var(--color-neutral-100);
 }
 
 .product-card:hover {
-  transform: translateY(-8px);
+  transform: translateY(-10px);
+  background: #ffffff;
+  box-shadow: var(--shadow-hover);
+  border-color: var(--color-brand-accent);
 }
 
 .image-wrapper {
@@ -216,114 +236,143 @@ ul.ant-menu {
   display: flex;
   justify-content: center;
   align-items: center;
-  height: 220px;
+  height: 240px;
+  background: #ffffff;
+  border-radius: 20px;
+  overflow: hidden;
+  transition: all 0.5s ease;
+}
+
+.product-card:hover .image-wrapper {
+  background: var(--color-brand-soft);
 }
 
 .light-glow {
   position: absolute;
-  width: 160px;
-  height: 160px;
-  background: radial-gradient(circle, #f45aaf 0%, transparent 70%);
+  width: 180px;
+  height: 180px;
+  background: radial-gradient(circle, var(--color-brand-accent) 0%, transparent 70%);
   border-radius: 50%;
-  filter: blur(40px);
-  opacity: 0.6;
+  filter: blur(50px);
+  opacity: 0.4;
+  transition: opacity 0.5s ease;
+}
+
+.product-card:hover .light-glow {
+  opacity: 0.8;
 }
 
 .product-image {
-  height: 180px;
+  height: 200px;
   object-fit: contain;
   position: relative;
   z-index: 2;
+  transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-@keyframes float {
-
-  0%,
-  100% {
-    transform: translateY(0px);
-  }
-
-  50% {
-    transform: translateY(-10px);
-  }
+.product-card:hover .product-image {
+  transform: scale(1.1) rotate(3deg);
 }
 
 .heart-btn {
   position: absolute;
-  top: 10px;
-  right: 10px;
-  background: white;
-  padding: 6px;
+  top: 12px;
+  right: 12px;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(8px);
+  padding: 8px;
   border-radius: 50%;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
   cursor: pointer;
-  transition: 0.3s;
+  z-index: 10;
+  transition: all 0.3s ease;
+  border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
 .heart-btn:hover {
-  transform: scale(1.1);
+  background: #ffffff;
+  transform: scale(1.15);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
 }
 
 .product-title {
-  font-size: 14px;
-  color: #555;
-  margin-top: 10px;
-  min-height: 40px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-neutral-700);
+  margin-top: 16px;
+  min-height: 44px;
+  line-height: 1.4;
+  transition: color 0.3s ease;
+}
+
+.product-card:hover .product-title {
+  color: var(--color-brand-primary);
 }
 
 .old-price {
-  color: #bbb;
+  color: var(--color-neutral-400);
   text-decoration: line-through;
   font-size: 13px;
+  margin-bottom: 2px;
 }
 
 .new-price {
-  color: #ec4899;
-  font-weight: bold;
-  font-size: 18px;
-}
-
-.product-meta {
-  font-size: 12px;
-  color: #999;
-  margin-bottom: 10px;
+  color: var(--color-brand-primary);
+  font-weight: 800;
+  font-size: 20px;
+  letter-spacing: -0.5px;
 }
 
 .button-group {
-  margin-top: 10px;
+  margin-top: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: all 0.4s ease;
+}
+
+.product-card:hover .button-group {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .btn-cart {
   width: 100%;
-  background: #edffc5;
-  color: #2f5d3a;
-  border: none;
+  background: var(--color-nature-soft);
+  color: var(--color-nature-primary);
+  border: 1px solid var(--color-nature-secondary);
   padding: 10px;
-  border-radius: 14px;
+  border-radius: 12px;
   transition: all 0.3s ease;
-  font-weight: 500;
+  font-weight: 600;
+  font-size: 13px;
 }
 
 .btn-cart:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(16, 185, 129, 0.3);
+  background: var(--color-nature-primary);
+  color: #ffffff;
+  box-shadow: 0 8px 15px rgba(136, 168, 42, 0.2);
 }
 
 .btn-buy {
   width: 100%;
-  margin-top: 8px;
-  border: 1px solid #ec4899;
-  color: #ec4899;
-  background: white;
-  padding: 9px;
-  border-radius: 20px;
+  background: var(--color-brand-primary);
+  color: #ffffff;
+  border: none;
+  padding: 11px;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 14px;
   transition: all 0.3s ease;
+  box-shadow: 0 4px 10px rgba(236, 72, 153, 0.2);
 }
 
 .btn-buy:hover {
-  background: #ec4899;
-  color: white;
-  transform: scale(1.05);
+  background: var(--color-brand-secondary);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(236, 72, 153, 0.3);
 }
 
 /* ---- Shop: Rating ---- */
@@ -411,4 +460,72 @@ ul.ant-menu {
   100% {
     transform: translateY(110vh) rotate(360deg);
   }
+}
+
+/* ---- Utilities: Custom Scrollbar ---- */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--color-neutral-200);
+  border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: var(--color-brand-soft);
+}
+
+/* ---- Utilities: Premium Shadows ---- */
+.shadow-premium {
+  box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.03), 0 20px 40px -10px rgba(0, 0, 0, 0.02);
+}
+
+.shadow-hover {
+  box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.08), 0 30px 60px -15px rgba(0, 0, 0, 0.05);
+}
+
+/* ---- Animation Utilities ---- */
+.animate-in {
+  animation: fadeIn 0.8s ease forwards;
+}
+
+.slide-up {
+  animation: slideUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* Premium Select Overrides (for Ant Design or native) */
+.premium-select .ant-select-selector {
+  border-radius: 16px !important;
+  border-color: var(--color-neutral-100) !important;
+  background-color: var(--color-neutral-50) !important;
+  height: 52px !important;
+  display: flex !important;
+  align-items: center !important;
+  padding: 0 20px !important;
+  transition: all 0.3s ease !important;
+}
+
+.premium-select .ant-select-selector:hover {
+  border-color: var(--color-brand-accent) !important;
+}
+
+.premium-select.ant-select-focused .ant-select-selector {
+  background-color: #ffffff !important;
+  border-color: var(--color-brand-accent) !important;
+  box-shadow: 0 0 0 4px var(--color-brand-soft) !important;
 }

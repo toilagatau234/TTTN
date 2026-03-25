@@ -122,41 +122,41 @@ const ProductCard = ({ product }) => {
       </div>
 
       <div className="product-content">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-1 bg-yellow-50 px-2 py-0.5 rounded-full border border-yellow-100">
+            <Star size={12} className="text-yellow-500 fill-yellow-500" />
+            <span className="text-[11px] font-bold text-yellow-700">
+              {product.averageRating || 5.0}
+            </span>
+          </div>
+          <span className="text-[11px] text-gray-400 font-medium">
+            Đã bán {product.sold || 0}
+          </span>
+        </div>
+
         <Link to={`/product/${product._id}`}>
-          <h3 className="product-title line-clamp-2">
+          <h3 className="product-title line-clamp-2 hover:text-pink-600 transition-colors">
             {product.name}
           </h3>
         </Link>
 
-        {product.originalPrice > product.price && (
-          <p className="old-price">
-            {product.originalPrice.toLocaleString()} đ
+        <div className="mt-3 flex flex-col items-center">
+          {product.originalPrice > product.price && (
+            <p className="old-price">
+              {product.originalPrice.toLocaleString()} đ
+            </p>
+          )}
+          <p className="new-price">
+            {product.price.toLocaleString()} đ
           </p>
-        )}
-
-        <p className="new-price">
-          {product.price.toLocaleString()} đ
-        </p>
-
-        <div className="rating-row">
-          <span className="star-wrapper">
-            <Star size={14} className="star-icon" />
-          </span>
-          <span className="rating-number">
-            {product.averageRating || 5.0}
-          </span>
-          <span className="sold-text">
-            | Đã bán {product.sold || 0}
-          </span>
         </div>
 
         <div className="button-group">
-          <button className="btn-cart" onClick={handleAddToCart}>
-            Thêm vào giỏ
-          </button>
-
           <button className="btn-buy" onClick={handleBuyNow}>
             Mua ngay
+          </button>
+          <button className="btn-cart" onClick={handleAddToCart}>
+            Thêm vào giỏ
           </button>
         </div>
 

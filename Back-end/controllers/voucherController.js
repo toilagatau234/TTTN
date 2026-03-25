@@ -172,15 +172,22 @@ const applyVoucher = async (req, res) => {
             console.log(`[Voucher] Not found:`, code.toUpperCase());
             return res.status(404).json({ success: false, message: 'Mã voucher không tồn tại' });
         }
-
-        console.log(`[Voucher Debug] code: ${code}, isValid: ${voucher.isValid}, isActive: ${voucher.isActive}, now>=start: ${new Date() >= voucher.startDate}, now<=end: ${new Date() <= voucher.endDate}, orderTotal: ${orderTotal}, minOrder: ${voucher.minOrderValue}`);
+        console.log(`[Voucher Debug] code: ${code}, isActive: ${voucher.isActive}, orderTotal: ${orderTotal}, minOrder: ${voucher.minOrderValue}`);
 
         // Kiểm tra hiệu lực
-        if (!voucher.isValid) {
-            return res.status(400).json({
-                success: false,
-                message: 'Voucher đã hết hạn hoặc hết lượt sử dụng',
-            });
+        if (!voucher.isActive) {
+            return res.status(400).json({ success: false, message: 'Voucher này hiện đang tạm khóa' });
+        }
+
+        const now = new Date();
+        if (now < voucher.startDate) {
+            return res.status(400).json({ success: false, message: 'Voucher này chưa đến thời gian áp dụng' });
+        }
+        if (now > voucher.endDate) {
+            return res.status(400).json({ success: false, message: 'Voucher này đã hết hạn sử dụng' });
+        }
+        if (voucher.usageLimit !== null && voucher.usedCount >= voucher.usageLimit) {
+            return res.status(400).json({ success: false, message: 'Voucher này đã hết lượt sử dụng' });
         }
 
         // Kiểm tra đơn tối thiểu

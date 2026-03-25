@@ -1,6 +1,7 @@
 const Order = require('../models/Order');
 const Cart = require('../models/Cart');
 const Product = require('../models/Product');
+const Voucher = require('../models/Voucher'); // Thêm model Voucher
 
 // =============================================
 // USER ENDPOINTS
@@ -10,7 +11,7 @@ const Product = require('../models/Product');
 // @route   POST /api/orders
 const createOrder = async (req, res) => {
     try {
-        const { shippingInfo, paymentMethod, voucherCode } = req.body;
+        const { shippingInfo, paymentMethod, voucherCode, shippingFee } = req.body; // Thêm shippingFee, voucherCode
 
         // 1. Validate thông tin giao hàng
         if (!shippingInfo || !shippingInfo.fullName || !shippingInfo.phone || !shippingInfo.address) {
@@ -40,15 +41,16 @@ const createOrder = async (req, res) => {
                 // Sản phẩm AI custom
                 orderItems.push({
                     isCustom: true,
-                    name: item.name,
-                    image: item.image,
-                    price: item.price,
-                    quantity: item.quantity,
-                    materials: item.materials,
-                    note: item.note,
+                    name: item.name || 'Sản phẩm custom AI',
+                    image: item.image || 'https://placehold.co/400x400?text=AI+Bouquet',
+                    price: item.price || 0,
+                    quantity: Number(item.quantity || 1),
+                    materials: item.materials || [],
+                    note: item.note || '',
                 });
-                itemsPrice += item.price * item.quantity;
-            } else {
+                itemsPrice += (item.price || 0) * Number(item.quantity || 1);
+            }
+ else {
                 // Sản phẩm thường → kiểm tra tồn kho
                 const product = item.product;
                 if (!product) continue;
@@ -63,12 +65,12 @@ const createOrder = async (req, res) => {
                 orderItems.push({
                     product: product._id,
                     name: product.name,
-                    image: product.images?.[0]?.url || '',
-                    price: product.price,
-                    quantity: item.quantity,
+                    image: (product.images && product.images.length > 0) ? product.images[0].url : 'https://placehold.co/400x400?text=No+Image',
+                    price: product.price || 0,
+                    quantity: Number(item.quantity || 1),
                     isCustom: false,
                 });
-                itemsPrice += product.price * item.quantity;
+                itemsPrice += (product.price || 0) * Number(item.quantity || 1);
             }
         }
 
@@ -79,25 +81,77 @@ const createOrder = async (req, res) => {
             });
         }
 
-        // 4. Tính phí ship (có thể tùy chỉnh sau)
-        const shippingPrice = itemsPrice >= 500000 ? 0 : 30000; // Free ship cho đơn >= 500k
+        // 4. Phí vận chuyển
+        // Ưu tiên phí từ Frontend gửi lên, nếu không có thì dùng logic cũ của Backend
+        const shippingPrice = typeof shippingFee === 'number' ? shippingFee : (itemsPrice >= 500000 ? 0 : 30000);
 
-        // 5. Tính tổng
-        const totalPrice = itemsPrice + shippingPrice;
+        // 5. Xử lý Voucher (Mã giảm giá)
+        let discountPrice = 0;
+        let voucherId = null;
 
-        // 6. Tạo đơn hàng
+        if (voucherCode && typeof voucherCode === 'string') {
+            const voucher = await Voucher.findOne({ code: voucherCode.toUpperCase() });
+            
+            // Re-validate voucher trên Server
+            if (voucher && voucher.isValid && itemsPrice >= (voucher.minOrderValue || 0)) {
+                if (voucher.discountType === 'percent') {
+                    discountPrice = Math.round((itemsPrice * (voucher.discountValue || 0)) / 100);
+                    if (voucher.maxDiscount && discountPrice > voucher.maxDiscount) {
+                        discountPrice = voucher.maxDiscount;
+                    }
+                } else {
+                    discountPrice = voucher.discountValue || 0;
+                }
+
+                // Không để giảm vượt quá tiền hàng
+                if (discountPrice > itemsPrice) {
+                    discountPrice = itemsPrice;
+                }
+
+                voucherId = voucher._id;
+            } else {
+                // Nếu mã không hợp lệ (hết hạn, không đủ đơn tối thiểu...) thì bỏ qua hoặc báo lỗi?
+                // Ở đây ta có thể chọn bỏ qua mã và log lại, hoặc trả lỗi về client
+                console.warn(`[Order] Invalid voucher ignored: ${voucherCode}`);
+            }
+        }
+
+        // 6. Tính tổng cuối cùng
+        const totalPrice = Math.max(0, (itemsPrice || 0) + (shippingPrice || 0) - (discountPrice || 0));
+
+        // 7. Làm sạch thông tin giao hàng (chỉ lấy các trường trong model để tránh lỗi Object/String)
+        const sanitizedShippingInfo = {
+            fullName: shippingInfo.fullName,
+            phone: shippingInfo.phone,
+            address: shippingInfo.address,
+            ward: String(shippingInfo.ward || ''),
+            district: String(shippingInfo.district || ''),
+            city: String(shippingInfo.city || ''),
+            note: String(shippingInfo.note || '')
+        };
+
+        const normalizedPaymentMethod = (paymentMethod || 'cod').toLowerCase();
+        console.log(`[Order] Creating order for user ${req.user._id}. Method: ${normalizedPaymentMethod}`);
+
+        // 8. Tạo đơn hàng
         const order = await Order.create({
             user: req.user._id,
             items: orderItems,
-            shippingInfo,
-            paymentMethod: paymentMethod || 'cod',
-            itemsPrice,
-            shippingPrice,
-            discountPrice: 0,
-            totalPrice,
+            shippingInfo: sanitizedShippingInfo,
+            paymentMethod: normalizedPaymentMethod,
+            itemsPrice: Number(itemsPrice) || 0,
+            shippingPrice: Number(shippingPrice) || 0,
+            discountPrice: Number(discountPrice) || 0,
+            totalPrice: Number(totalPrice) || 0,
+            voucher: voucherId,
         });
 
-        // 7. Trừ tồn kho cho sản phẩm thường
+        // 8. Cập nhật lượt dùng Voucher nếu có
+        if (voucherId) {
+            await Voucher.findByIdAndUpdate(voucherId, { $inc: { usedCount: 1 } });
+        }
+
+        // 9. Trừ tồn kho cho sản phẩm thường
         for (const item of orderItems) {
             if (!item.isCustom && item.product) {
                 await Product.findByIdAndUpdate(item.product, {
@@ -106,7 +160,7 @@ const createOrder = async (req, res) => {
             }
         }
 
-        // 8. Xóa giỏ hàng sau khi đặt thành công
+        // 10. Xóa giỏ hàng sau khi đặt thành công
         cart.items = [];
         await cart.save();
 
@@ -116,8 +170,13 @@ const createOrder = async (req, res) => {
             data: order,
         });
     } catch (error) {
-        console.error('Create order error:', error.message);
-        res.status(500).json({ success: false, message: 'Lỗi server khi tạo đơn hàng' });
+        console.error('Create order error details:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Lỗi server khi tạo đơn hàng',
+            error: error.message,
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        });
     }
 };
 

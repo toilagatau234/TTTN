@@ -31,15 +31,16 @@ const OrderStatCard = ({ title, options, icon }) => {
   const [filter, setFilter] = useState('week');
 
   return (
-    <div className="bg-white p-5 rounded-[20px] shadow-sm flex flex-col justify-between h-full relative overflow-hidden">
+    <div className="bg-white p-6 rounded-[24px] shadow-premium flex flex-col justify-between h-full border border-white/50 relative overflow-hidden group animate-in slide-in-from-bottom-4 duration-500">
+      <div className="absolute top-0 right-0 w-32 h-32 bg-blue-50/20 rounded-full translate-x-1/2 -translate-y-1/2 blur-3xl pointer-events-none"></div>
       
       {/* Header Card: Tiêu đề + Bộ lọc thời gian */}
-      <div className="flex justify-between items-start mb-4 z-10">
-        <div className="flex items-center gap-3">
-           <div className="bg-light-primary text-brand-500 w-10 h-10 rounded-full flex items-center justify-center text-xl">
+      <div className="flex justify-between items-start mb-6 z-10">
+        <div className="flex items-center gap-4">
+           <div className="bg-[#F4F7FE] text-blue-600 w-12 h-12 rounded-2xl flex items-center justify-center text-2xl shadow-sm group-hover:scale-110 transition-transform duration-500">
               {icon}
            </div>
-           <h4 className="text-lg font-bold text-navy-700">{title}</h4>
+           <h4 className="text-lg font-black text-[#2B3674] tracking-tight m-0">{title}</h4>
         </div>
         
         {/* Dropdown Filter */}
@@ -48,8 +49,7 @@ const OrderStatCard = ({ title, options, icon }) => {
           value={filter}
           onChange={setFilter}
           variant="borderless"
-          className="bg-[#F4F7FE] rounded-lg text-xs font-bold text-gray-600 min-w-[100px]"
-          styles={{ popup: { root: { borderRadius: '12px' } } }}
+          className="bg-[#F4F7FE] rounded-xl text-[10px] font-black uppercase tracking-widest text-gray-500 min-w-[110px]"
         >
           <Option value="today">Hôm nay</Option>
           <Option value="yesterday">Hôm qua</Option>
@@ -59,24 +59,19 @@ const OrderStatCard = ({ title, options, icon }) => {
       </div>
 
       {/* Nội dung thống kê */}
-      <div className="flex items-center justify-around z-10">
+      <div className="flex items-center justify-around z-10 py-2">
         {options.map((item, index) => (
           <React.Fragment key={index}>
-            <div className="flex flex-col items-center gap-1">
-               <span className="text-3xl font-bold text-navy-700">{item.value}</span>
-               <span className="text-sm text-gray-400 font-medium">{item.label}</span>
+            <div className="flex flex-col items-center gap-1 group/item cursor-pointer">
+               <span className="text-3xl font-black text-[#2B3674] tracking-tighter group-hover/item:text-blue-600 transition-colors">{item.value}</span>
+               <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{item.label}</span>
             </div>
-            {/* Đường kẻ dọc phân cách, trừ phần tử cuối */}
+            {/* Đường kẻ dọc phân cách */}
             {index < options.length - 1 && (
-              <div className="h-10 w-[1px] bg-gray-200 mx-2"></div>
+              <div className="h-10 w-px bg-gray-100"></div>
             )}
           </React.Fragment>
         ))}
-      </div>
-      
-      {/* Background Decor */}
-      <div className="absolute -right-5 -bottom-5 text-[100px] text-gray-100 opacity-50 z-0 pointer-events-none">
-        {icon}
       </div>
     </div>
   );
@@ -152,63 +147,88 @@ const OrderPage = () => {
 
   const columns = [
     {
-      title: 'MÃ ĐƠN',
+      title: <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest pl-2">Mã đơn hàng</span>,
       dataIndex: 'orderCode',
       key: 'orderCode',
-      render: (text, record) => <span className="font-bold text-navy-700 hover:text-brand-500 cursor-pointer" onClick={() => showDetail(record)}>{text}</span>,
+      render: (text, record) => (
+        <span 
+          className="font-black text-[#2B3674] hover:text-blue-600 cursor-pointer transition-colors pl-2" 
+          onClick={() => showDetail(record)}
+        >
+          #{text}
+        </span>
+      ),
     },
     {
-      title: 'KHÁCH HÀNG',
+      title: <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest">Khách hàng</span>,
       dataIndex: 'shippingInfo',
       key: 'customer',
-      render: (val) => <span className="font-bold text-navy-700">{val?.fullName || 'N/A'}</span>,
+      render: (val) => (
+        <div className="flex flex-col">
+          <span className="font-black text-[#2B3674] text-sm">{val?.fullName || 'N/A'}</span>
+          <span className="text-[10px] font-bold text-gray-400">{val?.phone || 'N/A'}</span>
+        </div>
+      ),
     },
     {
-      title: 'NGÀY ĐẶT',
+      title: <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest">Thời gian</span>,
       dataIndex: 'createdAt',
       key: 'date',
-      render: (text) => <span className="font-medium text-gray-500">{dayjs(text).format('DD/MM/YYYY')}</span>,
+      render: (text) => (
+        <div className="flex flex-col">
+          <span className="font-bold text-[#2B3674] text-xs">{dayjs(text).format('DD/MM/YYYY')}</span>
+          <span className="text-[10px] text-gray-400">{dayjs(text).format('HH:mm')}</span>
+        </div>
+      ),
     },
     {
-      title: 'TỔNG TIỀN',
+      title: <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest">Số tiền</span>,
       dataIndex: 'totalPrice',
       key: 'total',
-      render: (val) => <span className="font-bold text-brand-500">{(val || 0).toLocaleString()} ₫</span>,
+      render: (val) => <span className="font-black text-[#2B3674]">{(val || 0).toLocaleString()} ₫</span>,
     },
     {
-      title: 'TRẠNG THÁI',
+      title: <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest">Trạng thái</span>,
       dataIndex: 'status',
       key: 'status',
       render: (status) => {
-        let icon, color, text;
+        let bg, dot, text, textColor;
         switch (status) {
-          case 'delivered': icon = <CheckCircleOutlined />; color = 'text-green-500'; text = 'Hoàn thành'; break;
-          case 'pending': icon = <ClockCircleOutlined />; color = 'text-orange-500'; text = 'Chờ xử lý'; break;
-          case 'processing': icon = <ClockCircleOutlined />; color = 'text-blue-500'; text = 'Đang chuẩn bị'; break;
-          case 'shipping': icon = <CarOutlined />; color = 'text-purple-500'; text = 'Đang giao'; break;
-          case 'cancelled': icon = <CloseCircleOutlined />; color = 'text-red-500'; text = 'Đã hủy'; break;
-          case 'confirmed': icon = <CheckCircleOutlined />; color = 'text-cyan-500'; text = 'Đã xác nhận'; break;
-          default: icon = <CheckCircleOutlined />; color = 'text-gray-500'; text = status;
+          case 'delivered':
+            bg = 'bg-emerald-50'; dot = 'bg-emerald-500'; textColor = 'text-emerald-700'; text = 'Hoàn thành'; break;
+          case 'pending':
+            bg = 'bg-amber-50'; dot = 'bg-amber-500'; textColor = 'text-amber-700'; text = 'Chờ xử lý'; break;
+          case 'processing':
+            bg = 'bg-blue-50'; dot = 'bg-blue-500'; textColor = 'text-blue-700'; text = 'Đang chuẩn bị'; break;
+          case 'shipping':
+            bg = 'bg-purple-50'; dot = 'bg-purple-500'; textColor = 'text-purple-700'; text = 'Đang giao'; break;
+          case 'cancelled':
+            bg = 'bg-rose-50'; dot = 'bg-rose-500'; textColor = 'text-rose-700'; text = 'Đã hủy'; break;
+          case 'confirmed':
+            bg = 'bg-cyan-50'; dot = 'bg-cyan-500'; textColor = 'text-cyan-700'; text = 'Đã xác nhận'; break;
+          default:
+            bg = 'bg-gray-50'; dot = 'bg-gray-500'; textColor = 'text-gray-700'; text = status;
         }
         return (
-          <div className={`flex items-center gap-2 ${color}`}>
-            <span className="text-lg">{icon}</span>
-            <span className="font-bold text-sm text-navy-700">{text}</span>
+          <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full ${bg} ${textColor} border border-transparent`}>
+            <span className={`w-2 h-2 rounded-full ${dot}`}></span>
+            <span className="text-[11px] font-black uppercase tracking-wider">{text}</span>
           </div>
         );
       },
     },
     {
-      title: 'HÀNH ĐỘNG',
+      title: <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest">Thao tác</span>,
       key: 'action',
+      align: 'right',
       render: (_, record) => (
         <Dropdown 
           menu={{ items: [
-            { key: 'view', label: 'Xem chi tiết', icon: <EyeOutlined />, onClick: () => showDetail(record) },
+            { key: 'view', label: <span className="font-bold">Xem chi tiết</span>, icon: <EyeOutlined className="text-blue-500" />, onClick: () => showDetail(record) },
             { 
               key: 'status_menu', 
-              label: 'Cập nhật trạng thái', 
-              icon: <ClockCircleOutlined />,
+              label: <span className="font-bold">Cập nhật trạng thái</span>, 
+              icon: <ClockCircleOutlined className="text-amber-500" />,
               children: [
                 { key: 'confirmed', label: 'Xác nhận', onClick: () => handleUpdateStatus(record._id, 'confirmed') },
                 { key: 'processing', label: 'Chuẩn bị', onClick: () => handleUpdateStatus(record._id, 'processing') },
@@ -219,10 +239,10 @@ const OrderPage = () => {
             }
           ] }} 
           trigger={['click']}
+          placement="bottomRight"
+          arrow
         >
-          <div className="cursor-pointer text-gray-400 hover:text-navy-700 text-xl bg-light-primary w-8 h-8 flex items-center justify-center rounded-lg">
-             <MoreOutlined />
-          </div>
+          <Button type="text" className="hover:bg-blue-50 rounded-xl" icon={<MoreOutlined className="text-gray-400 text-lg" />} />
         </Dropdown>
       ),
     },
@@ -230,34 +250,37 @@ const OrderPage = () => {
 
   return (
     <div className="w-full">
-      {/* --- BẢNG THỐNG KÊ --- */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-6">
+      {/* Header Title & Actions */}
+      <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4 px-2">
+        <h3 className="text-2xl font-black text-[#2B3674] m-0 tracking-tighter"></h3>
         
-        {/* Tổng quan đơn hàng */}
+        <div className="flex gap-4">
+          <Button icon={<ExportOutlined />} className="bg-[#F4F7FE] border-none text-gray-600 font-black uppercase tracking-widest text-[10px] rounded-2xl h-12 px-6 hover:bg-blue-50 hover:text-blue-600 transition-all">Xuất dữ liệu</Button>
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => setIsModalOpen(true)} className="bg-blue-600 h-12 px-8 rounded-2xl font-black shadow-lg shadow-blue-100 border-none hover:bg-blue-500 transition-all transform hover:-translate-y-1 active:translate-y-0 uppercase tracking-widest text-xs">Tạo vận đơn</Button>
+        </div>
+      </div>
+
+      {/* --- BẢNG THỐNG KÊ --- */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
         <OrderStatCard 
-          title="Tổng quan đơn hàng"
+          title="Thông tin vận hành"
           icon={<InboxOutlined />}
           options={[
-            { label: 'Tất cả', value: 128 },
+            { label: 'Tất cả', value: pagination.total },
             { label: 'Chờ xử lý', value: 12 },
             { label: 'Hoàn thành', value: 98 },
           ]}
         />
-
-        {/* Đơn có vấn đề */}
         <OrderStatCard 
-          title="Đơn cần chú ý"
+          title="Rủi ro vận chuyển"
           icon={<StopOutlined />}
           options={[
             { label: 'Đã hủy', value: 5 },
             { label: 'Hoàn trả', value: 2 },
-            { label: 'Hư hỏng', value: 0 },
           ]}
         />
-
-        {/* Khách hàng & Giỏ hàng */}
         <OrderStatCard 
-          title="Hiệu suất khách hàng"
+          title="Luồng mua hàng"
           icon={<ShoppingCartOutlined />}
           options={[
             { label: 'Bỏ quên giỏ', value: 24 },
@@ -266,35 +289,26 @@ const OrderPage = () => {
         />
       </div>
 
-      {/* --- HEADER TITLE --- */}
-      <div className="mb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          
-        </div>
-        
-        <div className="flex gap-3">
-          <Button icon={<ExportOutlined />} className="bg-white border-gray-200 text-gray-600 font-medium rounded-xl h-10 shadow-sm">Xuất Excel</Button>
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => setIsModalOpen(true)} className="bg-brand-500 font-medium rounded-xl h-10 shadow-brand-500/50 border-none">Tạo đơn hàng</Button>
-        </div>
-      </div>
-
       {/* --- MAIN CARD: FILTER & TABLE --- */}
-      <div className="bg-white p-6 rounded-[20px] shadow-sm">
-        <div className="flex flex-wrap gap-4 mb-8 justify-between items-center">
+      <div className="bg-white p-8 rounded-[32px] shadow-premium border border-white/50 relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-blue-50/20 rounded-full translate-x-1/2 -translate-y-1/2 blur-3xl pointer-events-none"></div>
+
+        <div className="flex flex-wrap gap-4 mb-8 justify-between items-center relative z-10">
             <div className="flex flex-wrap gap-3 w-full lg:w-auto">
-               <Input 
-                 prefix={<SearchOutlined className="text-gray-400" />} 
-                 placeholder="Tìm đơn hàng..." 
-                 className="w-full sm:w-[250px] h-[44px] rounded-xl border-none bg-[#F4F7FE] text-navy-700" 
-                 value={searchText}
-                 onChange={(e) => setSearchText(e.target.value)}
-                 allowClear
-               />
+               <div className="relative group">
+                  <SearchOutlined className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition-colors z-20" />
+                  <Input 
+                    placeholder="Tìm theo mã vận đơn..." 
+                    className="w-full sm:w-[280px] h-[48px] rounded-2xl border-none bg-[#F4F7FE] pl-11 pr-4 font-bold text-sm focus:bg-white focus:ring-4 focus:ring-blue-50 transition-all shadow-sm" 
+                    value={searchText}
+                    onChange={(e) => setSearchText(e.target.value)}
+                    allowClear
+                  />
+               </div>
                <Select 
                  value={statusFilter} 
                  onChange={setStatusFilter}
-                 className="h-[44px] w-[160px] custom-select-borderless bg-[#F4F7FE] rounded-xl" 
-                 variant="borderless"
+                 className="h-[48px] w-[180px] premium-select" 
                >
                  <Option value="all">Tất cả trạng thái</Option>
                  <Option value="pending">Chờ xử lý</Option>
@@ -304,21 +318,28 @@ const OrderPage = () => {
                  <Option value="delivered">Đã giao</Option>
                  <Option value="cancelled">Đã hủy</Option>
                </Select>
-               <RangePicker className="h-[44px] border-none bg-[#F4F7FE] rounded-xl" />
+               <RangePicker className="h-[48px] border-none bg-[#F4F7FE] rounded-2xl font-bold text-sm px-4 shadow-sm" />
             </div>
+            
+            <Button icon={<FilterOutlined />} className="rounded-2xl h-[48px] px-6 font-bold text-gray-500 bg-[#F4F7FE] border-none hover:bg-blue-50 hover:text-blue-600 transition-all flex items-center gap-2">
+               Bộ lọc
+               {(statusFilter !== 'all') && <Badge dot status="processing" className="ml-1" />}
+            </Button>
         </div>
 
-        <div className="overflow-x-auto">
-          <Table 
-            columns={columns} 
-            dataSource={dataSource} 
-            pagination={pagination} 
-            loading={loading}
-            onChange={(p) => fetchOrders(p.current, p.pageSize)}
-            className="custom-table-metrix" 
-            rowKey="_id"
-          />
-        </div>
+        <Table 
+          columns={columns} 
+          dataSource={dataSource} 
+          pagination={{
+            ...pagination,
+            className: "premium-pagination",
+          }}
+          loading={loading}
+          onChange={(p) => fetchOrders(p.current, p.pageSize)}
+          className="premium-admin-table" 
+          rowKey="_id"
+          rowClassName="group hover:bg-blue-50/20 transition-colors cursor-pointer"
+        />
       </div>
 
       <CreateOrderModal open={isModalOpen} onCancel={() => setIsModalOpen(false)} onCreate={() => {}} />

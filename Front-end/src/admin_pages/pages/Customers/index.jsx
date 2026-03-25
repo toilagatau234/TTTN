@@ -115,57 +115,95 @@ const CustomersPage = () => {
     };
 
     const renderRank = (rank) => {
-        let color = rank === 'Gold' ? 'gold' : (rank === 'Silver' ? 'cyan' : 'orange');
-        return <Tag icon={<SafetyCertificateOutlined />} color={color}>{rank} Member</Tag>;
+        let bg, dot, text, textColor;
+        switch (rank) {
+          case 'Gold':
+            bg = 'bg-amber-50'; dot = 'bg-amber-500'; textColor = 'text-amber-700'; text = 'Gold Member'; break;
+          case 'Silver':
+            bg = 'bg-slate-50'; dot = 'bg-slate-400'; textColor = 'text-slate-700'; text = 'Silver Member'; break;
+          default:
+            bg = 'bg-orange-50'; dot = 'bg-orange-400'; textColor = 'text-orange-700'; text = 'Bronze Member';
+        }
+        return (
+          <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full ${bg} ${textColor} border border-transparent`}>
+            <span className={`w-2 h-2 rounded-full ${dot}`}></span>
+            <span className="text-[10px] font-black uppercase tracking-wider">{text}</span>
+          </div>
+        );
     };
 
     const columns = [
         {
-            title: 'KHÁCH HÀNG',
+            title: <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest pl-2">Thông tin khách hàng</span>,
             dataIndex: 'name',
             render: (text, record) => (
-                <div className="flex items-center gap-3 cursor-pointer" onClick={() => showDetail(record)}>
-                    <Avatar src={record.avatar || undefined} size={40} />
-                    <div>
-                        <h5 className="font-bold text-navy-700 text-sm m-0 hover:text-brand-500">{text}</h5>
-                        <span className="text-gray-400 text-xs">{record.email}</span>
+                <div className="flex items-center gap-4 py-2 pl-2 group/card cursor-pointer" onClick={() => showDetail(record)}>
+                    <Avatar 
+                      src={record.avatar || undefined} 
+                      size={52} 
+                      className="rounded-2xl border-2 border-white shadow-sm group-hover/card:scale-110 transition-transform duration-500"
+                      icon={<UserOutlined />}
+                    />
+                    <div className="flex flex-col">
+                        <h5 className="font-black text-[#2B3674] text-sm m-0 hover:text-blue-600 transition-colors leading-tight">{text}</h5>
+                        <span className="text-[10px] font-bold text-gray-400 lowercase truncate max-w-[150px]">{record.email}</span>
                     </div>
                 </div>
             ),
         },
         {
-            title: 'HẠNG THÀNH VIÊN',
+            title: <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest">Hạng hội viên</span>,
             dataIndex: 'rank',
             render: (rank) => renderRank(rank || 'Bronze'),
         },
         {
-            title: 'CHI TIÊU',
+            title: <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest text-center">Chi tiêu (Lũy kế)</span>,
             dataIndex: 'totalSpent',
-            render: (val) => <span className="font-bold text-navy-700">{(val || 0).toLocaleString()} d</span>,
+            align: 'center',
+            render: (val) => <span className="font-black text-[#2B3674]">{(val || 0).toLocaleString()} đ</span>,
             sorter: (a, b) => (a.totalSpent || 0) - (b.totalSpent || 0),
         },
         {
-            title: 'ĐƠN HÀNG',
+            title: <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest text-center">Đơn hàng</span>,
             dataIndex: 'orderCount',
-            render: (val) => <div className="text-center w-10 bg-gray-100 rounded-md font-bold text-sm">{val || 0}</div>,
-        },
-        {
-            title: 'TRẠNG THÁI',
-            dataIndex: 'status',
-            render: (status) => (
-                <Tag color={status === 'Blocked' ? 'red' : 'green'}>{status === 'Blocked' ? 'Đã khóa' : 'Hoạt động'}</Tag>
+            align: 'center',
+            render: (val) => (
+              <div className="inline-flex items-center justify-center min-w-[32px] h-8 bg-[#F4F7FE] rounded-lg font-black text-[#2B3674] text-xs">
+                {val || 0}
+              </div>
             ),
         },
         {
-            title: '',
+            title: <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest">Trạng thái</span>,
+            dataIndex: 'status',
+            render: (status) => {
+                const isBlocked = status === 'Blocked';
+                return (
+                  <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full ${isBlocked ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-700'}`}>
+                    <span className={`w-2 h-2 rounded-full ${isBlocked ? 'bg-rose-500' : 'bg-emerald-500'} ${!isBlocked && 'animate-pulse'}`}></span>
+                    <span className="text-[10px] font-black uppercase tracking-wider">{isBlocked ? 'Đã khóa' : 'Hoạt động'}</span>
+                  </div>
+                );
+            },
+        },
+        {
+            title: <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest text-right pr-2">Thao tác</span>,
             key: 'action',
+            align: 'right',
             render: (_, record) => (
                 <Dropdown menu={{ items: [
-                    { key: '1', label: 'Xem chi tiết', icon: <UserOutlined />, onClick: () => showDetail(record) },
-                    { key: '2', label: 'Sửa thông tin', icon: <EditOutlined />, onClick: () => handleEdit(record) },
-                    { key: '3', label: record.status === 'Blocked' ? 'Mở khóa tài khoản' : 'Khóa tài khoản', icon: <StopOutlined />, danger: record.status !== 'Blocked', onClick: () => handleToggleBlock(record) },
-                ] }}>
-                    <Button type="text" icon={<MoreOutlined />} />
+                    { key: 'view', label: <span className="font-bold">Hồ sơ chi tiết</span>, icon: <UserOutlined className="text-blue-500" />, onClick: () => showDetail(record) },
+                    { key: 'edit', label: <span className="font-bold">Cập nhật thông tin</span>, icon: <EditOutlined className="text-amber-500" />, onClick: () => handleEdit(record) },
+                    { type: 'divider' },
+                    { 
+                      key: 'block', 
+                      label: <span className="font-bold">{record.status === 'Blocked' ? 'Mở khóa tài khoản' : 'Khóa truy cập'}</span>, 
+                      icon: <StopOutlined />, 
+                      danger: record.status !== 'Blocked', 
+                      onClick: () => handleToggleBlock(record) 
+                    },
+                ] }} placement="bottomRight" arrow>
+                    <Button type="text" className="hover:bg-blue-50 rounded-xl mr-2" icon={<MoreOutlined className="text-gray-400 text-lg" />} />
                 </Dropdown>
             ),
         },
@@ -173,78 +211,100 @@ const CustomersPage = () => {
 
     // --- NỘI DUNG DRAWER CHI TIẾT ---
     const renderCustomerDetailContent = () => (
-        <div>
+        <div className="animate-in fade-in slide-in-from-right-4 duration-500">
             {/* Header Profile */}
-            <div className="flex items-center gap-4 mb-6 p-4 bg-gradient-to-r from-blue-50 to-white rounded-2xl">
-                <Avatar src={selectedCustomer?.avatar || 'https://i.pravatar.cc/150?img=11'} size={80} className="border-4 border-white shadow-sm" />
-                <div>
-                    <h2 className="text-2xl font-bold text-navy-700 m-0">{selectedCustomer?.name}</h2>
-                    <div className="flex gap-2 mt-2">
-                        {renderRank(selectedCustomer?.rank || 'Bronze')}
-                        <Tag>Tham gia: {selectedCustomer?.createdAt ? new Date(selectedCustomer.createdAt).toLocaleDateString() : 'N/A'}</Tag>
+            <div className="flex items-center gap-6 mb-8 p-8 bg-gradient-to-br from-[#4318FF] to-[#707EAE] rounded-[32px] shadow-lg relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full translate-x-1/2 -translate-y-1/2 blur-2xl"></div>
+                <Avatar 
+                  src={selectedCustomer?.avatar || undefined} 
+                  size={100} 
+                  className="border-4 border-white/30 shadow-2xl shrink-0" 
+                  icon={<UserOutlined />}
+                />
+                <div className="relative z-10">
+                    <h2 className="text-3xl font-black text-white m-0 tracking-tighter">{selectedCustomer?.name}</h2>
+                    <div className="flex flex-wrap gap-2 mt-3">
+                        <span className="px-3 py-1 bg-white/20 backdrop-blur-md text-white text-[10px] font-black rounded-full uppercase tracking-widest border border-white/20">
+                          {selectedCustomer?.rank || 'Bronze'} Member
+                        </span>
+                        <span className="px-3 py-1 bg-white/10 backdrop-blur-md text-white/80 text-[10px] font-black rounded-full uppercase tracking-widest border border-white/10">
+                          ID: {selectedCustomer?._id?.slice(-8).toUpperCase()}
+                        </span>
                     </div>
                 </div>
             </div>
 
             {/* Quick Stats */}
-            <Row gutter={16} className="mb-6">
+            <Row gutter={20} className="mb-8">
                 <Col span={8}>
-                    <Card size="small" className="rounded-xl bg-gray-50 border-none">
-                        <Statistic title="Tổng chi tiêu" value={selectedCustomer?.totalSpent} suffix="đ" styles={{ value: { color: '#4318FF', fontWeight: 'bold' } }} />
-                    </Card>
+                    <div className="bg-[#F4F7FE] p-5 rounded-[24px] border border-transparent hover:border-blue-100 transition-all text-center">
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Tổng chi tiêu</p>
+                        <h3 className="text-xl font-black text-[#2B3674] m-0 tracking-tighter">{(selectedCustomer?.totalSpent || 0).toLocaleString()}đ</h3>
+                    </div>
                 </Col>
                 <Col span={8}>
-                    <Card size="small" className="rounded-xl bg-gray-50 border-none">
-                        <Statistic title="Số đơn hàng" value={selectedCustomer?.orderCount} prefix={<ShoppingOutlined />} />
-                    </Card>
+                    <div className="bg-[#F4F7FE] p-5 rounded-[24px] border border-transparent hover:border-blue-100 transition-all text-center">
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Đơn hàng</p>
+                        <h3 className="text-xl font-black text-[#2B3674] m-0 tracking-tighter">{selectedCustomer?.orderCount || 0}</h3>
+                    </div>
                 </Col>
                 <Col span={8}>
-                    <Card size="small" className="rounded-xl bg-gray-50 border-none">
-                        <Statistic title="Điểm thưởng" value={selectedCustomer?.points} prefix={<DollarOutlined />} styles={{ value: { color: '#FAAD14' } }} />
-                    </Card>
+                    <div className="bg-[#F4F7FE] p-5 rounded-[24px] border border-transparent hover:border-blue-100 transition-all text-center">
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Điểm thưởng</p>
+                        <h3 className="text-xl font-black text-amber-500 m-0 tracking-tighter">{selectedCustomer?.points || 0}</h3>
+                    </div>
                 </Col>
             </Row>
 
             {/* Detail Tabs */}
-            <Tabs defaultActiveKey="1" items={[
+            <Tabs 
+              defaultActiveKey="1" 
+              className="premium-tabs"
+              items={[
                 {
-                    key: '1', label: 'Thông tin liên hệ',
+                    key: '1', 
+                    label: <span className="font-black uppercase tracking-widest text-[11px]">Thông tin sở hữu</span>,
                     children: (
-                        <div className="flex flex-col gap-4 mt-2">
-                            <div className="flex items-center gap-3 p-3 bg-white border border-gray-100 rounded-xl">
-                                <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-500 flex items-center justify-center text-xl"><MailOutlined /></div>
-                                <div><p className="text-xs text-gray-400 m-0">Email</p><p className="font-bold text-navy-700 m-0">{selectedCustomer?.email}</p></div>
+                        <div className="flex flex-col gap-4 mt-4 animate-in fade-in duration-300">
+                            <div className="flex items-center gap-4 p-5 bg-white border border-gray-100 rounded-[20px] shadow-sm hover:shadow-md transition-shadow">
+                                <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-500 flex items-center justify-center text-2xl"><MailOutlined /></div>
+                                <div><p className="text-[10px] font-black text-gray-400 uppercase tracking-widest m-0">Email</p><p className="font-black text-[#2B3674] m-0">{selectedCustomer?.email}</p></div>
                             </div>
-                            <div className="flex items-center gap-3 p-3 bg-white border border-gray-100 rounded-xl">
-                                <div className="w-10 h-10 rounded-full bg-green-50 text-green-500 flex items-center justify-center text-xl"><PhoneOutlined /></div>
-                                <div><p className="text-xs text-gray-400 m-0">Số điện thoại</p><p className="font-bold text-navy-700 m-0">{selectedCustomer?.phone}</p></div>
+                            <div className="flex items-center gap-4 p-5 bg-white border border-gray-100 rounded-[20px] shadow-sm hover:shadow-md transition-shadow">
+                                <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-500 flex items-center justify-center text-2xl"><PhoneOutlined /></div>
+                                <div><p className="text-[10px] font-black text-gray-400 uppercase tracking-widest m-0">Số điện thoại</p><p className="font-black text-[#2B3674] m-0">{selectedCustomer?.phone}</p></div>
                             </div>
-                            <div className="flex items-center gap-3 p-3 bg-white border border-gray-100 rounded-xl">
-                                <div className="w-10 h-10 rounded-full bg-orange-50 text-orange-500 flex items-center justify-center text-xl"><EnvironmentOutlined /></div>
-                                <div><p className="text-xs text-gray-400 m-0">Địa chỉ mặc định</p><p className="font-bold text-navy-700 m-0">{selectedCustomer?.address}</p></div>
+                            <div className="flex items-center gap-4 p-5 bg-white border border-gray-100 rounded-[20px] shadow-sm hover:shadow-md transition-shadow">
+                                <div className="w-12 h-12 rounded-2xl bg-orange-50 text-orange-500 flex items-center justify-center text-2xl"><EnvironmentOutlined /></div>
+                                <div><p className="text-[10px] font-black text-gray-400 uppercase tracking-widest m-0">Địa chỉ giao hàng</p><p className="font-black text-[#2B3674] m-0">{selectedCustomer?.address || 'Chưa cập nhật'}</p></div>
                             </div>
                         </div>
                     )
                 },
                 {
-                    key: '2', label: 'Lịch sử mua hàng',
+                    key: '2', 
+                    label: <span className="font-black uppercase tracking-widest text-[11px]">Lịch sử giao dịch</span>,
                     children: (
-                        <List
-                            dataSource={MOCK_HISTORY}
-                            renderItem={item => (
-                                <List.Item>
-                                    <List.Item.Meta
-                                        avatar={<div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center"><HistoryOutlined /></div>}
-                                        title={<span className="font-bold">{item.id}</span>}
-                                        description={item.date}
-                                    />
-                                    <div className="text-right">
-                                        <div className="font-bold text-navy-700">{item.total}</div>
-                                        <Tag color={item.status === 'Completed' ? 'green' : 'red'}>{item.status}</Tag>
-                                    </div>
-                                </List.Item>
-                            )}
-                        />
+                        <div className="mt-4 px-2">
+                           <List
+                                dataSource={MOCK_HISTORY}
+                                renderItem={item => (
+                                    <List.Item className="border-b border-gray-50 py-4 hover:bg-gray-50/50 rounded-xl px-3 transition-colors">
+                                        <List.Item.Meta
+                                            avatar={<div className="w-12 h-12 bg-[#F4F7FE] text-blue-600 rounded-2xl flex items-center justify-center text-xl"><HistoryOutlined /></div>}
+                                            title={<span className="font-black text-[#2B3674]">{item.id}</span>}
+                                            description={<span className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">{item.date}</span>}
+                                        />
+                                        <div className="text-right">
+                                            <div className="font-black text-[#2B3674]">{item.total}</div>
+                                            <div className={`text-[9px] font-black uppercase tracking-widest mt-1 px-2 py-0.5 rounded-full inline-block ${item.status === 'Completed' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                                              {item.status}
+                                            </div>
+                                        </div>
+                                    </List.Item>
+                                )}
+                            />
+                        </div>
                     )
                 }
             ]} />
@@ -253,45 +313,64 @@ const CustomersPage = () => {
 
     return (
         <div className="w-full">
-            <div className="flex justify-between items-center mb-6">
-                <div>
-                    
+            <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4 px-2">
+                <h3 className="text-2xl font-black text-[#2B3674] m-0 tracking-tighter"></h3>
+                {/* Statistics Summary if needed */}
+                <div className="flex gap-2">
+                  <span className="px-4 py-2 bg-[#F4F7FE] rounded-2xl text-[11px] font-black text-blue-600 uppercase tracking-widest border border-white/50">
+                    Sức khỏe CRM: <span className="text-[#2B3674]">Tốt</span>
+                  </span>
                 </div>
-                {/* Thêm Khách Mới button removed per user request */}
             </div>
 
-            <div className="bg-white p-6 rounded-[20px] shadow-sm">
-                <div className="flex justify-between mb-4">
-                    <div className="flex gap-3">
-                        <Input 
-                            prefix={<SearchOutlined className="text-gray-400" />} 
-                            placeholder="Tìm khách hàng..." 
-                            className="w-[250px] rounded-xl h-[40px] bg-[#F4F7FE] border-none" 
-                            onChange={(e) => setSearchText(e.target.value)}
-                        />
-                        <Select defaultValue="all" className="w-[150px] h-[40px] custom-select-metrix bg-[#F4F7FE] rounded-xl">
+            <div className="bg-white p-8 rounded-[32px] shadow-premium border border-white/50 relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-64 h-64 bg-blue-50/20 rounded-full translate-x-1/2 -translate-y-1/2 blur-3xl pointer-events-none"></div>
+
+                <div className="flex flex-wrap gap-4 mb-8 justify-between items-center relative z-10">
+                    <div className="flex flex-wrap gap-3 w-full lg:w-auto">
+                        <div className="relative group">
+                           <SearchOutlined className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition-colors z-20" />
+                           <Input 
+                               placeholder="Tìm khách hàng theo tên hoặc email..." 
+                               className="w-full sm:w-[320px] h-[48px] rounded-2xl border-none bg-[#F4F7FE] pl-11 pr-4 font-bold text-sm focus:bg-white focus:ring-4 focus:ring-blue-50 transition-all shadow-sm" 
+                               onChange={(e) => setSearchText(e.target.value)}
+                               allowClear
+                           />
+                        </div>
+                        <Select defaultValue="all" className="h-[48px] w-[180px] premium-select">
                             <Option value="all">Tất cả hạng</Option>
-                            <Option value="gold">Gold</Option>
+                            <Option value="gold">Hạng Gold</Option>
+                            <Option value="silver">Hạng Silver</Option>
+                            <Option value="bronze">Hạng Bronze</Option>
                         </Select>
                     </div>
                 </div>
+
                 <Table 
                     columns={columns} 
                     dataSource={data} 
-                    pagination={{ pageSize: 6 }} 
-                    className="custom-table-metrix" 
+                    pagination={{ 
+                      pageSize: 6,
+                      className: "premium-pagination" 
+                    }} 
+                    className="premium-admin-table" 
                     loading={loading}
+                    rowClassName="group hover:bg-blue-50/20 transition-colors cursor-pointer"
                 />
             </div>
 
             {/* Drawer Chi Tiết */}
             <Drawer
-                title="Hồ sơ khách hàng"
+                title={<span className="font-black uppercase tracking-widest text-xs text-gray-400">Hồ sơ khách hàng chi tiết</span>}
                 placement="right"
                 onClose={() => setDrawerVisible(false)}
                 open={drawerVisible}
                 size="large"
-                className="custom-drawer-metrix"
+                className="premium-drawer"
+                closeIcon={null}
+                extra={
+                  <Button type="text" onClick={() => setDrawerVisible(false)} className="font-black text-gray-400 hover:text-blue-600">Đóng</Button>
+                }
             >
                 {selectedCustomer && renderCustomerDetailContent()}
             </Drawer>

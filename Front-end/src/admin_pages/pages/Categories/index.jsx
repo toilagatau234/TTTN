@@ -93,68 +93,73 @@ const CategoryPage = () => {
 
   const columns = [
     {
-      title: 'HÌNH ẢNH',
+      title: <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest pl-2">Hình ảnh</span>,
       dataIndex: 'image',
       key: 'image',
       width: 100,
       render: (img) => (
-        <Avatar
-          shape="square"
-          size={64}
-          src={img}
-          icon={<FileImageOutlined />}
-          className="rounded-lg border border-gray-200 bg-gray-50"
-        />
+        <div className="pl-2 flex items-center justify-center">
+          <Avatar
+            shape="square"
+            size={72}
+            src={img}
+            icon={<FileImageOutlined />}
+            className="rounded-[20px] border-2 border-white shadow-sm group-hover:scale-110 transition-transform duration-500 bg-gray-50"
+          />
+        </div>
       ),
     },
     {
-      title: 'TÊN DANH MỤC',
+      title: <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest">Tên danh mục</span>,
       dataIndex: 'name',
       key: 'name',
-      render: (text) => <span className="font-bold text-navy-700">{text}</span>,
+      render: (text) => <span className="font-black text-[#2B3674] text-sm tracking-tight">{text}</span>,
     },
     {
-      title: 'MÔ TẢ',
+      title: <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest">Mô tả chi tiết</span>,
       dataIndex: 'description',
       key: 'description',
-      className: 'text-gray-500',
+      render: (text) => <span className="text-[11px] font-bold text-gray-400 line-clamp-2 max-w-[300px]">{text || 'Không có mô tả chi tiết cho danh mục này.'}</span>,
     },
     {
-      title: 'TRẠNG THÁI',
+      title: <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest">Trạng thái</span>,
       dataIndex: 'isActive',
       key: 'isActive',
       width: 120,
       render: (isActive) => (
-        <Tag color={isActive ? 'green' : 'red'} className="rounded-full px-3">
-          {isActive ? 'Active' : 'Hidden'}
-        </Tag>
+        <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full ${isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>
+          <span className={`w-2 h-2 rounded-full ${isActive ? 'bg-emerald-500' : 'bg-rose-500'}`}></span>
+          <span className="text-[10px] font-black uppercase tracking-wider">{isActive ? 'Đang hiển thị' : 'Đang ẩn'}</span>
+        </div>
       ),
     },
     {
-      title: 'THAO TÁC',
+      title: <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest text-right pr-2">Thao tác</span>,
       key: 'action',
-      width: 120,
+      width: 140,
+      align: 'right',
       render: (_, record) => (
-        <div className="flex gap-2">
+        <div className="flex justify-end gap-2 pr-2">
           <Button
             icon={<EditOutlined />}
-            size="small"
-            className="text-blue-500 border-blue-100 hover:bg-blue-50"
+            size="large"
+            className="w-10 h-10 rounded-xl border-none bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
             onClick={() => openEditModal(record)}
           />
           <Popconfirm
-            title="Xóa danh mục?"
-            description="Hành động này không thể hoàn tác"
+            title={<span className="font-black">Xác nhận xóa?</span>}
+            description="Dữ liệu danh mục sẽ bị xóa vĩnh viễn."
             onConfirm={() => handleDelete(record._id)}
-            okText="Xóa"
+            okText="Xóa ngay"
             cancelText="Hủy"
-            okButtonProps={{ danger: true }}
+            okButtonProps={{ danger: true, className: "rounded-lg font-bold" }}
+            cancelButtonProps={{ className: "rounded-lg font-bold" }}
           >
             <Button
               icon={<DeleteOutlined />}
-              size="small"
+              size="large"
               danger
-              className="border-red-100 hover:bg-red-50"
+              className="w-10 h-10 rounded-xl border-none bg-rose-50 text-rose-600 hover:bg-rose-100 transition-colors"
             />
           </Popconfirm>
         </div>
@@ -164,33 +169,37 @@ const CategoryPage = () => {
 
   return (
     <div className="w-full">
-      {/* Header */}
-      <div className="flex justify-between items-center mb-6">
-        <div>
-        </div>
+      {/* Header Actions */}
+      <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4 px-2">
+        <h3 className="text-2xl font-black text-[#2B3674] m-0 tracking-tighter">Cấu trúc Danh mục</h3>
+        
         <Button
           type="primary"
           icon={<PlusOutlined />}
           onClick={openCreateModal}
-          className="bg-brand-500 h-10 px-6 rounded-xl font-bold shadow-lg shadow-brand-500/50 border-none hover:bg-brand-600"
+          className="bg-blue-600 h-12 px-8 rounded-2xl font-black shadow-lg shadow-blue-100 border-none hover:bg-blue-500 transition-all transform hover:-translate-y-1 active:translate-y-0 uppercase tracking-widest text-xs"
         >
-          Thêm Mới
+          Thêm danh mục mới
         </Button>
       </div>
 
-      {/* Main Table */}
-      <div className="bg-white p-6 rounded-[20px] shadow-sm">
-        <div className="flex justify-between mb-6">
-          <Input
-            prefix={<SearchOutlined className="text-gray-400" />}
-            placeholder="Tìm kiếm theo tên hoặc mô tả..."
-            value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
-            allowClear
-            className="w-[400px] h-[40px] rounded-xl bg-[#F4F7FE] border-none hover:bg-gray-100 focus:bg-white transition-all"
-          />
-          <div className="text-gray-500">
-            Tổng: <span className="font-semibold text-navy-700">{filteredData.length}</span> danh mục
+      {/* Main Container: Filter & Table */}
+      <div className="bg-white p-8 rounded-[32px] shadow-premium border border-white/50 relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-blue-50/20 rounded-full translate-x-1/2 -translate-y-1/2 blur-3xl pointer-events-none"></div>
+
+        <div className="flex flex-wrap gap-4 mb-8 justify-between items-center relative z-10">
+          <div className="relative group">
+              <SearchOutlined className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition-colors z-20" />
+              <Input
+                placeholder="Tìm danh mục theo tên hoặc mô tả..."
+                value={searchText}
+                onChange={(e) => setSearchText(e.target.value)}
+                allowClear
+                className="w-full sm:w-[420px] h-[48px] rounded-2xl border-none bg-[#F4F7FE] pl-11 pr-4 font-bold text-sm focus:bg-white focus:ring-4 focus:ring-blue-50 transition-all shadow-sm"
+              />
+          </div>
+          <div className="px-4 py-2 bg-[#F4F7FE] rounded-2xl text-[11px] font-black text-gray-400 uppercase tracking-widest border border-white/50">
+            Tổng bách khoa: <span className="text-[#2B3674]">{filteredData.length}</span>
           </div>
         </div>
 
@@ -200,9 +209,11 @@ const CategoryPage = () => {
           loading={loading}
           pagination={{
             pageSize: 8,
-            showTotal: (total, range) => `${range[0]}-${range[1]} của ${total} danh mục`,
+            className: "premium-pagination",
+            showTotal: (total, range) => <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest">{range[0]}-{range[1]} của {total} danh mục</span>,
           }}
-          className="custom-table-metrix"
+          className="premium-admin-table"
+          rowClassName="group hover:bg-blue-50/20 transition-all cursor-pointer"
         />
       </div>
 

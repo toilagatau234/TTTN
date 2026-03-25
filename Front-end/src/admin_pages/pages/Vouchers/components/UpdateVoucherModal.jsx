@@ -117,22 +117,26 @@ const UpdateVoucherModal = ({ open, onCancel, onUpdate, voucher }) => {
                   name="value" 
                   rules={[{ required: true }]}
                 >
-                 <InputNumber 
-                    className="w-full rounded-xl h-[40px] flex items-center pt-1 font-bold"
-                    formatter={value => discountType === 'percent' ? `${value}%` : `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                    parser={value => value.replace(/%|\s?|,/g, '')}
-                 />
+                  <InputNumber 
+                    className="w-full rounded-xl h-[40px] flex items-center pt-1"
+                    formatter={value => (value || value === 0) ? `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, '.') : ''}
+                    parser={value => value.replace(/\./g, '')}
+                    suffix={discountType === 'percent' ? '%' : ''}
+                    min={0}
+                  />
                </Form.Item>
              </Col>
              
              {discountType === 'percent' && (
                <Col span={8}>
-                 <Form.Item label="Giảm tối đa (VNĐ)" name="maxDiscount">
+                 <Form.Item label="Giảm tối đa" name="maxDiscount">
                    <InputNumber 
                       className="w-full rounded-xl h-[40px] flex items-center pt-1" 
-                      formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                      parser={value => value.replace(/\$\s?|(,*)/g, '')}
+                      formatter={value => (value || value === 0) ? `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, '.') : ''}
+                      parser={value => value.replace(/\./g, '')}
+                      suffix=""
                       placeholder="Không giới hạn"
+                      min={0}
                    />
                  </Form.Item>
                </Col>
@@ -141,18 +145,20 @@ const UpdateVoucherModal = ({ open, onCancel, onUpdate, voucher }) => {
 
            <Row gutter={16}>
              <Col span={12}>
-               <Form.Item label="Đơn hàng tối thiểu (VNĐ)" name="minOrder">
+               <Form.Item label="Đơn hàng tối thiểu" name="minOrder">
                  <InputNumber 
                     className="w-full rounded-xl h-[40px] flex items-center pt-1" 
-                    formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                    parser={value => value.replace(/\$\s?|(,*)/g, '')}
+                    formatter={value => value ? `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',') : ''}
+                    parser={value => value.replace(/\s?|,/g, '')}
+                    suffix=""
                     placeholder="0"
+                    min={0}
                  />
                </Form.Item>
              </Col>
              <Col span={12}>
                <Form.Item label="Tổng lượt dùng tối đa" name="limit">
-                 <InputNumber className="w-full rounded-xl h-[40px] flex items-center pt-1" placeholder="Vô hạn" />
+                 <InputNumber className="w-full rounded-xl h-[40px] flex items-center pt-1" placeholder="Vô hạn" min={0} />
                </Form.Item>
              </Col>
            </Row>

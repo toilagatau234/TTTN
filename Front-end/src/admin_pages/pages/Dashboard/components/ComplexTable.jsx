@@ -40,86 +40,91 @@ const ComplexTable = () => {
 
   const columns = [
     {
-      title: 'TÊN SẢN PHẨM',
+      title: <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest pl-2">Sản phẩm</span>,
       dataIndex: 'name',
       key: 'name',
       width: '40%',
       render: (text, record) => (
-        <div className="flex items-center gap-3">
-          <div className="h-12 w-12 rounded-xl overflow-hidden shadow-sm">
+        <div className="flex items-center gap-4 py-2 pl-2">
+          <div className="h-14 w-14 rounded-2xl overflow-hidden shadow-sm border border-gray-100 group-hover:scale-110 transition-transform duration-500">
              <img 
                src={record.image} 
                alt={text} 
                className="h-full w-full object-cover"
              />
           </div>
-          <span className="font-bold text-navy-700 text-sm hover:text-brand-500 cursor-pointer transition-colors">
-            {text}
-          </span>
+          <div className="flex flex-col">
+            <span className="font-black text-[#2B3674] text-sm hover:text-blue-600 cursor-pointer transition-colors line-clamp-1">
+              {text}
+            </span>
+            <span className="text-[11px] font-bold text-gray-400 uppercase tracking-tighter">ID: {record.key.slice(-6)}</span>
+          </div>
         </div>
       ),
     },
     {
-      title: 'TRẠNG THÁI',
+      title: <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest">Trạng thái</span>,
       dataIndex: 'status',
       key: 'status',
       render: (status) => {
-        let icon, color, text;
+        let bg, dot, text, textColor;
         
         switch (status) {
           case 'Approved':
-            icon = <CheckCircleOutlined />;
-            color = 'text-green-500';
+            bg = 'bg-emerald-50';
+            dot = 'bg-emerald-500';
+            textColor = 'text-emerald-700';
             text = 'Đang bán';
             break;
           case 'Disable':
-            icon = <ExclamationCircleOutlined />;
-            color = 'text-orange-500';
+            bg = 'bg-amber-50';
+            dot = 'bg-amber-500';
+            textColor = 'text-amber-700';
             text = 'Tạm ngưng';
             break;
           case 'Error':
-            icon = <CloseCircleOutlined />;
-            color = 'text-red-500';
+            bg = 'bg-rose-50';
+            dot = 'bg-rose-500';
+            textColor = 'text-rose-700';
             text = 'Hết hàng';
             break;
           default:
-            icon = <InfoCircleOutlined />;
-            color = 'text-gray-500';
+            bg = 'bg-gray-50';
+            dot = 'bg-gray-500';
+            textColor = 'text-gray-700';
             text = 'Không rõ';
         }
 
         return (
-          <div className={`flex items-center gap-2 ${color}`}>
-            <span className="text-xl">{icon}</span>
-            <span className="text-sm font-bold text-navy-700">{text}</span>
+          <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full ${bg} ${textColor} border border-transparent`}>
+            <span className={`w-2 h-2 rounded-full ${dot} animate-pulse`}></span>
+            <span className="text-[11px] font-black uppercase tracking-wider">{text}</span>
           </div>
         );
       },
     },
     {
-      title: 'GIÁ BÁN',
+      title: <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest">Giá niêm yết</span>,
       dataIndex: 'price',
       key: 'price',
-      render: (text) => <span className="font-bold text-navy-700">{text}</span>,
+      render: (text) => <span className="font-black text-[#2B3674]">{text}</span>,
     },
     {
-      title: 'TỒN KHO',
+      title: <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest">Tồn kho</span>,
       dataIndex: 'stock',
       key: 'stock',
       render: (stockVal) => (
-        <div className="w-full max-w-[140px]">
-           <div className="flex justify-between mb-1">
-             <span className="text-xs font-medium text-gray-500">{stockVal} Sp</span>
+        <div className="w-full max-w-[120px]">
+           <div className="flex justify-between mb-1.5">
+             <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{stockVal} đơn vị</span>
           </div>
-          <Tooltip title={`Tồn kho: ${stockVal} sản phẩm`}>
-            <Progress 
-              percent={stockVal > 100 ? 100 : stockVal} 
-              showInfo={false} 
-              strokeColor={stockVal < 10 ? "#FF4D4F" : "#4318FF"} 
-              railColor="#EFF4FB"
-              size="small"
-              strokeLinecap="round" 
-            />
+          <Tooltip title={`Hàng trong kho: ${stockVal}`}>
+            <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
+               <div 
+                 className={`h-full rounded-full transition-all duration-1000 ${stockVal < 10 ? 'bg-rose-500' : 'bg-blue-600'}`}
+                 style={{ width: `${Math.min(100, (stockVal / 200) * 100)}%` }}
+               ></div>
+            </div>
           </Tooltip>
         </div>
       ),
@@ -127,13 +132,14 @@ const ComplexTable = () => {
   ];
 
   return (
-    <div className="w-full overflow-x-auto">
+    <div className="w-full">
       <Table 
         columns={columns} 
         dataSource={data} 
         pagination={false} 
         loading={loading}
-        className="custom-table-metrix"
+        className="premium-admin-table"
+        rowClassName="group hover:bg-blue-50/30 transition-colors cursor-pointer"
       />
     </div>
   );

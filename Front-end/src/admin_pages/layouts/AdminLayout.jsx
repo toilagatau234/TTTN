@@ -156,16 +156,16 @@ const AdminLayout = () => {
     };
 
     return (
-        <Layout className="min-h-screen bg-[#F4F7FE]">
+        <Layout className="min-h-screen bg-[#F4F7FE] font-sans">
             {/* SIDEBAR */}
             <Sider
                 trigger={null}
                 collapsible
                 collapsed={collapsed}
-                width={260}
-                collapsedWidth={80}
-                theme="light" // Thêm theme light để chuẩn màu Antd
-                className="border-r border-gray-100 shadow-sm"
+                width={280}
+                collapsedWidth={90}
+                theme="light"
+                className="border-none shadow-premium"
                 style={{
                     position: 'fixed', 
                     height: '100vh', 
@@ -173,18 +173,34 @@ const AdminLayout = () => {
                     top: 0, 
                     bottom: 0, 
                     zIndex: 100,
+                    backgroundColor: '#ffffff'
                 }}
             >
-                <div className="flex flex-col h-full bg-white">
-                    {/* Logo */}
-                    <div className="h-24 flex items-center justify-center flex-shrink-0">
-                        <h1 className={`font-bold text-blue-600 transition-all duration-300 ${collapsed ? 'text-sm' : 'text-2xl'}`}>
-                            {collapsed ? 'FLW' : 'FLOWER SHOP'}
-                        </h1>
+                <div className="flex flex-col h-full bg-white relative overflow-hidden">
+                    {/* Decorative bubble */}
+                    <div className="absolute top-0 left-0 w-32 h-32 bg-blue-50 rounded-full -translate-x-1/2 -translate-y-1/2 blur-2xl opacity-60"></div>
+
+                    {/* Logo Section */}
+                    <div className="h-28 flex items-center justify-center px-6 relative z-10">
+                        <div className={`flex items-center gap-3 transition-all duration-500 ${collapsed ? 'scale-90' : 'scale-100'}`}>
+                            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center text-white shadow-lg shadow-blue-100 flex-shrink-0">
+                                <ShoppingOutlined className="text-xl" />
+                            </div>
+                            {!collapsed && (
+                                <div className="leading-tight">
+                                    <h1 className="text-xl font-black text-[#2B3674] tracking-tighter m-0 uppercase">Rosee</h1>
+                                    <p className="text-[10px] font-black text-blue-500 uppercase tracking-[0.2em] m-0">Admin Panel</p>
+                                </div>
+                            )}
+                        </div>
                     </div>
 
-                    {/* Menu Chính */}
-                    <div className="flex-1 overflow-y-auto custom-scrollbar">
+                    <div className="px-4 py-2 relative z-10">
+                        <div className="h-px bg-gray-50 w-full mb-6"></div>
+                    </div>
+
+                    {/* Main Navigation */}
+                    <div className="flex-1 overflow-y-auto custom-scrollbar px-3 relative z-10">
                         <Menu
                             mode="inline"
                             theme="light"
@@ -192,20 +208,20 @@ const AdminLayout = () => {
                             selectedKeys={[activeKey]}
                             items={visibleMainMenu}
                             onClick={({ key }) => navigate(key)}
-                            className="border-none px-2 font-medium text-gray-600"
+                            className="border-none font-bold text-gray-500 admin-sidebar-menu"
                         />
                     </div>
 
-                    {/* Menu Đáy */}
-                    <div className="flex-shrink-0 pb-4 bg-white">
-                        <div className="mx-4 my-2 border-t border-gray-200"></div>
+                    {/* Bottom Navigation */}
+                    <div className="px-3 pb-6 relative z-10">
+                        <div className="h-px bg-gray-50 w-full mb-4"></div>
                         <Menu
                             mode="inline"
                             theme="light"
                             selectedKeys={[activeKey]}
                             items={visibleBottomMenu}
                             onClick={({ key }) => navigate(key)}
-                            className="border-none px-2 font-medium text-gray-600"
+                            className="border-none font-bold text-gray-500 admin-sidebar-menu"
                         />
                     </div>
                 </div>
@@ -213,69 +229,92 @@ const AdminLayout = () => {
 
             {/* CONTENT AREA */}
             <Layout
-                className="bg-[#F4F7FE] transition-all duration-200 ease-in-out"
-                style={{ marginLeft: collapsed ? 80 : 260 }}
+                className="bg-[#F4F7FE] transition-all duration-300 ease-in-out"
+                style={{ marginLeft: collapsed ? 90 : 280 }}
             >
                 {/* HEADER */}
                 <Header 
                     style={{
-                        padding: 0,             // Ghi đè padding mặc định của AntD
-                        height: 'auto',         // Ghi đè height 64px của AntD
-                        lineHeight: 'normal',   // Ghi đè line-height 64px của AntD
+                        padding: 0,
+                        height: 'auto',
+                        lineHeight: 'normal',
                         background: 'transparent'
                     }}
-                    className="px-4 md:px-6 py-4 flex flex-col md:flex-row justify-between items-start md:items-center sticky top-0 z-50 backdrop-blur-xl bg-[#F4F7FE]/80"
+                    className="px-6 py-6 flex flex-col md:flex-row justify-between items-start md:items-center sticky top-0 z-50 transition-all duration-300"
                 >
-                    {/* Phần Trái: Breadcrumb & Title */}
-                    <div className="flex flex-col mb-4 md:mb-0 w-full md:w-auto">
+                    {/* Left Side: Breadcrumb & Title */}
+                    <div className="flex flex-col mb-4 md:mb-0">
                         <Breadcrumb 
-                            className="text-sm text-gray-500 mb-1"
+                            className="text-gray-400 font-medium mb-1"
                             items={[
-                                {
-                                    title: 'pages'
-                                },
-                                {
-                                    title: <span className='text-gray-800 font-medium'>{currentBreadcrumb} </span>
-                                }
+                                { title: <span className="text-[11px] uppercase tracking-widest opacity-60">Management</span> },
+                                { title: <span className="text-[11px] uppercase tracking-widest font-black text-[#2B3674]">{currentBreadcrumb}</span> }
                             ]}
                         />
                         
-                        <div className="flex items-center gap-2">
-                            {/* Nút thu/phóng Menu cho Mobile (chỉ hiện trên màn hình nhỏ) */}
+                        <div className="flex items-center gap-3">
                             <Button 
                                 type="text" 
                                 icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />} 
                                 onClick={() => setCollapsed(!collapsed)} 
-                                className="flex md:hidden text-lg p-0 w-8 h-8 flex-shrink-0 text-gray-600" 
+                                className="md:flex hidden bg-white shadow-sm border border-gray-100 rounded-xl hover:text-blue-600 transition-all" 
                             />
-                            <h2 className="text-2xl md:text-3xl font-bold text-[#2B3674] m-0 tracking-tight">
+                            <Button 
+                                type="text" 
+                                icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />} 
+                                onClick={() => setCollapsed(!collapsed)} 
+                                className="flex md:hidden bg-white shadow-sm border border-gray-100 rounded-xl" 
+                            />
+                            <h2 className="text-3xl font-black text-[#2B3674] m-0 tracking-tighter capitalize">
                                 {currentBreadcrumb}
                             </h2>
                         </div>
                     </div>
 
-                    {/* Phần Phải: Search & Actions */}
-                    <div className="flex items-center justify-between md:justify-end gap-2 md:gap-4 p-2 bg-white rounded-full shadow-sm w-full md:w-auto">
+                    {/* Right Side: Search & Actions with Glassmorphism */}
+                    <div className="flex items-center gap-3 p-2 bg-white/70 backdrop-blur-xl rounded-3xl shadow-premium border border-white/50 w-full md:w-auto">
 
-                        {/* Ô Tìm kiếm */}
-                        <div className="flex items-center bg-[#F4F7FE] rounded-full px-4 py-1.5 flex-1 md:flex-none md:w-[220px]">
-                            <SearchOutlined className="text-gray-400 mr-2" />
+                        {/* Search Input */}
+                        <div className="flex items-center bg-[#F4F7FE] rounded-2xl px-4 py-2 transition-all focus-within:bg-white focus-within:ring-4 focus-within:ring-blue-50 group flex-1 md:flex-none">
+                            <SearchOutlined className="text-gray-400 group-focus-within:text-blue-500" />
                             <Input 
-                                placeholder="Tìm kiếm..." 
-                                variant="outlined" 
-                                className="p-0 text-sm bg-transparent shadow-none focus:ring-0 w-full" 
+                                placeholder="Tìm kiếm nhanh..." 
+                                variant="borderless" 
+                                className="text-sm font-medium bg-transparent shadow-none w-full md:w-[180px] border-none outline-none" 
                             />
                         </div>
                         
-                        {/* Các icon thông báo & Avatar */}
-                        <div className="flex items-center gap-3 pr-2 flex-shrink-0">
-                            <BellOutlined className="text-xl text-gray-400 hover:text-blue-600 cursor-pointer transition-colors" />
-                            <InfoCircleOutlined className="text-xl text-gray-400 hover:text-blue-600 cursor-pointer transition-colors" />
-                            <Dropdown menu={userMenu} placement="bottomRight" trigger={['click']}>
-                                <Avatar 
-                                    className="bg-blue-600 cursor-pointer transform hover:scale-105 transition-transform shadow-md flex-shrink-0" 
-                                    icon={<UserOutlined />} 
+                        {/* Quick Actions */}
+                        <div className="flex items-center gap-2 px-2">
+                            <div className="relative group">
+                                <Button 
+                                    type="text" 
+                                    icon={<BellOutlined />} 
+                                    className="text-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl w-10 h-10 transition-colors"
                                 />
+                                <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
+                            </div>
+                            
+                            <Button 
+                                type="text" 
+                                icon={<InfoCircleOutlined />} 
+                                className="text-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl w-10 h-10 transition-colors hidden sm:flex items-center justify-center"
+                            />
+                            
+                            <div className="w-px h-6 bg-gray-100 mx-1 hidden sm:block"></div>
+
+                            <Dropdown menu={userMenu} placement="bottomRight" trigger={['click']} arrow>
+                                <div className="flex items-center gap-2 p-1 pl-2 hover:bg-gray-50 rounded-2xl cursor-pointer transition-colors group">
+                                    <div className="text-right leading-tight hidden lg:block">
+                                        <p className="text-[11px] font-black text-[#2B3674] m-0 uppercase tracking-tight">{currentUser.name}</p>
+                                        <p className="text-[10px] font-bold text-blue-400 m-0 capitalize">{currentUser.role === 'Admin' ? 'Quản trị viên' : 'Nhân viên'}</p>
+                                    </div>
+                                    <Avatar 
+                                        className="bg-gradient-to-br from-blue-500 to-indigo-600 shadow-md group-hover:scale-105 transition-transform" 
+                                        icon={<UserOutlined />} 
+                                        size={40}
+                                    />
+                                </div>
                             </Dropdown>
                         </div>
                     </div>

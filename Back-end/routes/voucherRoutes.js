@@ -11,10 +11,6 @@ const {
 const { protect, authorize } = require('../middleware/auth');
 const validateObjectId = require('../middleware/validateObjectId');
 
-router.get('/debug/all', async (req, res) => {
-    res.json(await require('../models/Voucher').find());
-});
-
 router.param('id', validateObjectId);
 
 // User: áp dụng voucher (cần đăng nhập)
