@@ -31,7 +31,7 @@ function App() {
         {/* ===== USER (CLIENT) ===== */}
         {/* Tất cả user routes liệt kê CỤ THỂ bên trong UserLayout */}
         <Route element={<UserLayout />}>
-          <Route index element={<><Banner /><Home /></>} />
+          <Route index element={<Home />} />
           <Route path="cart" element={<Cart />} />
           <Route path="checkout" element={<Checkout />} />
           <Route path="customDesign" element={<HydrangeaStudio />} />
