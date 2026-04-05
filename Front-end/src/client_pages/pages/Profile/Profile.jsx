@@ -236,8 +236,7 @@ const Profile = () => {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
+    authService.logout();
     window.dispatchEvent(new Event("cartUpdated")); // Reset cart badge
     message.success("Đã đăng xuất");
     navigate("/login");

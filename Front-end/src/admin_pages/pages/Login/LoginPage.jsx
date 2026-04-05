@@ -1,12 +1,20 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Form, Input, Button, Checkbox, message } from 'antd';
 import { UserOutlined, LockOutlined } from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import authService from '../../../services/authService';
 
 const LoginPage = () => {
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
+    const location = useLocation();
+
+    useEffect(() => {
+        const searchParams = new URLSearchParams(location.search);
+        if (searchParams.get("expired") === "true") {
+            message.warning("Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.");
+        }
+    }, [location]);
 
     const onFinish = async (values) => {
         setLoading(true);
@@ -27,8 +35,12 @@ const LoginPage = () => {
             }
         }
         catch (error) {
-            const errMsg = error?.response?.data?.message || 'Sai tài khoản hoặc mật khẩu!';
-            message.error(errMsg);
+            if (error?.response?.data?.isLocked) {
+                message.error('Tài khoản của bạn đã bị khoá. Vui lòng liên hệ Admin khác.');
+            } else {
+                const errMsg = error?.response?.data?.message || 'Sai tài khoản hoặc mật khẩu!';
+                message.error(errMsg);
+            }
         } finally {
             setLoading(false);
         }
@@ -78,9 +90,9 @@ const LoginPage = () => {
                         <Form.Item name="remember" valuePropName="checked" noStyle>
                             <Checkbox className="text-gray-500">Ghi nhớ tôi</Checkbox>
                         </Form.Item>
-                        <a className="text-blue-600 hover:text-blue-800 font-medium text-sm" href="#">
+                        <Link to="/forgot-password" className="text-blue-600 hover:text-blue-800 font-medium text-sm">
                             Quên mật khẩu?
-                        </a>
+                        </Link>
                     </div>
 
                     <Form.Item>

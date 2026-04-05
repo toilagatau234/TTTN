@@ -22,6 +22,7 @@ import dayjs from 'dayjs';
 import CreateOrderModal from './components/CreateOrderModal';
 import ViewOrderDetailDrawer from './components/ViewOrderDetailDrawer';
 import orderService from '../../../services/orderService';
+import shippingService from '../../../services/shippingService';
 
 const { RangePicker } = DatePicker;
 const { Option } = Select;
@@ -140,6 +141,26 @@ const OrderPage = () => {
     }
   };
 
+  const handleCreateShipment = async (orderId) => {
+    try {
+      message.loading({ content: 'Đang đẩy đơn sang GHN...', key: 'pushGHN' });
+      // Lấy danh sách carrier và tìm GHN proxy mặc định
+      const carrierRes = await shippingService.getCarriers();
+      if (!carrierRes.success || !carrierRes.data.length) {
+          return message.error({ content: 'Không tìm thấy cấu hình Đối tác Vận Chuyển', key: 'pushGHN' });
+      }
+      const activeCarrier = carrierRes.data.find(c => c.isActive) || carrierRes.data[0];
+      
+      const response = await shippingService.createShipment(orderId, activeCarrier._id);
+      if (response && response.success) {
+        message.success({ content: response.message || 'Tạo vận đơn GHN thành công', key: 'pushGHN', duration: 3 });
+        fetchOrders(pagination.current, pagination.pageSize);
+      }
+    } catch (error) {
+      message.error({ content: error.response?.data?.message || 'Lỗi khi đẩy đơn GHN', key: 'pushGHN', duration: 4 });
+    }
+  };
+
   const showDetail = (record) => {
     setSelectedOrder(record);
     setIsDrawerOpen(true);
@@ -236,6 +257,13 @@ const OrderPage = () => {
                 { key: 'delivered', label: 'Đã giao', onClick: () => handleUpdateStatus(record._id, 'delivered') },
                 { key: 'cancelled', label: 'Hủy đơn', danger: true, onClick: () => handleUpdateStatus(record._id, 'cancelled') }
               ]
+            },
+            { type: 'divider' },
+            { 
+              key: 'push_ghn', 
+              label: <span className="font-bold text-orange-600">Đẩy đơn GHN</span>, 
+              icon: <CarOutlined className="text-orange-500" />, 
+              onClick: () => handleCreateShipment(record._id) 
             }
           ] }} 
           trigger={['click']}

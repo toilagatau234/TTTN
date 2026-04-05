@@ -21,6 +21,16 @@ const authService = {
     return axiosClient.post('/auth/verify-otp', { email, code });
   },
 
+  // Yêu cầu quên mật khẩu (gửi OTP)
+  forgotPassword: (email) => {
+    return axiosClient.post('/auth/forgot-password', { email });
+  },
+
+  // Xác nhận đổi mật khẩu dựa trên OTP
+  resetPassword: (email, code, newPassword) => {
+    return axiosClient.post('/auth/reset-password', { email, code, newPassword });
+  },
+
   // Lấy thông tin user hiện tại (từ token)
   getMe: () => {
     return axiosClient.get('/auth/me');
@@ -29,7 +39,9 @@ const authService = {
   // Đăng xuất
   logout: () => {
     localStorage.removeItem('user');
-    localStorage.removeItem('loginTime'); // Thêm dòng này để xoá loginTime
+    localStorage.removeItem('loginTime');
+    // Bắn event để các component khác tự update state (ví dụ Context, Header)
+    window.dispatchEvent(new Event('authStatusChanged'));
   },
 
   // Lấy user từ localStorage
@@ -46,6 +58,18 @@ const authService = {
   isLoggedIn: () => {
     const user = authService.getCurrentUser();
     return user && user.token ? true : false;
+  },
+
+  // Lấy token
+  getToken: () => {
+    const user = authService.getCurrentUser();
+    return user ? user.token : null;
+  },
+
+  // Kiểm tra là Admin/Staff
+  isAdmin: () => {
+    const user = authService.getCurrentUser();
+    return user && ['Admin', 'Manager', 'Staff', 'Warehouse'].includes(user.role);
   },
 
   // Lưu user vào localStorage

@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
 import { Send, Image as ImageIcon, Sparkles, CheckCircle, RefreshCcw, ShoppingCart } from 'lucide-react';
+import authService from '../../../services/authService';
 
 const HydrangeaStudio = () => {
     // ---- State ----
@@ -22,7 +23,7 @@ const HydrangeaStudio = () => {
 
     // Auto scroll chat
     useEffect(() => {
-        chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        chatEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }, [messages]);
 
     // ---- Handlers ----
@@ -107,8 +108,8 @@ const HydrangeaStudio = () => {
     const handleAddToCart = async () => {
         setIsAddingToCart(true);
         try {
-            // Lấy token từ LocalStorage/Cookies (Tuỳ thuộc kiến trúc Frontend của bạn)
-            const token = localStorage.getItem('token'); 
+            // Lấy token từ authService để đảm bảo an toàn
+            const token = authService.getToken(); 
             
             const response = await axios.post('http://localhost:8080/api/cart/custom-add', {
                 entities: currentEntities,

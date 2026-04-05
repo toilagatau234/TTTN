@@ -6,6 +6,7 @@ import {
     DatabaseOutlined, CustomerServiceOutlined, ShoppingOutlined
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
+import authService from '../../services/authService';
 
 import { MENU_PERMISSIONS } from '../../constants/roles';
 
@@ -13,12 +14,7 @@ const { Header, Sider, Content } = Layout;
 
 // Giả lập hàm lấy user (bọc try catch chống crash)
 const getCurrentUser = () => {
-    try {
-        const user = JSON.parse(localStorage.getItem('user'));
-        return user || { "name": "Admin", "role": "Admin" };
-    } catch (error) {
-        return { "name": "Admin", "role": "staff" };
-    }
+    return authService.getCurrentUser() || { "name": "Admin", "role": "Admin" };
 };
 
 const AdminLayout = () => {
@@ -148,7 +144,7 @@ const AdminLayout = () => {
                 label: 'Đăng xuất', 
                 danger: true, 
                 onClick: () => {
-                    localStorage.removeItem('user'); // Clear user khi đăng xuất
+                    authService.logout(); // Sử dụng authService để clear user và báo event
                     navigate('/admin/login');
                 } 
             }

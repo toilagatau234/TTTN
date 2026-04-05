@@ -9,6 +9,9 @@ const carrierSchema = new mongoose.Schema({
     baseFee: { type: Number, default: 30000 },                  // Phí ship mặc định
     freeShipMinOrder: { type: Number, default: 500000 },        // Free ship khi đơn >= xxx
     estimatedDays: { type: String, default: '2-4 ngày' },       // Thời gian dự kiến
+    apiToken: { type: String, default: '' },                    // Token API kết nối
+    shopId: { type: String, default: '' },                      // Mã Shop/Client ID kết nối
+    isSandbox: { type: Boolean, default: true },                // Chế độ thử nghiệm (GHN Dev)
 }, { timestamps: true });
 
 // Vận đơn (liên kết đơn hàng ↔ hãng ship)

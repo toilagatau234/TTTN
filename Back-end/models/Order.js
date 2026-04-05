@@ -47,6 +47,8 @@ const orderSchema = new mongoose.Schema({
         ward: { type: String },       // Phường/Xã
         district: { type: String },    // Quận/Huyện
         city: { type: String },        // Tỉnh/TP
+        wardCode: { type: String },    // Mã phường/xã (GHN)
+        districtId: { type: Number },  // Mã quận/huyện (GHN)
         note: { type: String }         // Ghi chú giao hàng
     },
 

@@ -7,7 +7,7 @@ const OTP_EXPIRES_MINUTES = 5;
 
 // Hàm tạo Token
 const generateToken = (id, role) => {
-  return jwt.sign({ id, role }, process.env.JWT_SECRET, { expiresIn: '30d' });
+  return jwt.sign({ id, role }, process.env.JWT_SECRET, { expiresIn: '1d' });
 };
 
 // @desc    Gửi mã OTP xác nhận email
@@ -129,6 +129,81 @@ const registerUser = async (req, res) => {
   }
 };
 
+// @desc    Quên mật khẩu (Gửi OTP)
+// @route   POST /api/auth/forgot-password
+const forgotPassword = async (req, res) => {
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({ success: false, message: 'Vui lòng nhập email' });
+  }
+
+  const existingUser = await User.findOne({ email });
+  if (!existingUser) {
+    return res.status(404).json({ success: false, message: 'Tài khoản không tồn tại. Vui lòng kiểm tra lại email.' });
+  }
+
+  try {
+    const code = String(Math.floor(100000 + Math.random() * 900000));
+    await Otp.deleteByEmail(email);
+    await Otp.create({
+      email: email.toLowerCase().trim(),
+      code,
+      expiresAt: new Date(Date.now() + OTP_EXPIRES_MINUTES * 60 * 1000),
+    });
+
+    await sendOtpEmail(email, code, OTP_EXPIRES_MINUTES);
+    res.json({ success: true, message: `Mã khôi phục đã được gửi đến ${email}` });
+  } catch (error) {
+    console.error('Forgot password error:', error.message);
+    res.status(500).json({ success: false, message: 'Không thể gửi email. Vui lòng thử lại.' });
+  }
+};
+
+// @desc    Khôi phục mật khẩu (Xác nhận OTP và đổi mật khẩu)
+// @route   POST /api/auth/reset-password
+const resetPassword = async (req, res) => {
+  const { email, code, newPassword } = req.body;
+
+  if (!email || !code || !newPassword) {
+    return res.status(400).json({ success: false, message: 'Vui lòng nhập đủ email, mã OTP và mật khẩu mới' });
+  }
+
+  if (newPassword.length < 6) {
+    return res.status(400).json({ success: false, message: 'Mật khẩu phải có ít nhất 6 ký tự' });
+  }
+
+  try {
+    const defaultEmail = email.toLowerCase().trim();
+    const otp = await Otp.findOne({ email: defaultEmail });
+
+    if (!otp || otp.code !== String(code).trim()) {
+      return res.status(400).json({ success: false, message: 'Mã OTP không đúng hoặc không tồn tại' });
+    }
+
+    if (otp.expiresAt < new Date()) {
+      await otp.deleteOne();
+      return res.status(400).json({ success: false, message: 'Mã OTP đã hết hạn. Vui lòng gửi lại.' });
+    }
+
+    const user = await User.findOne({ email });
+    if (!user) {
+        return res.status(404).json({ success: false, message: 'Người dùng không tồn tại' });
+    }
+
+    // Đổi mật khẩu và tự động trigger hook pre('save') bcrypt để mã hoá mật khẩu
+    user.password = newPassword;
+    await user.save();
+
+    await otp.deleteOne(); // Xoá OTP sau khi lấy lại pass thành công
+
+    res.json({ success: true, message: 'Đổi mật khẩu thành công! Hãy đăng nhập lại.' });
+  } catch (error) {
+    console.error('Reset password error:', error.message);
+    res.status(500).json({ success: false, message: 'Lỗi server khi khôi phục mật khẩu' });
+  }
+};
+
 // @desc    Đăng nhập user & lấy token
 // @route   POST /api/auth/login
 const loginUser = async (req, res) => {
@@ -138,6 +213,15 @@ const loginUser = async (req, res) => {
     const user = await User.findOne({ email });
 
     if (user && (await user.matchPassword(password))) {
+      // Kiểm tra tài khoản bị khoá
+      if (user.status === 'Blocked') {
+        return res.status(403).json({
+          success: false,
+          isLocked: true,
+          message: 'Tài khoản của bạn đã bị khoá.',
+        });
+      }
+
       res.json({
         success: true,
         data: {
@@ -193,4 +277,4 @@ const getMe = async (req, res) => {
   }
 };
 
-module.exports = { sendOtp, verifyOtp, registerUser, loginUser, getMe };
+module.exports = { sendOtp, verifyOtp, registerUser, loginUser, getMe, forgotPassword, resetPassword };

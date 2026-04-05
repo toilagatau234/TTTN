@@ -41,12 +41,16 @@ axiosClient.interceptors.response.use(
       console.log('[AxiosClient] Current user in localStorage:', localStorage.getItem('user'));
       
       localStorage.removeItem('user');
+      localStorage.removeItem('loginTime');
+      window.dispatchEvent(new Event('authStatusChanged'));
       
-      // Chỉ redirect nếu đang ở trang admin (tránh loop ở trang login)
       const currentPath = window.location.pathname;
       if (currentPath.startsWith('/admin') && !currentPath.includes('/admin/login')) {
         console.warn('[AxiosClient] Redirecting to /admin/login due to 401');
-        window.location.href = '/admin/login';
+        window.location.href = '/admin/login?expired=true';
+      } else if (!currentPath.includes('/login') && !currentPath.startsWith('/admin')) {
+        console.warn('[AxiosClient] Redirecting to /login due to 401');
+        window.location.href = '/login?expired=true';
       }
     }
     throw error;

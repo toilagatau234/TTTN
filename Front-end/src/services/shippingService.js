@@ -3,6 +3,17 @@ import axiosClient from "./axiosClient";
 const SHIPPING_ENDPOINT = '/shipping'; // Backend route
 
 const shippingService = {
+  // --- GHN API PROXIES ---
+  getProvinces: () => {
+    return axiosClient.get(`${SHIPPING_ENDPOINT}/ghn/provinces`);
+  },
+  getDistricts: (province_id) => {
+    return axiosClient.get(`${SHIPPING_ENDPOINT}/ghn/districts/${province_id}`);
+  },
+  getWards: (district_id) => {
+    return axiosClient.get(`${SHIPPING_ENDPOINT}/ghn/wards/${district_id}`);
+  },
+
   // --- CẤU HÌNH ĐỐI TÁC ---
   getCarriers: () => {
     return axiosClient.get(`${SHIPPING_ENDPOINT}/carriers`);

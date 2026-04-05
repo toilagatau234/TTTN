@@ -1,20 +1,11 @@
-import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
+import authService from '../../services/authService';
 
 const PermissionGate = ({ children }) => {
     const location = useLocation();
     
-    // Lấy thông tin user từ localStorage một cách an toàn
-    let user = null;
-    try {
-        const userStr = localStorage.getItem('user');
-        if (userStr) {
-            user = JSON.parse(userStr);
-        }
-    } catch (error) {
-        console.error("Lỗi đọc dữ liệu user từ LocalStorage:", error);
-        localStorage.removeItem('user'); // Xóa luôn rác đi cho sạch
-    }
+    // Lấy thông tin user an toàn
+    const user = authService.getCurrentUser();
 
     // 1. Kiểm tra chưa đăng nhập (không có user hoặc không có token)
     if (!user || !user.token) {

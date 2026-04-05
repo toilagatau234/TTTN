@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Table, Button, Input, Select, Tag, Tabs, Tooltip, message } from 'antd';
 import { 
   SearchOutlined, ReloadOutlined, CarOutlined, 
   EnvironmentOutlined, FilePdfOutlined 
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
+import dayjs from 'dayjs';
+import shippingService from '../../../services/shippingService';
 
 const { Option } = Select;
 
@@ -12,31 +14,41 @@ const ShippingPage = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
 
-  // Dữ liệu giả lập
-  const [shipments, setShipments] = useState([
-    {
-      key: '1', id: 'GHN-829392', orderId: '#ORD-001', carrier: 'GHN',
-      status: 'Delivering', fee: 35000, cod: 550000,
-      createdAt: '31/01/2026', customer: 'Nguyễn Văn A'
-    },
-    {
-      key: '2', id: 'GHTK-112233', orderId: '#ORD-003', carrier: 'GHTK',
-      status: 'ReadyToPick', fee: 22000, cod: 0,
-      createdAt: '31/01/2026', customer: 'Lê Hoàng C'
-    },
-    {
-      key: '3', id: 'AHA-998877', orderId: '#ORD-005', carrier: 'Ahamove',
-      status: 'Returned', fee: 45000, cod: 1200000,
-      createdAt: '30/01/2026', customer: 'Phạm Thị D'
-    },
-  ]);
+  const [shipments, setShipments] = useState([]);
+  const [pagination, setPagination] = useState({ current: 1, pageSize: 10, total: 0 });
+
+  const fetchShipments = async (page = 1, pageSize = 10) => {
+    setLoading(true);
+    try {
+      const res = await shippingService.getShipments({ page, limit: pageSize });
+      if (res.success) {
+         setShipments(res.data.map(item => ({
+            key: item._id,
+            id: item.trackingCode || item._id.slice(-6),
+            orderId: item.order?.orderCode || 'N/A',
+            carrier: item.carrier?.name || 'Vận chuyển',
+            status: item.status,
+            fee: item.shippingFee || 0,
+            cod: item.order?.paymentMethod === 'cod' ? item.order?.totalPrice : 0,
+            createdAt: item.createdAt,
+            customer: item.order?.shippingInfo?.fullName || 'N/A'
+         })));
+         setPagination({ current: res.pagination.page, pageSize: res.pagination.limit, total: res.pagination.total });
+      }
+    } catch (err) {
+      message.error('Lỗi tải danh sách vận đơn');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchShipments(1, 10);
+  }, []);
 
   const handleSync = () => {
-    setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      message.success('Đã đồng bộ trạng thái vận đơn mới nhất!');
-    }, 1000);
+    fetchShipments(1, pagination.pageSize);
+    message.success('Đã làm mới danh sách vận đơn!');
   };
 
   const columns = [
@@ -78,10 +90,13 @@ const ShippingPage = () => {
       dataIndex: 'status',
       render: (status) => {
         const map = {
-          ReadyToPick: { color: 'cyan', text: 'Chờ lấy hàng' },
-          Delivering: { color: 'processing', text: 'Đang giao' },
-          Delivered: { color: 'success', text: 'Giao thành công' },
-          Returned: { color: 'error', text: 'Đang hoàn trả' },
+          created: { color: 'cyan', text: 'Mới tạo / Chờ lấy hàng' },
+          picked_up: { color: 'blue', text: 'Đã lấy hàng' },
+          in_transit: { color: 'processing', text: 'Đang luân chuyển' },
+          delivering: { color: 'processing', text: 'Đang giao' },
+          delivered: { color: 'success', text: 'Giao thành công' },
+          returned: { color: 'error', text: 'Đang hoàn trả' },
+          failed: { color: 'error', text: 'Thất bại' },
         };
         const st = map[status] || { color: 'default', text: status };
         return <Tag color={st.color} icon={<CarOutlined />}>{st.text}</Tag>;
@@ -106,8 +121,7 @@ const ShippingPage = () => {
     <div className="w-full">
       <div className="flex justify-between items-center mb-6">
         <div>
-           <h2 className="text-2xl font-bold text-navy-700">Quản lý Vận Chuyển</h2>
-           <p className="text-gray-500 text-sm">Theo dõi hành trình đơn hàng</p>
+           
         </div>
         <div className="flex gap-3">
            <Button icon={<ReloadOutlined />} onClick={handleSync} loading={loading} className="rounded-xl h-[40px]">Đồng bộ trạng thái</Button>
@@ -133,8 +147,10 @@ const ShippingPage = () => {
          <Table 
             columns={columns} 
             dataSource={shipments} 
-            pagination={{ pageSize: 5 }} 
+            pagination={{ ...pagination, onChange: (page, pageSize) => fetchShipments(page, pageSize) }} 
+            loading={loading}
             className="custom-table-metrix" 
+            rowClassName="hover:bg-blue-50/20 transition-colors"
          />
       </div>
     </div>

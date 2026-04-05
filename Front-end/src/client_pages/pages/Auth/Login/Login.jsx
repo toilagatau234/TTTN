@@ -1,5 +1,5 @@
-import { useState } from "react"
-import { Link, useNavigate } from "react-router-dom"
+import { useState, useEffect } from "react"
+import { Link, useNavigate, useLocation } from "react-router-dom"
 import { Mail, Lock, Eye, EyeOff, Loader2 } from "lucide-react"
 import { message } from "antd"
 import authService from "../../../../services/authService"
@@ -10,6 +10,14 @@ const Login = () => {
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
+  const location = useLocation()
+
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search)
+    if (searchParams.get("expired") === "true") {
+      message.warning("Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.")
+    }
+  }, [location])
 
   const handleLogin = async (e) => {
     e.preventDefault()
@@ -37,6 +45,10 @@ const Login = () => {
         }
       }
     } catch (error) {
+      if (error?.response?.data?.isLocked) {
+        navigate("/account-locked")
+        return
+      }
       const msg = error?.response?.data?.message || "Đăng nhập thất bại"
       message.error(msg)
     } finally {
@@ -98,6 +110,9 @@ const Login = () => {
               >
                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
+            </div>
+            <div className="text-right mt-2">
+              <Link to="/forgot-password" className="text-sm text-pink-400 hover:underline font-medium">Quên mật khẩu?</Link>
             </div>
           </div>
 

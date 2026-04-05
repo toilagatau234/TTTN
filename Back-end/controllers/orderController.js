@@ -127,6 +127,8 @@ const createOrder = async (req, res) => {
             ward: String(shippingInfo.ward || ''),
             district: String(shippingInfo.district || ''),
             city: String(shippingInfo.city || ''),
+            wardCode: shippingInfo.wardCode ? String(shippingInfo.wardCode) : undefined,
+            districtId: shippingInfo.districtId ? Number(shippingInfo.districtId) : undefined,
             note: String(shippingInfo.note || '')
         };
 

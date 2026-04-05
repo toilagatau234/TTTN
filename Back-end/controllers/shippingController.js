@@ -1,5 +1,15 @@
 const { Carrier, Shipment } = require('../models/Shipping');
 const Order = require('../models/Order');
+const axios = require('axios');
+
+const getGHNConfig = async () => {
+    const carrier = await Carrier.findOne({ code: { $regex: /^GHN$/i } });
+    if (!carrier || !carrier.isActive || !carrier.apiToken) {
+        throw new Error('Đơn vị vận chuyển GHN chưa được cấu hình token hoặc đang bị tắt');
+    }
+    const domain = carrier.isSandbox ? 'dev-online-gateway.ghn.vn' : 'online-gateway.ghn.vn';
+    return { token: carrier.apiToken, shopId: carrier.shopId, domain };
+};
 
 // =============================================
 // CARRIERS (Đối tác vận chuyển)
@@ -96,7 +106,7 @@ const createShipment = async (req, res) => {
         }
 
         // Kiểm tra đơn hàng
-        const order = await Order.findById(orderId);
+        const order = await Order.findById(orderId).populate('user');
         if (!order) {
             return res.status(404).json({ success: false, message: 'Đơn hàng không tồn tại' });
         }
@@ -109,24 +119,77 @@ const createShipment = async (req, res) => {
 
         // Kiểm tra carrier
         const carrier = await Carrier.findById(carrierId);
-        if (!carrier) {
-            return res.status(404).json({ success: false, message: 'Đối tác vận chuyển không tồn tại' });
+        if (!carrier || !carrier.isActive) {
+            return res.status(404).json({ success: false, message: 'Đối tác vận chuyển không tồn tại hoặc đã bị tắt' });
         }
 
-        // Tính phí ship
-        const shippingFee = order.totalPrice >= carrier.freeShipMinOrder ? 0 : carrier.baseFee;
+        // BẮT ĐẦU ĐẨY ĐƠN SANG GHN =======================
+        if (carrier.code.toUpperCase() !== 'GHN') {
+            return res.status(400).json({ success: false, message: 'Chỉ hỗ trợ tạo đơn cho hệ thống GHN trong phiên bản này' });
+        }
+        
+        if (!carrier.apiToken || !carrier.shopId) {
+            return res.status(400).json({ success: false, message: 'Vui lòng vào Quản lý Vận Chuyển để điền Mật khẩu (Token) và Shop ID trước khi tạo đơn' });
+        }
 
+        if (!order.shippingInfo.districtId || !order.shippingInfo.wardCode) {
+            return res.status(400).json({ success: false, message: 'Đơn hàng chưa có District ID hoặc Ward Code gốc từ GHN, không thể tạo đơn' });
+        }
+
+        // Chuẩn bị items format GHN
+        const ghnItems = order.items.map(item => ({
+            name: item.name,
+            quantity: item.quantity,
+            price: item.price,
+            weight: 1000 // Quy đổi mặc định 1Kg mỗi món
+        }));
+
+        const totalWeight = order.items.length * 1000;
+
+        // Payload đẩy đơn GHN
+        const ghnPayload = {
+            payment_type_id: 1, // 1: Người tính mua phí
+            note: order.shippingInfo.note || 'Hoa tươi, giao hàng cẩn thận',
+            required_note: 'CHOXEMHANGKHONGTHU',
+            client_order_code: order.orderCode,
+            to_name: order.shippingInfo.fullName,
+            to_phone: order.shippingInfo.phone,
+            to_address: order.shippingInfo.address,
+            to_ward_code: String(order.shippingInfo.wardCode),
+            to_district_id: parseInt(order.shippingInfo.districtId),
+            cod_amount: order.paymentMethod === 'cod' ? order.totalPrice : 0, 
+            weight: totalWeight,
+            length: 20, width: 20, height: 20,
+            insurance_value: order.totalPrice <= 5000000 ? order.totalPrice : 5000000,
+            service_type_id: 2, // E-commerce
+            items: ghnItems
+        };
+
+        const ghnDomain = carrier.isSandbox ? 'dev-online-gateway.ghn.vn' : 'online-gateway.ghn.vn';
+        const ghnResponse = await axios.post(`https://${ghnDomain}/shiip/public-api/v2/shipping-order/create`, ghnPayload, {
+            headers: {
+                'Token': carrier.apiToken,
+                'ShopId': carrier.shopId
+            }
+        });
+
+        const ghnOrderCode = ghnResponse.data.data.order_code;
+        const ghnExpectedDelivery = ghnResponse.data.data.expected_delivery_time;
+        const shippingFee = order.shippingPrice > 0 ? order.shippingPrice : ghnResponse.data.data.total_fee;
+
+        // Tạo Shipment nội bộ lưu trữ
         const shipment = await Shipment.create({
             order: orderId,
             carrier: carrierId,
-            shippingFee,
-            statusHistory: [{ status: 'created', note: 'Tạo vận đơn' }],
+            trackingCode: ghnOrderCode,
+            shippingFee: shippingFee,
+            estimatedDelivery: ghnExpectedDelivery ? new Date(ghnExpectedDelivery) : null,
+            statusHistory: [{ status: 'created', note: 'Đã tạo vận đơn trên hệ thống GHN' }],
         });
 
         // Cập nhật trạng thái đơn hàng → processing
         if (order.status === 'confirmed' || order.status === 'pending') {
             order.status = 'processing';
-            order.shippingPrice = shippingFee;
             await order.save();
         }
 
@@ -134,12 +197,13 @@ const createShipment = async (req, res) => {
 
         res.status(201).json({
             success: true,
-            message: `Tạo vận đơn thành công! Mã: ${shipment.trackingCode}`,
+            message: `Tạo vận đơn gốc GHN thành công! Mã: ${shipment.trackingCode}`,
             data: shipment,
         });
     } catch (error) {
-        console.error('Create shipment error:', error.message);
-        res.status(500).json({ success: false, message: 'Lỗi server' });
+        console.error('Create shipment (GHN) error:', error.response?.data || error.message);
+        const errorMsg = error.response?.data?.message || 'Lỗi kết nối API đẩy đơn Giao Hàng Nhanh';
+        res.status(500).json({ success: false, message: errorMsg });
     }
 };
 
@@ -189,37 +253,98 @@ const syncShipmentStatus = async (req, res) => {
     }
 };
 
-// @desc    Tính phí ship cho user (dùng ở checkout)
+// =============================================
+// GHN API PROXIES (Địa chỉ)
+// =============================================
+
+// @desc    Lấy danh sách Tỉnh/Thành phố từ GHN
+// @route   GET /api/shipping/ghn/provinces
+const getProvinces = async (req, res) => {
+    try {
+        const config = await getGHNConfig();
+        const response = await axios.get(`https://${config.domain}/shiip/public-api/master-data/province`, {
+            headers: { 'Token': config.token }
+        });
+        res.json({ success: true, data: response.data.data });
+    } catch (error) {
+        console.error('GHN getProvinces error:', error.message);
+        res.status(500).json({ success: false, message: 'Lỗi lấy dữ liệu Tỉnh/Thành từ GHN' });
+    }
+};
+
+// @desc    Lấy danh sách Quận/Huyện từ GHN
+// @route   GET /api/shipping/ghn/districts/:province_id
+const getDistricts = async (req, res) => {
+    try {
+        const config = await getGHNConfig();
+        const province_id = req.params.province_id;
+        const response = await axios.get(`https://${config.domain}/shiip/public-api/master-data/district`, {
+            headers: { 'Token': config.token },
+            params: { province_id }
+        });
+        res.json({ success: true, data: response.data.data });
+    } catch (error) {
+        console.error('GHN getDistricts error:', error.message);
+        res.status(500).json({ success: false, message: 'Lỗi lấy dữ liệu Quận/Huyện từ GHN' });
+    }
+};
+
+// @desc    Lấy danh sách Phường/Xã từ GHN
+// @route   GET /api/shipping/ghn/wards/:district_id
+const getWards = async (req, res) => {
+    try {
+        const config = await getGHNConfig();
+        const district_id = req.params.district_id;
+        const response = await axios.get(`https://${config.domain}/shiip/public-api/master-data/ward`, {
+            headers: { 'Token': config.token },
+            params: { district_id }
+        });
+        res.json({ success: true, data: response.data.data });
+    } catch (error) {
+        console.error('GHN getWards error:', error.message);
+        res.status(500).json({ success: false, message: 'Lỗi lấy dữ liệu Phường/Xã từ GHN' });
+    }
+};
+
+// @desc    Tính phí ship cho user sử dụng API GHN
 // @route   POST /api/shipping/calculate
 const calculateShippingFee = async (req, res) => {
     try {
-        const { orderTotal, carrierId } = req.body;
+        const { orderTotal, to_district_id, to_ward_code, weightInGrams } = req.body;
 
-        let carrier;
-        if (carrierId) {
-            carrier = await Carrier.findById(carrierId);
-        } else {
-            // Lấy carrier mặc định (active, đầu tiên)
-            carrier = await Carrier.findOne({ isActive: true });
+        if (!to_district_id || !to_ward_code) {
+           return res.status(400).json({ success: false, message: 'Thiếu thông tin Quận/Huyện hoặc Phường/Xã để tính phí GHN' });
         }
 
-        if (!carrier) {
-            return res.json({ success: true, data: { shippingFee: 30000, carrier: null } });
-        }
+        const config = await getGHNConfig();
 
-        const shippingFee = orderTotal >= carrier.freeShipMinOrder ? 0 : carrier.baseFee;
+        // Gọi API của hàng ship GHN
+        const response = await axios.post(`https://${config.domain}/shiip/public-api/v2/shipping-order/fee`, {
+            service_type_id: 2, // 2: E-commerce
+            to_district_id: parseInt(to_district_id),
+            to_ward_code: String(to_ward_code),
+            weight: weightInGrams || 1000, 
+            insurance_value: orderTotal <= 5000000 ? orderTotal : 5000000 
+        }, {
+            headers: {
+                'Token': config.token,
+                'ShopId': config.shopId
+            }
+        });
 
+        const shippingFee = response.data.data.total;
+        
         res.json({
             success: true,
             data: {
                 shippingFee,
-                carrier: { name: carrier.name, estimatedDays: carrier.estimatedDays },
-                freeShipNote: shippingFee > 0 ? `Miễn phí ship cho đơn từ ${carrier.freeShipMinOrder.toLocaleString('vi-VN')}đ` : 'Miễn phí vận chuyển!',
+                carrier: { name: 'Giao Hàng Nhanh', estimatedDays: '2 - 3 ngày' },
+                freeShipNote: `Đã tính phí ship tự động qua GHN API`,
             },
         });
     } catch (error) {
-        console.error('Calculate fee error:', error.message);
-        res.status(500).json({ success: false, message: 'Lỗi server' });
+        console.error('Calculate GHN fee error:', error.response?.data || error.message);
+        res.status(500).json({ success: false, message: 'Lỗi lấy dữ liệu tính phí từ GHN' });
     }
 };
 
@@ -230,5 +355,8 @@ module.exports = {
     getShipments,
     createShipment,
     syncShipmentStatus,
+    getProvinces,
+    getDistricts,
+    getWards,
     calculateShippingFee,
 };

@@ -1,5 +1,6 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import ScrollToTop from './client_pages/components/common/ScrollToTop';
 
 import AdminRoutes from './admin_pages/routes/routes';
 import UserLayout from './client_pages/layouts/UserLayout';
@@ -19,11 +20,14 @@ import Mess from './client_pages/pages/Mess/Mess';
 import Auth from './client_pages/pages/Auth/Auth';
 import Login from './client_pages/pages/Auth/Login/Login';
 import Register from './client_pages/pages/Auth/Register/Register';
+import AccountLocked from './client_pages/pages/Auth/AccountLocked/AccountLocked';
+import ForgotPassword from './client_pages/pages/Auth/ForgotPassword/ForgotPassword';
 import Error from './client_pages/pages/Error/Error';
 
 function App() {
   return (
     <BrowserRouter>
+      <ScrollToTop />
       <Routes>
         {/* ===== ADMIN ===== */}
         <Route path="/admin/*" element={<AdminRoutes />} />
@@ -44,6 +48,8 @@ function App() {
           <Route path="auth" element={<Auth />} />
           <Route path="login" element={<Login />} />
           <Route path="register" element={<Register />} />
+          <Route path="forgot-password" element={<ForgotPassword />} />
+          <Route path="account-locked" element={<AccountLocked />} />
         </Route>
 
         {/* 404 — trong UserLayout */}

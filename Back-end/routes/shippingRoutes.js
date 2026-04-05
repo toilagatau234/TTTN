@@ -7,12 +7,20 @@ const {
     getShipments,
     createShipment,
     syncShipmentStatus,
+    getProvinces,
+    getDistricts,
+    getWards,
     calculateShippingFee,
 } = require('../controllers/shippingController');
 const { protect, authorize } = require('../middleware/auth');
 const validateObjectId = require('../middleware/validateObjectId');
 
 router.param('id', validateObjectId);
+
+// Public/User: GHN Master Data Proxies
+router.get('/ghn/provinces', getProvinces);
+router.get('/ghn/districts/:province_id', getDistricts);
+router.get('/ghn/wards/:district_id', getWards);
 
 // Public/User: tính phí ship (dùng ở checkout)
 router.post('/calculate', protect, calculateShippingFee);

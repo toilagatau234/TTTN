@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { Loader2, ArrowLeft, CheckCircle2, Ticket, Truck, CreditCard } from "lucide-react";
 import { message, Select } from "antd";
@@ -38,27 +38,63 @@ const Checkout = () => {
   useEffect(() => {
     const fetchProvinces = async () => {
       try {
-        const res = await fetch("https://provinces.open-api.vn/api/?depth=3");
-        const data = await res.json();
-        setProvinces(data);
+        const res = await shippingService.getProvinces();
+        if (res.success) {
+          // Format theo chuẩn GHN để các Select dùng chung format dễ render
+          const formatted = res.data.map(p => ({
+            code: p.ProvinceID,
+            name: p.ProvinceName
+          }));
+          setProvinces(formatted);
+        }
       } catch (err) {
-        console.error("Lỗi tải danh mục Tỉnh/Thành:", err);
+        console.error("Lỗi tải danh mục Tỉnh/Thành từ GHN:", err);
       }
     };
     fetchProvinces();
   }, []);
 
-  const handleProvinceChange = (value) => {
+  const handleProvinceChange = async (value) => {
     const province = provinces.find(p => p.code === value);
     setShippingInfo(prev => ({ ...prev, province, district: null, ward: null, address: "" }));
-    setDistricts(province?.districts || []);
+    setDistricts([]);
     setWards([]);
+    // Lấy Districts từ GHN
+    try {
+      if (province) {
+        const res = await shippingService.getDistricts(province.code);
+        if (res.success) {
+          const formatted = res.data.map(d => ({
+            code: d.DistrictID,
+            name: d.DistrictName
+          }));
+          setDistricts(formatted);
+        }
+      }
+    } catch (err) {
+      console.error("Lỗi tải danh mục Quận/Huyện từ GHN:", err);
+    }
   };
 
-  const handleDistrictChange = (value) => {
+  const handleDistrictChange = async (value) => {
     const district = districts.find(d => d.code === value);
     setShippingInfo(prev => ({ ...prev, district, ward: null, address: "" }));
-    setWards(district?.wards || []);
+    setWards([]);
+    // Lấy Wards từ GHN
+    try {
+      if (district) {
+        const res = await shippingService.getWards(district.code);
+        if (res.success) {
+          const formatted = res.data.map(w => ({
+            code: w.WardCode,
+            name: w.WardName
+          }));
+          setWards(formatted);
+        }
+      }
+    } catch (err) {
+      console.error("Lỗi tải danh mục Phường/Xã từ GHN:", err);
+    }
   };
 
   const handleWardChange = (value) => {
@@ -89,6 +125,14 @@ const Checkout = () => {
   const [paymentMethod, setPaymentMethod] = useState("COD");
   const [orderSuccess, setOrderSuccess] = useState(false);
   const [newOrderCode, setNewOrderCode] = useState("");
+  
+  // Calculate true subtotal locally for pricing consistency
+  const subTotal = useMemo(() => {
+    return (cart?.items || []).reduce((acc, item) => {
+      const p = item.isCustom ? (item.price || item.totalCustomPrice || 0) : (item.product?.price || 0);
+      return acc + p * (item.quantity || 1);
+    }, 0);
+  }, [cart]);
 
   // ----- INITIAL LOAD -----
   useEffect(() => {
@@ -116,9 +160,14 @@ const Checkout = () => {
           // Wait for provinces if not yet loaded
           let currentProvinces = provinces;
           if (currentProvinces.length === 0) {
-             const res = await fetch("https://provinces.open-api.vn/api/?depth=3");
-             currentProvinces = await res.json();
-             setProvinces(currentProvinces);
+             const res = await shippingService.getProvinces();
+             if (res.success) {
+               currentProvinces = res.data.map(p => ({
+                  code: p.ProvinceID,
+                  name: p.ProvinceName
+               }));
+               setProvinces(currentProvinces);
+             }
           }
 
           const profileRes = await userService.getProfile();
@@ -296,33 +345,33 @@ const Checkout = () => {
   // ----- CALCULATE SHIPPING FEE -----
   useEffect(() => {
     const calcFee = async () => {
-      if (selectedCarrier && shippingInfo.address.length > 5) {
+      // Phải có District ID và Ward Code mới tính được giá
+      if (shippingInfo.district && shippingInfo.ward && shippingInfo.address.length > 5) {
         try {
-          // Tính phí dựa trên hãng và địa chỉ (có thể fake weight=1kg)
           const feeRes = await shippingService.calculateFee({
-            carrierId: selectedCarrier,
-            shippingAddress: shippingInfo.address,
+            orderTotal: subTotal,
+            to_district_id: shippingInfo.district.code,
+            to_ward_code: shippingInfo.ward.code,
             weightInGrams: 1000 // Tạm hardcode 1kg
           });
           if (feeRes.success) {
-            setShippingFee(feeRes.data.fee ?? 0);
+            setShippingFee(feeRes.data.shippingFee ?? 0);
           }
         } catch (error) {
-          console.error("Lỗi tính phí ship:", error);
-          // Fallback
-          setShippingFee(30000);
+          console.error("Lỗi tính phí ship GHN:", error);
+          setShippingFee(0);
         }
       } else {
         setShippingFee(0); // Chưa chọn Carrier hoặc chưa nhập Address
       }
     };
 
-    // Debounce nhẹ khi gõ địa chỉ
+    // Gọi liên tục khi District, Ward thay đổi
     const timer = setTimeout(() => {
       calcFee();
-    }, 800);
+    }, 500);
     return () => clearTimeout(timer);
-  }, [selectedCarrier, shippingInfo.address]);
+  }, [shippingInfo.district, shippingInfo.ward, subTotal]);
 
   // ----- VOUCHER -----
   const handleApplyVoucher = async () => {
@@ -376,6 +425,8 @@ const Checkout = () => {
           ward: shippingInfo.ward?.name || "",
           district: shippingInfo.district?.name || "",
           city: shippingInfo.province?.name || "",
+          wardCode: shippingInfo.ward?.code || "",
+          districtId: shippingInfo.district?.code || null,
         },
         paymentMethod,
         shippingFee,
@@ -438,12 +489,6 @@ const Checkout = () => {
   // Tách items
   const regularItems = (cart?.items || []).filter(item => !item.isCustom);
   const customItems = (cart?.items || []).filter(item => item.isCustom);
-  
-  // Calculate true subtotal locally
-  const subTotal = (cart?.items || []).reduce((acc, item) => {
-    const p = item.isCustom ? (item.price || item.totalCustomPrice || 0) : (item.product?.price || 0);
-    return acc + p * (item.quantity || 1);
-  }, 0);
 
   const finalTotal = subTotal + shippingFee - discountAmount;
 
