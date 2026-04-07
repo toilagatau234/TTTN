@@ -13,7 +13,7 @@ import logging.config
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.models.ml_models import lifespan
-from app.routes import iris, hydrangea
+from app.routes import hydrangea
 from app.config import HOST, PORT, ALLOWED_ORIGINS, DEBUG_MODE
 
 # ── Logging configuration ────────────────────────────────────────────────────
@@ -31,7 +31,6 @@ app = FastAPI(
     description=(
         "PhoBERT-powered NLP microservice for Rosee flower e-commerce.\n\n"
         "**Models:**\n"
-        "- 🌸 **Iris** — Intent classification (GREETING, CREATE_BOUQUET, ASK_PRICE_STOCK, CHECK_POLICY, Out_Of_Domain)\n"
         "- 🌿 **Hydrangea** — Named Entity Recognition (FLOWER, COLOR, OCCASION, PRICE, STYLE)"
     ),
     lifespan=lifespan,
@@ -47,7 +46,6 @@ app.add_middleware(
 )
 
 # ── Routers ───────────────────────────────────────────────────────────────────
-app.include_router(iris.router)
 app.include_router(hydrangea.router)
 
 

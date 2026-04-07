@@ -16,7 +16,6 @@ import ProductDetail from './client_pages/pages/ProductDetail/ProductDetail';
 import Profile from './client_pages/pages/Profile/Profile';
 import Shop from './client_pages/pages/Shop/Shop';
 import Wishlist from './client_pages/pages/Wishlist/Wishlist';
-import Mess from './client_pages/pages/Mess/Mess';
 import Auth from './client_pages/pages/Auth/Auth';
 import Login from './client_pages/pages/Auth/Login/Login';
 import Register from './client_pages/pages/Auth/Register/Register';
@@ -44,7 +43,6 @@ function App() {
           <Route path="profile" element={<Profile />} />
           <Route path="shop" element={<Shop />} />
           <Route path="wishlist" element={<Wishlist />} />
-          <Route path="mess" element={<Mess />} />
           <Route path="auth" element={<Auth />} />
           <Route path="login" element={<Login />} />
           <Route path="register" element={<Register />} />

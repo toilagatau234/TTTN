@@ -1,7 +1,6 @@
 import { Link, useNavigate } from "react-router-dom"
 import { useState, useEffect } from "react"
 import { Heart, ShoppingCart, User, Search, LogOut } from "lucide-react"
-import { MessageCircle } from "lucide-react"
 import { Bell, Gift, Tag, Sparkles, X } from "lucide-react"
 import { Home, Flower, LayoutGrid, Shapes } from "lucide-react"
 import { message } from "antd"
@@ -154,11 +153,6 @@ const Navbar = () => {
               <Heart size={22} />
             </Link>
 
-            <Link
-              to="/mess"
-              className="text-pink-400 hover:text-pink-500 transition">
-              <MessageCircle size={21} />
-            </Link>
 
             <Link to="/cart" className="relative text-pink-400 hover:text-pink-500 transition duration-300">
               <ShoppingCart size={22} />
@@ -278,11 +272,6 @@ const Navbar = () => {
             to="/miniGame"
             className="px-5 py-2 rounded-full text-pink-500 hover:bg-pink-400 hover:text-white transition duration-200" >
             MiniGame
-          </Link>
-          <Link
-            to="/mess"
-            className="px-5 py-2 rounded-full text-pink-500 hover:bg-pink-400 hover:text-white transition duration-200" >
-            Nhắn tin
           </Link>
         </div>
       </div>
