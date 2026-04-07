@@ -9,7 +9,6 @@ const {
     addCustomBouquetToCart,
 } = require('../controllers/cartController');
 const { protect } = require('../middleware/auth');
-const aiOrderController = require('../controllers/aiOrder.controller');
 
 // Tất cả cart routes đều yêu cầu đăng nhập
 router.use(protect);
@@ -21,8 +20,7 @@ router.put('/:itemId', updateCartItem);
 router.delete('/:itemId', removeCartItem);
 router.delete('/', clearCart);
 
-// Thêm sản phẩm custom AI vào giỏ
+// Thêm sản phẩm custom vào giỏ (từ HydrangeaStudio)
 router.post('/custom', addCustomBouquetToCart);
-router.post('/custom-add', aiOrderController.addCustomItem);
 
 module.exports = router;

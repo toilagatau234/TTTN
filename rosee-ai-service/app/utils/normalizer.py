@@ -193,6 +193,44 @@ STYLE_MAP: dict[str, str] = {
     "cá tính": "bold",
 }
 
+# ── Layout Map (bố cục / hình dạng giỏ hoa) ──────────────────────────────────
+LAYOUT_MAP: dict[str, str] = {
+    # Hình dạng cơ bản
+    "tròn": "round",
+    "hình tròn": "round",
+    "oval": "oval",
+    "hình oval": "oval",
+    "vuông": "square",
+    "hình vuông": "square",
+    "chữ nhật": "rectangular",
+    "hình chữ nhật": "rectangular",
+    # Hình đặc biệt
+    "trái tim": "heart",
+    "hình trái tim": "heart",
+    "tim": "heart",
+    "ngôi sao": "star",
+    "hình sao": "star",
+    # Bố cục chiều cao
+    "tháp": "tower",
+    "hình tháp": "tower",
+    "thác": "cascade",
+    "dạng thác": "cascade",
+    "thẳng đứng": "vertical",
+    "nằm ngang": "horizontal",
+    # Loại giỏ / bó
+    "giỏ": "basket",
+    "lẵng": "basket",
+    "bó": "bouquet",
+    "bó hoa": "bouquet",
+    "hộp": "box",
+    "hộp hoa": "box",
+    # Mật độ
+    "dày": "dense",
+    "dày đặc": "dense",
+    "thưa": "sparse",
+    "thưa thoáng": "sparse",
+}
+
 
 # ── Public API ────────────────────────────────────────────────────────────────
 def normalize_flower(value: str) -> Optional[str]:
@@ -210,12 +248,17 @@ def normalize_occasion(value: str) -> Optional[str]:
 def normalize_style(value: str) -> Optional[str]:
     return _fuzzy_lookup(value, STYLE_MAP)
 
+def normalize_layout(value: str) -> Optional[str]:
+    return _fuzzy_lookup(value, LAYOUT_MAP)
+
 
 def keyword_scan(text: str) -> dict:
     """
     Fallback: scan raw text directly against all map keys.
     Returns a partial dict with whatever was found.
     Used when NER fails or returns empty.
+    Bao gồm cả layout (bố cục giỏ hoa) — PhoBERT chưa có nhãn LAYOUT
+    nên luôn trích xuất qua keyword scan.
     """
     text_lower = text.lower()
     result: dict = {}
@@ -227,6 +270,7 @@ def keyword_scan(text: str) -> dict:
         ("occasion", OCCASION_MAP, "occasion"),
         ("wrapper", WRAPPER_MAP, "wrapper"),
         ("style", STYLE_MAP, "style"),
+        ("layout", LAYOUT_MAP, "layout"),
     ]:
         for viet_key, eng_val in mapping.items():
             if viet_key in text_lower:

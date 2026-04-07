@@ -15,13 +15,14 @@ Pipeline:
 """
 import logging
 from typing import Optional
-from app.models.schemas import ProcessedData
+from app.models.schemas import ProcessedData, AnalyzeEntities, AnalyzeResponse
 from app.utils.normalizer import (
     normalize_flower,
     normalize_color,
     normalize_wrapper,
     normalize_occasion,
     normalize_style,
+    normalize_layout,
     keyword_scan,
 )
 from app.utils.quantity_extractor import extract_quantity
@@ -76,8 +77,8 @@ def process_entities(
     """
     logger.debug(f"[Processor] raw_ner={raw_ner}, intent={intent}")
 
-    # ── Step 1: Normalize each NER entity ─────────────────────────────────
-    flower = normalize_flower(raw_ner.get("FLOWER", ""))
+    # ── Step 1: Normalize each NER entity ───────────────────────────────────
+    flower_type = normalize_flower(raw_ner.get("FLOWER", ""))
     color  = normalize_color(raw_ner.get("COLOR", ""))
     occasion = normalize_occasion(raw_ner.get("OCCASION", ""))
     style  = normalize_style(raw_ner.get("STYLE", ""))
@@ -102,16 +103,20 @@ def process_entities(
     if qty is None:
         qty = extract_quantity(original_text)
 
-    # ── Step 3: Keyword fallback (when NER returns nothing useful) ────────
-    ner_is_sparse = not any([flower, color, occasion])
+    # ── Step 3: Keyword fallback (when NER returns nothing useful) ────────────
+    ner_is_sparse = not any([flower_type, color, occasion])
     if ner_is_sparse:
         logger.debug("[Processor] NER sparse → applying keyword fallback")
         scanned = keyword_scan(original_text)
-        flower   = flower   or scanned.get("flower")
-        color    = color    or scanned.get("color")
-        occasion = occasion or scanned.get("occasion")
-        wrapper  = wrapper  or scanned.get("wrapper")
-        style    = style    or scanned.get("style")
+        flower_type = flower_type or scanned.get("flower")
+        color       = color       or scanned.get("color")
+        occasion    = occasion    or scanned.get("occasion")
+        wrapper     = wrapper     or scanned.get("wrapper")
+        style       = style       or scanned.get("style")
+
+    # ── Step 3b: Layout extraction (luôn dùng keyword scan vì PhoBERT chưa có nhãn LAYOUT)
+    scanned_all = keyword_scan(original_text)
+    layout = normalize_layout(raw_ner.get("LAYOUT", "")) or scanned_all.get("layout")
 
     # ── Step 4: Price hint ────────────────────────────────────────────────
     price_hint = _extract_price_hint(original_text, raw_ner)
@@ -126,18 +131,78 @@ def process_entities(
     )
 
     logger.debug(
-        f"[Processor] flower={flower}, color={color}, qty={qty}, "
-        f"occasion={occasion}, wrapper={wrapper}, style={style}, "
+        f"[Processor] flower_type={flower_type}, color={color}, qty={qty}, "
+        f"occasion={occasion}, wrapper={wrapper}, style={style}, layout={layout}, "
         f"confidence={unified_confidence}"
     )
 
     return ProcessedData(
-        flower=flower,
+        flower_type=flower_type,
         qty=qty,
         color=color,
         wrapper=wrapper,
         occasion=occasion,
         style=style,
+        layout=layout,
         price_hint=price_hint,
         confidence=unified_confidence,
+    )
+
+
+def analyze_entities(
+    raw_ner: dict,
+    ner_avg_confidence: float,
+    intent: str,
+    intent_confidence: float,
+    original_text: str,
+) -> AnalyzeResponse:
+    """
+    Trả về format chuẩn của Bước 3, dùng cho /api/hydrangea/analyze.
+
+    Output:
+        {
+            "intent": "CREATE_BOUQUET",
+            "entities": {
+                "flower_type": "rose",
+                "color": "red",
+                "occasion": "birthday",
+                "style": "luxury",
+                "layout": "round"
+            }
+        }
+    """
+    logger.debug(f"[Analyze] raw_ner={raw_ner}, intent={intent}")
+
+    # Normalize từng entity từ NER
+    flower_type = normalize_flower(raw_ner.get("FLOWER", ""))
+    color       = normalize_color(raw_ner.get("COLOR", ""))
+    occasion    = normalize_occasion(raw_ner.get("OCCASION", ""))
+    style       = normalize_style(raw_ner.get("STYLE", ""))
+
+    # Layout: luôn tìm qua keyword scan (PhoBERT chưa được train nhãn LAYOUT)
+    scanned = keyword_scan(original_text)
+    layout = normalize_layout(raw_ner.get("LAYOUT", "")) or scanned.get("layout")
+
+    # Fallback keyword scan nếu NER rỗng
+    if not any([flower_type, color, occasion]):
+        logger.debug("[Analyze] NER sparse → keyword fallback")
+        flower_type = flower_type or scanned.get("flower")
+        color       = color       or scanned.get("color")
+        occasion    = occasion    or scanned.get("occasion")
+        style       = style       or scanned.get("style")
+
+    logger.debug(
+        f"[Analyze] flower_type={flower_type}, color={color}, "
+        f"occasion={occasion}, style={style}, layout={layout}"
+    )
+
+    return AnalyzeResponse(
+        intent=intent,
+        entities=AnalyzeEntities(
+            flower_type=flower_type,
+            color=color,
+            occasion=occasion,
+            style=style,
+            layout=layout,
+        ),
     )

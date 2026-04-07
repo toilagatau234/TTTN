@@ -19,3 +19,17 @@ exports.chatWithHydrangea = async (req, res) => {
         });
     }
 };
+
+exports.generateImage = async (req, res) => {
+    try {
+        const { layout, main_color, sub_color } = req.body;
+        const result = await hydrangeaService.generateImage(layout, main_color, sub_color);
+        return res.status(200).json(result);
+    } catch (error) {
+        console.error("[Hydrangea Image Error]:", error);
+        return res.status(500).json({ 
+            success: false, 
+            message: error.message || 'Không thể tạo ảnh lúc này.' 
+        });
+    }
+};

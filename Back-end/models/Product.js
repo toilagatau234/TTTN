@@ -40,6 +40,50 @@ const productSchema = new mongoose.Schema({
         ref: 'Category',
         required: [true, 'Vui lòng chọn danh mục cho sản phẩm']
     },
+    // ==========================================
+    // AI MATCHING ATTRIBUTES (New fields for Step 4)
+    // ==========================================
+    occasion: [{
+        type: String,
+        trim: true
+        // vd: 'birthday', 'anniversary', 'wedding'
+    }],
+    style: [{
+        type: String,
+        trim: true
+        // vd: 'luxury', 'minimalist', 'vintage'
+    }],
+    main_flowers: [{
+        type: String,
+        trim: true
+        // vd: 'rose', 'tulip', 'sunflower'
+    }],
+    sub_flowers: [{
+        type: String,
+        trim: true
+        // vd: 'baby breath', 'eucalyptus'
+    }],
+    dominant_color: {
+        type: String,
+        trim: true
+        // vd: 'red', 'pink', 'white'
+    },
+    secondary_colors: [{
+        type: String,
+        trim: true
+        // vd: 'green', 'gold'
+    }],
+    layout: {
+        type: String,
+        trim: true
+        // vd: 'round', 'heart', 'cascade'
+    },
+    elements: [{
+        type: String,
+        trim: true
+        // Các yếu tố trang trí khác vd: 'ribbon', 'pearl'
+    }],
+    // ==========================================
     images: [
         {
             url: { type: String, required: true },

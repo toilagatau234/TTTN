@@ -11,10 +11,14 @@ from app.models.schemas import (
     NERResponse,
     ProcessedResponse,
     RawOutput,
+    AnalyzeResponse,
+    ImageGenerationRequest,
+    ImageGenerationResponse,
 )
 from app.services.ner_service import extract_entities
 from app.services.intent_service import classify_intent
-from app.services.entity_processor import process_entities
+from app.services.entity_processor import process_entities, analyze_entities
+from app.services.image_composer import compose_flower_basket, image_to_base64
 from app.models.ml_models import ml_models
 
 logger = logging.getLogger("rosee.routes.hydrangea")
@@ -146,3 +150,105 @@ async def process_full(request: TextRequest):
         raw=raw,
         debug=debug_info,
     )
+
+
+# ── 3. Analyze — Format chuẩn Bước 3 ────────────────────────────────────────────
+@router.post(
+    "/analyze",
+    response_model=AnalyzeResponse,
+    summary="[Bước 3] Phân tích intent + entities theo format chuẩn",
+)
+async def analyze_text(request: TextRequest):
+    """
+    Pipeline đầy đủ: Intent + NER + Chuẩn hóa.
+
+    Trả về format chuẩn được dùng cho Node.js matching + image generation:
+    ```json
+    {
+        "intent": "CREATE_BOUQUET",
+        "entities": {
+            "flower_type": "rose",
+            "color": "red",
+            "occasion": "birthday",
+            "style": "luxury",
+            "layout": "round"
+        }
+    }
+    ```
+
+    **Đây là endpoint chính cho Node.js từ Bước 3 trở đi.**
+    """
+    # ─ NER (graceful fallback nếu model chưa load) ──────────────────────
+    ner_result = {"entities": {}, "avg_confidence": 0.0}
+    if ml_models.get("ner_available", False):
+        try:
+            ner_result = extract_entities(request.text)
+        except Exception as exc:
+            logger.warning(f"[Analyze] NER failed, fallback keyword: {exc}")
+
+    # ─ Intent (bắt buộc) ──────────────────────────────────────────────
+    if not ml_models.get("intent"):
+        raise HTTPException(status_code=503, detail="Intent model chưa sẵn sàng.")
+    try:
+        intent_result = classify_intent(request.text)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+
+    # ─ Analyze entities ──────────────────────────────────────────────
+    result = analyze_entities(
+        raw_ner=ner_result["entities"],
+        ner_avg_confidence=ner_result["avg_confidence"],
+        intent=intent_result["intent"],
+        intent_confidence=intent_result["confidence"],
+        original_text=request.text,
+    )
+
+    logger.info(
+        f"[Analyze] intent={result.intent}, "
+        f"flower_type={result.entities.flower_type}, "
+        f"color={result.entities.color}, "
+        f"occasion={result.entities.occasion}, "
+        f"style={result.entities.style}, "
+        f"layout={result.entities.layout} "
+        f"text={request.text!r:.60}"
+    )
+    return result
+
+
+# ── 4. Image Generation (Bước 8) ──────────────────────────────────────────────
+@router.post(
+    "/generate-image",
+    response_model=ImageGenerationResponse,
+    summary="[Bước 8] Tạo ảnh giỏ hoa từ template",
+)
+async def generate_image_composition(request: ImageGenerationRequest):
+    """
+    Tạo ảnh giỏ hoa từ template (Pillow) dựa trên layout và màu sắc.
+    """
+    try:
+        # Gọi composer service
+        img = compose_flower_basket(
+            layout_type=request.layout,
+            main_color=request.main_color,
+            sub_color=request.sub_color,
+            add_randomness=request.add_randomness
+        )
+        
+        # Chuyển sang base64
+        base64_str = image_to_base64(img)
+        
+        logger.info(
+            f"[GenerateImage] success=True, layout={request.layout}, "
+            f"main={request.main_color}, sub={request.sub_color}"
+        )
+        
+        return ImageGenerationResponse(
+            success=True,
+            image_base64=base64_str,
+            layout=request.layout,
+            main_color=request.main_color,
+            sub_color=request.sub_color
+        )
+    except Exception as exc:
+        logger.error(f"[GenerateImage] Error: {exc}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc))

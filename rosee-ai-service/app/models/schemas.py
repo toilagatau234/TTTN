@@ -25,14 +25,15 @@ class NERResponse(BaseModel):
 
 # ── Structured / Processed Output ────────────────────────────────────────────
 class ProcessedData(BaseModel):
-    flower: Optional[str] = None          # e.g. "rose"
-    qty: Optional[int] = None             # e.g. 10
-    color: Optional[str] = None           # e.g. "red"
-    wrapper: Optional[str] = None         # e.g. "kraft"
-    occasion: Optional[str] = None        # e.g. "birthday"
-    style: Optional[str] = None           # e.g. "royal"
-    price_hint: Optional[str] = None      # e.g. "500k" (raw price mention)
-    confidence: float = 0.0              # unified confidence score
+    flower_type: Optional[str] = None    # e.g. "rose" (renamed from flower)
+    qty: Optional[int] = None            # e.g. 10
+    color: Optional[str] = None          # e.g. "red"
+    wrapper: Optional[str] = None        # e.g. "basket"
+    occasion: Optional[str] = None       # e.g. "birthday"
+    style: Optional[str] = None          # e.g. "luxury"
+    layout: Optional[str] = None         # e.g. "round", "heart", "tower"
+    price_hint: Optional[str] = None     # e.g. "500k" (raw price mention)
+    confidence: float = 0.0             # unified confidence score
 
 
 class RawOutput(BaseModel):
@@ -46,3 +47,49 @@ class ProcessedResponse(BaseModel):
     data: ProcessedData
     raw: RawOutput
     debug: Optional[Dict[str, Any]] = None   # populated when request.debug=True
+
+
+# ── Analyze (Bước 3 — Clean Output) ────────────────────────────────────
+class AnalyzeEntities(BaseModel):
+    """Entities được chuẩn hóa, sẵn sàng cho Node.js dùng."""
+    flower_type: Optional[str] = None    # e.g. "rose"
+    color: Optional[str] = None          # e.g. "red"
+    occasion: Optional[str] = None       # e.g. "birthday"
+    style: Optional[str] = None          # e.g. "luxury"
+    layout: Optional[str] = None         # e.g. "round", "heart"
+
+
+class AnalyzeResponse(BaseModel):
+    """
+    Output chuẩn của endpoint /api/hydrangea/analyze.
+
+    Format:
+        {
+            "intent": "CREATE_BOUQUET",
+            "entities": {
+                "flower_type": "rose",
+                "color": "red",
+                "occasion": "birthday",
+                "style": "luxury",
+                "layout": "round"
+            }
+        }
+    """
+    intent: str
+    entities: AnalyzeEntities
+
+
+# ── Image Generation (Bước 8 — Template Composition) ──────────────────────────
+class ImageGenerationRequest(BaseModel):
+    layout: str = Field("round", description="Layout of the flower basket (round, tall)")
+    main_color: str = Field("red", description="Main color of the flowers")
+    sub_color: str = Field("white", description="Secondary color of the flowers")
+    add_randomness: bool = Field(True, description="Add slight randomization to flower positions")
+
+
+class ImageGenerationResponse(BaseModel):
+    success: bool
+    image_base64: str
+    layout: str
+    main_color: str
+    sub_color: str
