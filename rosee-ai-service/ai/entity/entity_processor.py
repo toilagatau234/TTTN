@@ -16,6 +16,7 @@ Pipeline:
 import logging
 from typing import Optional
 from app.models.schemas import ProcessedData, AnalyzeEntities, AnalyzeResponse
+from app.utils.normalizer import (
     normalize_flower,
     normalize_color,
     normalize_category,
@@ -23,6 +24,7 @@ from app.models.schemas import ProcessedData, AnalyzeEntities, AnalyzeResponse
     normalize_occasion,
     normalize_style,
     keyword_scan,
+)
 from app.utils.quantity_extractor import extract_quantity
 from app.config import INTENT_WEIGHT, NER_WEIGHT
 

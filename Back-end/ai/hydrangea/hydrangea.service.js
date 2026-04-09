@@ -81,7 +81,17 @@ class HydrangeaService {
         console.log(`[Hydrangea] Session sau khi cập nhật:`, session.entities);
 
         // ── Xử lý theo Intent chuẩn mới ──
-        if (intent === 'CREATE_FLOWER_BASKET' || intent === 'ASK_PRICE') {
+        let resolvedIntent = intent;
+        
+        // Nếu AI phân loại Intent = UNKNOWN nhưng MÀ vẫn trích xuất được thực thể (Loài hoa, màu sắc...)
+        // -> Chuyển intent thành CREATE_FLOWER_BASKET để bot tiếp tục báo giá và tư vấn
+        const hasCoreEntities = session.entities.flower_types.length > 0 || session.entities.color || session.entities.category;
+        if (intent === 'UNKNOWN' && hasCoreEntities) {
+            resolvedIntent = 'CREATE_FLOWER_BASKET';
+            console.log(`[Hydrangea] Tự động ép Intent từ UNKNOWN sang CREATE_FLOWER_BASKET do có chứa Entities.`);
+        }
+
+        if (resolvedIntent === 'CREATE_FLOWER_BASKET' || resolvedIntent === 'ASK_PRICE') {
             
             // Nếu chưa có thông tin cốt lõi (Loài hoa hoặc Màu hoặc Loại hình), hỏi thêm
             if (session.entities.flower_types.length === 0 && !session.entities.color && !session.entities.category) {
@@ -111,7 +121,7 @@ class HydrangeaService {
             const categoryDisplay = session.entities.category || 'mẫu';
             let replyMsg = `Mình đã tìm thấy một số ${categoryDisplay} cực kỳ phù hợp với yêu cầu hoa ${flowerDisplay} dưới đây nhé! Bạn có ưng mẫu nào không?`;
             
-            if (intent === 'ASK_PRICE') {
+            if (resolvedIntent === 'ASK_PRICE') {
                 replyMsg = `Dưới đây là giá của các ${categoryDisplay} hoa ${flowerDisplay} mà bạn quan tâm:`;
             }
 
@@ -124,8 +134,8 @@ class HydrangeaService {
             };
         }
 
-        // Với các Intent UNKNOWN hoặc khác
-        if (intent === 'UNKNOWN') {
+        // Với các Intent UNKNOWN thực sự (Không có entity nào bắt được)
+        if (resolvedIntent === 'UNKNOWN') {
              return {
                  success: true,
                  reply: "Mình chưa hiểu rõ ý bạn lắm. Bạn có thể nói rõ hơn về loài hoa, màu sắc hoặc dịp tặng (sinh nhật, khai trương...) mà bạn muốn không?",
