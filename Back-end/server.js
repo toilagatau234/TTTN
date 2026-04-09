@@ -19,6 +19,8 @@ const activityLogRoutes = require('./routes/activityLogRoutes');
 const recommendRoutes = require('./routes/recommendRoutes');
 const imageRoutes = require('./routes/imageRoutes');
 const path = require('path');
+const recommendController = require('./controllers/recommendController');
+
 
 
 
@@ -54,6 +56,10 @@ app.use('/api/stats', statsRoutes);
 app.use('/api/logs', activityLogRoutes);
 app.use('/api/recommend', recommendRoutes);
 app.use('/api/generate-image', imageRoutes);
+
+// New Simplified Recommendation API
+app.post('/api/recommend-products', recommendController.recommendProductsSimple);
+
 
 
 

@@ -19,11 +19,21 @@ exports.generateProductImage = async (req, res) => {
 
         // 2. Map Product Attributes to Assets
         // Logic: flower + color -> filename. Example: rose + red -> rose_red
-        const main_flower_type = (product.main_flowers && product.main_flowers.length > 0) 
-            ? product.main_flowers[0].toLowerCase() 
-            : 'rose';
         
-        const dominant_color = product.dominant_color ? product.dominant_color.toLowerCase() : 'red';
+        // TASK 5: SAFE EXTRACTION FOR IMAGE GENERATION
+        let main_flower_type = 'rose'; // Safe default
+        if (Array.isArray(product.main_flowers) && product.main_flowers.length > 0) {
+            const firstFlower = product.main_flowers[0];
+            if (typeof firstFlower === 'string') {
+                main_flower_type = firstFlower.toLowerCase();
+            } else if (firstFlower && typeof firstFlower.type === 'string') {
+                main_flower_type = firstFlower.type.toLowerCase();
+            }
+        }
+        
+        const dominant_color = (typeof product.dominant_color === 'string' && product.dominant_color.trim() !== '') 
+            ? product.dominant_color.toLowerCase() 
+            : 'red';
         
         // Asset mapping
         let mainFlowerAsset = `${main_flower_type}_${dominant_color}`;

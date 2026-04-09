@@ -50,13 +50,12 @@ class ProcessedResponse(BaseModel):
 
 
 class AnalyzeEntities(BaseModel):
-    """Entities được chuẩn hóa, sẵn sàng cho Node.js dùng."""
-    category: Optional[str] = None       # e.g. "basket", "bouquet", "box", "stand"
-    flower_types: List[str] = []         # e.g. ["rose", "tulip"]
-    color: Optional[str] = None          # e.g. "red"
-    occasion: Optional[str] = None       # e.g. "birthday"
-    style: Optional[str] = None          # e.g. "luxury"
-    confidence: Dict[str, float] = {}    # e.g. {"color": 0.9, "flower_types": 0.8}
+    """Entities được chuẩn hóa theo format STEP 3."""
+    occasion: Optional[str] = None
+    style: Optional[str] = None
+    color: Optional[str] = None
+    flowers: List[str] = []
+    layout: Optional[str] = None
 
 
 class AnalyzeResponse(BaseModel):

@@ -1,91 +1,107 @@
+const { normalizeString } = require('./normalizer');
+
 /**
  * Product Matcher Utility
- * 
- * Implement STEP 2: PRODUCT MATCHING FUNCTION
- * Scoring Rules:
- * score = category_match * 4 + 
- *         color_match * 3 + 
- *         occasion_match * 3 + 
- *         style_match * 2 + 
- *         flower_match * 1
+ * Handles scoring and matching logic for flower products based on AI-extracted filters.
  */
 
 /**
- * Normalizes category input for matching
- * @param {any} productCategory - The category field from the product (could be ID or populated object)
- * @returns {string} - The lowercased category name
+ * Normalizes string for safe comparison (lower, trim, dictionary)
  */
-const getCategoryName = (productCategory) => {
-    if (!productCategory) return '';
-    if (typeof productCategory === 'string') return productCategory.toLowerCase();
-    if (productCategory.name) return productCategory.name.toLowerCase();
-    if (productCategory.toString) return productCategory.toString().toLowerCase();
-    return '';
+const normalize = (value) => {
+    return normalizeString(value);
+};
+
+/**
+ * Safely checks if a normalized target exists partially in a normalized source array
+ * (Soft Matching Example: target="red", source=["dark red", "blue"])
+ */
+const matchInArray = (targetValue, sourceArray) => {
+    if (!targetValue || !Array.isArray(sourceArray)) return false;
+    const normalizedTarget = normalize(targetValue);
+    
+    // SOFT MATCH: Include check instead of strict ===
+    return sourceArray.some(item => {
+        const normalizedItem = normalize(item);
+        return normalizedItem.includes(normalizedTarget) || normalizedTarget.includes(normalizedItem);
+    });
 };
 
 /**
  * Matches products based on entities provided by AI pipeline
- * @param {Object} entities - The entities extracted from user request
- * @param {Array} products - List of products to match against
- * @returns {Array} - Top 5 matching products sorted by score DESC
+ * Each match satisfies the specific condition (Issue 7 requirement)
+ * 
+ * Weights:
+ * - Color: 3 (dominant_color OR secondary_colors)
+ * - Occasion: 3
+ * - Style: 2
+ * - Flowers: 1 (main_flowers.type)
+ * 
+ * @param {Object} filters - Standardized AI filters { color, occasion, style, flowers, layout }
+ * @param {Array} products - List of products from database
+ * @returns {Array} - All products with calculated 'matchScore'
  */
-const matchProducts = (entities = {}, products = []) => {
-    const scoredProducts = products.map(product => {
+const matchProducts = (filters = {}, products = []) => {
+    return products.map(product => {
         let score = 0;
 
-        // 1. Category Match (Weight: 4)
-        // exact match -> 1
-        const entityCategory = (entities.category || '').toLowerCase();
-        const productCategoryName = getCategoryName(product.category);
-        const categoryMatch = (entityCategory && productCategoryName === entityCategory) ? 1 : 0;
-        score += categoryMatch * 4;
+        // TASK 1 & 2: Safe Null Handling & Normalization
+        
+        // 1. Color Match (Weight: 3)
+        // match dominant_color OR secondary_colors with SOFT MATCHING
+        if (filters.color) {
+            const normalizedFilterColor = normalize(filters.color);
+            const normalizedDominantColor = normalize(product.dominant_color);
+            
+            // SOFT MATCH: (e.g., "red" matches "dark red")
+            const isDominantMatch = normalizedDominantColor.includes(normalizedFilterColor) || 
+                                    normalizedFilterColor.includes(normalizedDominantColor);
+            
+            const isSecondaryMatch = matchInArray(filters.color, product.secondary_colors);
+            
+            if (isDominantMatch || isSecondaryMatch) {
+                score += 3;
+            }
+        }
 
-        // 2. Color Match (Weight: 3)
-        // match dominant_color -> 1
-        const entityColor = (entities.color || '').toLowerCase();
-        const productDominantColor = (product.dominant_color || '').toLowerCase();
-        const colorMatch = (entityColor && productDominantColor === entityColor) ? 1 : 0;
-        score += colorMatch * 3;
+        // 2. Occasion Match (Weight: 3)
+        // TASK 4: Safe Array Matching
+        if (filters.occasion) {
+            if (matchInArray(filters.occasion, product.occasion)) {
+                score += 3;
+            }
+        }
 
-        // 3. Occasion Match (Weight: 3)
-        // if entities.occasion in product.occasion[] -> 1
-        const entityOccasion = (entities.occasion || '').toLowerCase();
-        const productOccasions = Array.isArray(product.occasion) 
-            ? product.occasion.map(o => o.toLowerCase()) 
-            : [];
-        const occasionMatch = (entityOccasion && productOccasions.includes(entityOccasion)) ? 1 : 0;
-        score += occasionMatch * 3;
+        // 3. Style Match (Weight: 2)
+        if (filters.style) {
+            if (matchInArray(filters.style, product.style)) {
+                score += 2;
+            }
+        }
 
-        // 4. Style Match (Weight: 2)
-        // if entities.style in product.style[] -> 1
-        const entityStyle = (entities.style || '').toLowerCase();
-        const productStyles = Array.isArray(product.style) 
-            ? product.style.map(s => s.toLowerCase()) 
-            : [];
-        const styleMatch = (entityStyle && productStyles.includes(entityStyle)) ? 1 : 0;
-        score += styleMatch * 2;
-
-        // 5. Flower Match (Weight: 1)
-        // if any entities.flower_types in product.main_flowers -> 1
-        const entityFlowerTypes = Array.isArray(entities.flower_types) 
-            ? entities.flower_types.map(f => f.toLowerCase()) 
-            : [];
-        const productMainFlowers = Array.isArray(product.main_flowers) 
-            ? product.main_flowers.map(f => f.toLowerCase()) 
-            : [];
-        const flowerMatch = (entityFlowerTypes.some(flower => productMainFlowers.includes(flower))) ? 1 : 0;
-        score += flowerMatch * 1;
+        // 4. Flower Match (Weight: 1)
+        // TASK 3: Correct Flower Matching (main_flowers.type) with SOFT MATCHING
+        if (Array.isArray(filters.flowers) && filters.flowers.length > 0) {
+            const aiFlowers = filters.flowers.map(f => normalize(f));
+            const productFlowers = Array.isArray(product.main_flowers) 
+                ? product.main_flowers.map(f => normalize(f.type)) 
+                : [];
+            
+            // If ANY AI flower SOFT-MATCHES product.main_flowers.type
+            if (aiFlowers.some(aiTarget => 
+                productFlowers.some(prodFlower => 
+                    prodFlower.includes(aiTarget) || aiTarget.includes(prodFlower)
+                )
+            )) {
+                score += 1;
+            }
+        }
 
         return {
             ...product.toObject ? product.toObject() : product,
             matchScore: score
         };
     });
-
-    // Sort by score DESC and return top 5
-    return scoredProducts
-        .sort((a, b) => b.matchScore - a.matchScore)
-        .slice(0, 5);
 };
 
 module.exports = {

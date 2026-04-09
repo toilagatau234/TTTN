@@ -11,9 +11,24 @@ const HydrangeaStudio = () => {
     const [inputText, setInputText] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [isAddingToCart, setIsAddingToCart] = useState(null); // productId đang add
+    
+    // ---- Search Recommendation States ----
+    const [searchQuery, setSearchQuery] = useState('');
+    const [isSearching, setIsSearching] = useState(false);
+    const [isAiGeneratedData, setIsAiGeneratedData] = useState(true); // TASK 6
+
+    // References for Debounce & Abort (TASK 3 & 4)
+    const abortControllerRef = useRef(null);
+    const debounceTimeoutRef = useRef(null);
 
     const [currentEntities, setCurrentEntities] = useState({});
     const [suggestedProducts, setSuggestedProducts] = useState([]);
+    
+    // ---- Image Generation States ----
+    const [generatedImage, setGeneratedImage] = useState(null);
+    const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+    const [selectedProduct, setSelectedProduct] = useState(null);
+    
     const [sessionId] = useState(() => `sess_${Math.random().toString(36).substring(2, 9)}`);
 
     const chatEndRef = useRef(null);
@@ -92,6 +107,104 @@ const HydrangeaStudio = () => {
             alert(errMsg);
         } finally {
             setIsAddingToCart(null);
+        }
+    };
+    
+    // Hàm gọi API thực tế kèm AbortController
+    const fetchQuickRecommendAPI = async (queryText) => {
+        if (!queryText.trim()) return;
+
+        // Cancel previous request if still pending
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+        }
+        
+        // Create new AbortController
+        abortControllerRef.current = new AbortController();
+        setIsSearching(true);
+
+        try {
+            const response = await axios.post('http://localhost:8080/api/recommend-products', {
+                text: queryText
+            }, {
+                signal: abortControllerRef.current.signal
+            });
+            
+            if (response.data && response.data.products) {
+                setSuggestedProducts(response.data.products);
+                
+                // Cập nhật UX Label (TASK 6)
+                if (typeof response.data.isAiGenerated !== 'undefined') {
+                    setIsAiGeneratedData(response.data.isAiGenerated);
+                }
+                
+                // Cập nhật info thực thể nếu có
+                if (response.data.filters) {
+                    setCurrentEntities(prev => ({ ...prev, ...response.data.filters }));
+                }
+            }
+        } catch (error) {
+            // Safe Error Handling & Task 7 Logging
+            if (axios.isCancel(error)) {
+                console.log("[Auto-search] Request canceled due to new input.");
+            } else {
+                console.error("[Auto-search] Quick Recommend Error:", error.message);
+                // We do not purely alert to avoid disturbing the user during typing
+            }
+        } finally {
+            setIsSearching(false);
+        }
+    };
+
+    // Hàm xử lý tìm kiếm sản phẩm nhanh (Debounce 500ms) - TASK 3
+    const handleQuickRecommend = (e) => {
+        if (e) e.preventDefault();
+        
+        // Clear old timeout to prevent rapid calls
+        if (debounceTimeoutRef.current) {
+            clearTimeout(debounceTimeoutRef.current);
+        }
+        
+        // Set new debounce timeout
+        debounceTimeoutRef.current = setTimeout(() => {
+            fetchQuickRecommendAPI(searchQuery);
+        }, 500); 
+    };
+
+    // Auto-trigger when search query changes significantly (Optional but good UX)
+    useEffect(() => {
+        handleQuickRecommend();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [searchQuery]);
+
+    const handleSelectProduct = async (product) => {
+        if (isGeneratingImage) return;
+        
+        setSelectedProduct(product);
+        setIsGeneratingImage(true);
+        setGeneratedImage(null); // Reset cũ
+        
+        try {
+            const response = await axios.post('http://localhost:8080/api/generate-image', {
+                product_id: product._id
+            });
+            
+            if (response.data.success) {
+                // Thêm tiền tố host vì backend trả về đường dẫn tương đối /public/...
+                const imageUrl = `http://localhost:8080${response.data.image_url}`;
+                setGeneratedImage(imageUrl);
+                
+                // Thêm tin nhắn bot chúc mừng
+                setMessages(prev => [...prev, {
+                    role: 'bot',
+                    text: `✨ Oa! Giỏ hoa ${product.name} của bạn đã được các nghệ nhân của Rosee hoàn thiện rồi đây. Bạn thấy thế nào?`
+                }]);
+            }
+        } catch (error) {
+            console.error("Image generation error:", error);
+            alert("Rất tiếc, hệ thống đang bận không thể cắm hoa ngay lúc này. Bạn thử lại sau nhé!");
+        } finally {
+            setIsGeneratingImage(false);
         }
     };
 
@@ -205,12 +318,35 @@ const HydrangeaStudio = () => {
                         {suggestedProducts.length > 0 ? (
                             <div className="relative z-10">
                                 {/* Tiêu đề gợi ý */}
-                                <div className="flex items-center gap-2 mb-6">
-                                    <div className="w-8 h-8 bg-pink-500 rounded-full flex items-center justify-center">
-                                        <Sparkles size={16} className="text-white" />
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <div className="w-8 h-8 bg-pink-500 rounded-full flex items-center justify-center">
+                                            <Sparkles size={16} className="text-white" />
+                                        </div>
+                                        <h3 className="text-lg font-bold text-gray-800">
+                                            {isAiGeneratedData ? '✨ Gợi Ý Dành Riêng Cho Bạn' : '🔥 Sản Phẩm Phổ Biến'}
+                                        </h3>
                                     </div>
-                                    <h3 className="text-lg font-bold text-gray-800">Gợi Ý Dành Riêng Cho Bạn</h3>
-                                </div>
+
+                                    
+                                    {/* Quick Search Bar */}
+                                    <div className="mb-6">
+                                        <form onSubmit={handleQuickRecommend} className="relative">
+                                            <input 
+                                                type="text"
+                                                placeholder="Mô tả nhanh mẫu hoa bạn muốn tìm..."
+                                                className="w-full bg-white border border-pink-200 text-sm px-4 py-3 rounded-xl pr-12 focus:outline-none focus:ring-2 focus:ring-pink-300 shadow-sm"
+                                                value={searchQuery}
+                                                onChange={(e) => setSearchQuery(e.target.value)}
+                                            />
+                                            <button 
+                                                type="submit"
+                                                disabled={isSearching}
+                                                className="absolute right-2 top-1/2 -translate-y-1/2 text-pink-500 hover:text-pink-600 p-2 cursor-pointer"
+                                            >
+                                                {isSearching ? <span className="animate-spin block w-4 h-4 border-2 border-pink-500 border-t-transparent rounded-full"></span> : <Search size={20} />}
+                                            </button>
+                                        </form>
+                                    </div>
 
                                 {/* Product Cards */}
                                 <div className="space-y-5">
@@ -268,7 +404,7 @@ const HydrangeaStudio = () => {
                                                         </div>
                                                     </div>
 
-                                                    <div className="flex items-end justify-between mt-3">
+                                                    <div className="flex items-end justify-between mt-3 gap-2">
                                                         <div>
                                                             <p className="text-pink-600 font-extrabold text-lg">
                                                                 {formatPrice(product.price)}
@@ -279,18 +415,26 @@ const HydrangeaStudio = () => {
                                                                 </p>
                                                             )}
                                                         </div>
-                                                        <button
-                                                            onClick={() => handleAddToCart(product._id)}
-                                                            disabled={isAddingToCart === product._id}
-                                                            className="bg-pink-500 hover:bg-pink-600 disabled:bg-pink-300 text-white text-xs font-semibold px-4 py-2 rounded-full shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
-                                                        >
-                                                            {isAddingToCart === product._id ? (
-                                                                <span className="animate-spin w-3 h-3 border-2 border-white border-t-transparent rounded-full"></span>
-                                                            ) : (
-                                                                <ShoppingCart size={14} />
-                                                            )}
-                                                            {isAddingToCart === product._id ? 'Đang thêm...' : 'Thêm giỏ'}
-                                                        </button>
+                                                        <div className="flex gap-2">
+                                                            <button
+                                                                onClick={() => handleSelectProduct(product)}
+                                                                className="border border-pink-500 text-pink-500 hover:bg-pink-50 text-[10px] font-bold px-3 py-2 rounded-full transition-all cursor-pointer"
+                                                            >
+                                                                Chọn
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleAddToCart(product._id)}
+                                                                disabled={isAddingToCart === product._id}
+                                                                className="bg-pink-500 hover:bg-pink-600 disabled:bg-pink-300 text-white text-[10px] font-bold px-4 py-2 rounded-full shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
+                                                            >
+                                                                {isAddingToCart === product._id ? (
+                                                                    <span className="animate-spin w-3 h-3 border-2 border-white border-t-transparent rounded-full"></span>
+                                                                ) : (
+                                                                    <ShoppingCart size={14} />
+                                                                )}
+                                                                {isAddingToCart === product._id ? 'Đang thêm...' : 'Thêm giỏ'}
+                                                            </button>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
@@ -315,11 +459,31 @@ const HydrangeaStudio = () => {
                                 </p>
                                 {/* Gợi ý nhanh */}
                                 <div className="mt-8 space-y-2 w-full max-w-xs">
-                                    <p className="text-xs text-gray-400 uppercase font-semibold tracking-wider">Thử hỏi:</p>
+                                    <p className="text-xs text-gray-400 uppercase font-semibold tracking-wider">Hoặc tìm kiếm nhanh:</p>
+                                    <form onSubmit={handleQuickRecommend} className="relative mb-4">
+                                        <input 
+                                            type="text"
+                                            placeholder="Gõ mô tả bó hoa bạn muốn..."
+                                            className="w-full bg-white border border-pink-200 text-sm px-4 py-3 rounded-xl pr-12 focus:outline-none focus:ring-2 focus:ring-pink-300 shadow-sm"
+                                            value={searchQuery}
+                                            onChange={(e) => setSearchQuery(e.target.value)}
+                                        />
+                                        <button 
+                                            type="submit"
+                                            className="absolute right-2 top-1/2 -translate-y-1/2 text-pink-500 cursor-pointer"
+                                        >
+                                            <Search size={20} />
+                                        </button>
+                                    </form>
+                                    <p className="text-xs text-gray-400 uppercase font-semibold tracking-wider">Gợi ý từ Hydrangea:</p>
                                     {['Giỏ hoa hồng đỏ tặng sinh nhật', 'Lẵng hoa sang trọng tone hồng', 'Hộp hoa hướng dương vui vẻ'].map((hint, i) => (
                                         <button
                                             key={i}
-                                            onClick={() => setInputText(hint)}
+                                            onClick={() => {
+                                                setSearchQuery(hint);
+                                                // Removed manual timeout since useEffect will handle it automatically
+                                            }}
+
                                             className="w-full text-left text-sm text-pink-600 bg-pink-50 hover:bg-pink-100 px-4 py-2.5 rounded-xl border border-pink-100 transition-colors cursor-pointer"
                                         >
                                             💬 {hint}
@@ -332,6 +496,85 @@ const HydrangeaStudio = () => {
 
                 </div>
             </div>
+            
+            {/* 1. Loading Overlay (Cắm hoa) */}
+            {isGeneratingImage && (
+                <div className="fixed inset-0 z-[60] flex flex-col items-center justify-center bg-white/80 backdrop-blur-md">
+                    <div className="relative w-40 h-40">
+                        <div className="absolute inset-0 border-4 border-pink-100 rounded-full"></div>
+                        <div className="absolute inset-0 border-4 border-pink-500 border-t-transparent rounded-full animate-spin"></div>
+                        <img src="/logo-rosee.png" className="absolute inset-8 w-24 h-24 object-contain animate-pulse" alt="Logo" />
+                    </div>
+                    <h3 className="mt-8 text-2xl font-bold text-gray-800 animate-bounce">Nghệ nhân đang cắm hoa...</h3>
+                    <p className="text-gray-500 italic">Vui lòng chờ trong giây lát bạn nhé! 🌸</p>
+                </div>
+            )}
+
+            {/* 2. Result Modal (Giỏ hoa hoàn thiện) */}
+            {generatedImage && (
+                <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
+                    <div className="bg-white rounded-3xl overflow-hidden shadow-2xl max-w-4xl w-full flex flex-col md:flex-row relative animate-in zoom-in-95 duration-300">
+                        {/* Close button */}
+                        <button 
+                            onClick={() => setGeneratedImage(null)}
+                            className="absolute top-4 right-4 w-10 h-10 bg-black/20 hover:bg-black/40 text-white rounded-full flex items-center justify-center transition-colors z-10 cursor-pointer"
+                        >
+                            ✕
+                        </button>
+
+                        {/* Image Panel */}
+                        <div className="w-full md:w-3/5 bg-gray-100 aspect-square md:aspect-auto">
+                            <img 
+                                src={generatedImage} 
+                                alt="Generated Basket" 
+                                className="w-full h-full object-cover"
+                            />
+                        </div>
+
+                        {/* Content Panel */}
+                        <div className="w-full md:w-2/5 p-8 flex flex-col justify-between bg-white">
+                            <div>
+                                <div className="flex items-center gap-2 mb-4">
+                                    <Sparkles className="text-yellow-400" size={24} />
+                                    <span className="text-xs font-bold text-pink-500 uppercase tracking-widest">Tuyệt tác hoàn thiện</span>
+                                </div>
+                                <h2 className="text-2xl font-extrabold text-gray-800 mb-2 leading-tight">
+                                    {selectedProduct?.name}
+                                </h2>
+                                <p className="text-gray-600 text-sm leading-relaxed mb-6">
+                                    Dựa trên yêu cầu của bạn, đây là phiên bản giỏ hoa thực tế được phối và cắm bởi nghệ nhân Rosee. Mọi thành phần đều được chọn lọc kỹ lưỡng để đảm bảo vẻ đẹp hoàn mỹ nhất.
+                                </p>
+                                
+                                <div className="space-y-4">
+                                    <div className="flex justify-between items-center bg-gray-50 p-4 rounded-2xl">
+                                        <span className="text-gray-500 font-medium">Giá sản phẩm</span>
+                                        <span className="text-2xl font-bold text-pink-600">{formatPrice(selectedProduct?.price)}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="mt-8 space-y-3">
+                                <button 
+                                    onClick={() => {
+                                        handleAddToCart(selectedProduct._id);
+                                        setGeneratedImage(null);
+                                    }}
+                                    className="w-full bg-pink-500 hover:bg-pink-600 text-white font-bold py-4 rounded-2xl shadow-lg shadow-pink-200 transition-all flex items-center justify-center gap-3 cursor-pointer"
+                                >
+                                    <ShoppingCart size={20} />
+                                    Đặt mua ngay
+                                </button>
+                                <button 
+                                    onClick={() => setGeneratedImage(null)}
+                                    className="w-full text-gray-400 hover:text-gray-600 text-sm font-medium py-2 transition-colors cursor-pointer"
+                                >
+                                    Tiếp tục thiết kế khác
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

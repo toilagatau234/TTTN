@@ -14,47 +14,53 @@ from app.models.schemas import AnalyzeResponse, ProcessedResponse, RawOutput
 
 logger = logging.getLogger("rosee.ai.pipeline")
 
-def run_ai_pipeline(text: str):
+def run_ai_pipeline(text: str) -> AnalyzeResponse:
     """
     Chạy toàn bộ quy trình phân tích AI cho một chuỗi văn bản.
-    
-    1. Phân loại Ý định (Intent)
-    2. Trích xuất Thực thể (NER)
-    3. Chuẩn hóa & Phân tích (Processing)
-    
-    Returns:
-        AnalyzeResponse: Đối tượng chứa intent và entities đã chuẩn hóa.
+    Đảm bảo KHÔNG bao giờ ném lỗi ra ngoài.
     """
-    # ── Bước A: Nhận diện Thực thể (NER) ──
-    ner_result = {"entities": {}, "avg_confidence": 0.0}
-    if ml_models.get("ner_available", False):
-        try:
-            ner_result = extract_entities(text)
-        except Exception as exc:
-            logger.warning(f"[Pipeline] NER failed, sử dụng fallback: {exc}")
+    try:
+        # ── Bước A: Nhận diện Thực thể (NER) ──
+        ner_result = {"entities": {}, "avg_confidence": 0.0}
+        if ml_models.get("ner_available", False):
+            try:
+                ner_result = extract_entities(text)
+            except Exception as exc:
+                logger.warning(f"[Pipeline] NER failed: {exc}")
 
-    # ── Bước B: Phân loại Ý định (Intent) ──
-    if not ml_models.get("intent"):
-        raise RuntimeError("Mô hình Intent chưa được tải.")
-    
-    intent_result = classify_intent(text)
+        # ── Bước B: Phân loại Ý định (Intent) ──
+        intent_result = {"intent": "UNKNOWN", "confidence": 0.0}
+        if ml_models.get("intent"):
+            try:
+                intent_result = classify_intent(text)
+            except Exception as exc:
+                logger.warning(f"[Pipeline] Intent failed: {exc}")
+        
+        # ── Bước C: Chuẩn hóa & Ánh xạ đầu ra ──
+        result = analyze_entities(
+            raw_ner=ner_result["entities"],
+            ner_avg_confidence=ner_result["avg_confidence"],
+            intent=intent_result["intent"],
+            intent_confidence=intent_result["confidence"],
+            original_text=text,
+            ner_scores=ner_result.get("scores", {})
+        )
+        
+        return result
 
-    # ── Bước C: Chuẩn hóa dữ liệu ──
-    result = analyze_entities(
-        raw_ner=ner_result["entities"],
-        ner_avg_confidence=ner_result["avg_confidence"],
-        intent=intent_result["intent"],
-        intent_confidence=intent_result["confidence"],
-        original_text=text,
-        ner_scores=ner_result.get("scores", {})
-    )
-
-    logger.info(
-        f"[Pipeline] Hoàn tất: intent={result.intent}, "
-        f"entities={result.entities.model_dump()}"
-    )
-    
-    return result
+    except Exception as exc:
+        logger.error(f"[Pipeline] Fatal error: {exc}", exc_info=True)
+        # Trả về fallback an toàn theo đúng schema yêu cầu
+        return AnalyzeResponse(
+            intent="UNKNOWN",
+            entities=AnalyzeEntities(
+                occasion=None,
+                style=None,
+                color=None,
+                flowers=[],
+                layout=None
+            )
+        )
 
 def run_processed_pipeline(text: str, debug: bool = False):
     """

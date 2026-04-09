@@ -191,23 +191,14 @@ def analyze_entities(
     occasion = normalize_occasion(raw_ner.get("OCCASION", "")) or scanned.get("occasion")
     style    = normalize_style(raw_ner.get("STYLE", "")) or scanned.get("style")
 
-    # Step 6: Confidence per entity
-    confidence: dict[str, float] = {}
-    label_map = {"flower_types": "FLOWER", "color": "COLOR", "occasion": "OCCASION", "style": "STYLE", "category": "CATEGORY"}
-    for field, label in label_map.items():
-        if ner_scores.get(label):
-            confidence[field] = ner_scores[label]
-        elif scanned.get(field):
-            confidence[field] = 0.8
-
+    # Step 6: Map to Standardized Output (lowercase normalization)
     return AnalyzeResponse(
         intent=intent,
         entities=AnalyzeEntities(
-            category=category,
-            flower_types=flower_types,
-            color=color,
-            occasion=occasion,
-            style=style,
-            confidence=confidence
+            occasion=occasion.lower() if occasion else None,
+            style=style.lower() if style else None,
+            color=color.lower() if color else None,
+            flowers=[f.lower() for f in flower_types],
+            layout=category.lower() if category else None
         ),
     )
