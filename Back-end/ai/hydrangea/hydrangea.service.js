@@ -21,11 +21,11 @@ class HydrangeaService {
         if (!sessions.has(sessionId)) {
             sessions.set(sessionId, {
                 entities: {
-                    flower_type: null,
+                    category: null,
+                    flower_types: [],
                     color: null,
                     occasion: null,
-                    style: null,
-                    layout: null
+                    style: null
                 },
                 history: []
             });
@@ -42,7 +42,7 @@ class HydrangeaService {
                  status: "suggesting",
                  suggestedProducts: suggestions
              };
-        }
+         }
 
         // Gọi FastAPI mới để phân tích câu chat
         let analyzeResult = null;
@@ -53,35 +53,41 @@ class HydrangeaService {
             console.log(`[Hydrangea] AI Service Response:`, analyzeResult);
         } catch (error) {
             console.error("[Hydrangea] Lỗi gọi AI Service:", error.message);
-            // Fallback logic in case AI is down
             return {
                 success: false,
-                reply: "Tin nhắn không gửi được. Xin lỗi, tổng đài AI đang bận. Vui lòng thử lại sau!",
+                reply: "Tin nhắn không gửi được. Xin lỗi, hệ thống AI đang bảo trì. Vui lòng thử lại sau!",
                 status: "error"
             };
         }
 
         const { intent, entities } = analyzeResult;
 
-        // Cập nhật session entities với những thông tin mới nhận được (bỏ qua null)
+        // ── Cập nhật session entities (Merge mới vào cũ) ──
         if (entities) {
-            Object.keys(entities).forEach(key => {
+            // Category, Color, Occasion, Style (Ghi đè nếu có giá trị mới)
+            ['category', 'color', 'occasion', 'style'].forEach(key => {
                 if (entities[key]) {
                     session.entities[key] = entities[key];
                 }
             });
+
+            // Flower Types (Merge danh sách loài hoa)
+            if (entities.flower_types && entities.flower_types.length > 0) {
+                const combined = new Set([...session.entities.flower_types, ...entities.flower_types]);
+                session.entities.flower_types = Array.from(combined);
+            }
         }
 
         console.log(`[Hydrangea] Session sau khi cập nhật:`, session.entities);
 
-        // CHẤM ĐIỂM (SCORING) SẢN PHẨM NẾU INTENT LÀ CREATE_BOUQUET hoặc ASK_PRICE_STOCK
-        if (intent === 'CREATE_BOUQUET' || intent === 'ASK_PRICE_STOCK') {
+        // ── Xử lý theo Intent chuẩn mới ──
+        if (intent === 'CREATE_FLOWER_BASKET' || intent === 'ASK_PRICE') {
             
-            // Nếu chưa có hoa chính VÀ chưa có màu, hỏi thêm
-            if (!session.entities.flower_type && !session.entities.color) {
+            // Nếu chưa có thông tin cốt lõi (Loài hoa hoặc Màu hoặc Loại hình), hỏi thêm
+            if (session.entities.flower_types.length === 0 && !session.entities.color && !session.entities.category) {
                 return {
                     success: true,
-                    reply: "Bạn muốn tìm mẫu hoa theo tone màu gì, hoặc sử dụng loài hoa chính nào không (ví dụ: hoa hồng, hướng dương...)?",
+                    reply: "Bạn muốn tìm mẫu hoa theo tông màu gì, loài hoa nào, hay kiểu dáng (giỏ, bó, lẵng) ra sao không?",
                     extractedEntities: session.entities,
                     status: "continue",
                     suggestedProducts: []
@@ -94,17 +100,19 @@ class HydrangeaService {
             if (suggestions.length === 0) {
                  return {
                     success: true,
-                    reply: "Tiếc quá, hiện kho Roseer chưa có mẫu nào đặc biệt nổi bật với đúng cấu hình hoa/màu sắc này. Bạn có muốn đổi sang tông màu khác như đỏ, hồng hoặc loài hoa khác không?",
+                    reply: "Tiếc quá, hiện kho Roseer chưa có mẫu nào khớp hoàn toàn với yêu cầu này. Bạn có muốn đổi sang tông màu khác hoặc loài hoa khác không?",
                     extractedEntities: session.entities,
                     status: "continue",
                     suggestedProducts: []
                  };
             }
 
-            let replyMsg = `Mình đã tìm thấy một số mẫu cực kỳ phù hợp với yêu cầu trang trí bằng hoa ${session.entities.flower_type || 'tự chọn'} tông ${session.entities.color || 'màu của bạn'} dưới đây nhé! Bạn có ưng mẫu nào không?`;
+            const flowerDisplay = session.entities.flower_types.join(', ') || 'tự chọn';
+            const categoryDisplay = session.entities.category || 'mẫu';
+            let replyMsg = `Mình đã tìm thấy một số ${categoryDisplay} cực kỳ phù hợp với yêu cầu hoa ${flowerDisplay} dưới đây nhé! Bạn có ưng mẫu nào không?`;
             
-            if (!session.entities.flower_type && session.entities.color) {
-                replyMsg = `Mình có những mẫu tông màu ${session.entities.color} này cực kỳ sang trọng. Bạn xem có thích món nào không nhé!`;
+            if (intent === 'ASK_PRICE') {
+                replyMsg = `Dưới đây là giá của các ${categoryDisplay} hoa ${flowerDisplay} mà bạn quan tâm:`;
             }
 
             return {
@@ -116,20 +124,11 @@ class HydrangeaService {
             };
         }
 
-        // Với các Intent khác (GREETING, CHECK_POLICY...)
-        if (intent === 'GREETING') {
+        // Với các Intent UNKNOWN hoặc khác
+        if (intent === 'UNKNOWN') {
              return {
                  success: true,
-                 reply: "Chào bạn! Mình là Trợ lý Hoa Của Rosee. Mình có thể gợi ý cho bạn những giỏ hoa đẹp nhất. Bạn muốn mua hoa cho dịp gì, và màu sắc thích hợp là gì?",
-                 extractedEntities: session.entities,
-                 status: "continue"
-             };
-        }
-        
-        if (intent === 'CHECK_POLICY') {
-              return {
-                 success: true,
-                 reply: "Rosee luôn cam kết chất lượng hoa! Mẫu được gợi ý từ kho đều có sẵn và được cắm cẩn thận. Bạn muốn mình gọi ý mẫu hoa nào hôm nay?",
+                 reply: "Mình chưa hiểu rõ ý bạn lắm. Bạn có thể nói rõ hơn về loài hoa, màu sắc hoặc dịp tặng (sinh nhật, khai trương...) mà bạn muốn không?",
                  extractedEntities: session.entities,
                  status: "continue"
              };
@@ -138,7 +137,7 @@ class HydrangeaService {
         // Fallback catch-all
         return {
             success: true,
-            reply: "Mình ghi nhận sở thích của bạn! Bạn có muốn bổ sung thêm hoa gì hay màu sắc nào khác không để mình tìm kiếm tốt hơn?",
+            reply: "Mình đã ghi nhận yêu cầu của bạn! Để mình tìm kiếm những mẫu hoa phù hợp nhất nhé.",
             extractedEntities: session.entities,
             status: "continue",
             suggestedProducts: []
@@ -157,30 +156,34 @@ class HydrangeaService {
         let scoredProducts = products.map(product => {
             let score = 0;
 
-            // 1. Match Layout (Bố cục - VD: lẵng, hộp, bó) => +3 điểm
-            if (entities.layout && product.layout && typeof product.layout === 'string') {
-                if (product.layout.toLowerCase() === entities.layout.toLowerCase()) {
-                    score += 3;
+            // 1. Match Category (Loại hình: basket, bouquet, box, stand) => +4 điểm
+            if (entities.category) {
+                const targetCat = entities.category.toLowerCase();
+                const productCat = (product.category && product.category.name) ? product.category.name.toLowerCase() : '';
+                const productLayout = product.layout ? product.layout.toLowerCase() : '';
+
+                if (productCat.includes(targetCat) || productLayout.includes(targetCat)) {
+                    score += 4;
                 }
             }
 
-            // 2. Match Hoa chính (Main flowers) => +5 điểm
-            if (entities.flower_type) {
-                const targetFlower = entities.flower_type.toLowerCase();
+            // 2. Match Flower Types (Hỗ trợ nhiều loài hoa) => +5 điểm mỗi loài
+            if (entities.flower_types && entities.flower_types.length > 0) {
                 const mainFlowers = (product.main_flowers || []).map(f => typeof f === 'string' ? f.toLowerCase() : '');
                 const productName = product.name ? product.name.toLowerCase() : '';
 
-                if (mainFlowers.includes(targetFlower) || productName.includes(targetFlower)) {
-                     score += 5;
-                }
+                entities.flower_types.forEach(targetFlower => {
+                    const flower = targetFlower.toLowerCase();
+                    if (mainFlowers.includes(flower) || productName.includes(flower)) {
+                        score += 5;
+                    }
+                });
             }
 
             // 3. Match Màu sắc (Dominant color) => +3 điểm
             if (entities.color) {
                 const targetColor = entities.color.toLowerCase();
                 const colorMatches = product.dominant_color && product.dominant_color.toLowerCase() === targetColor;
-                
-                // Fallback scan (do data cũ chưa có trường này)
                 const descMatches = product.description && product.description.toLowerCase().includes(targetColor);
                 const nameMatches = product.name && product.name.toLowerCase().includes(targetColor);
 
@@ -213,7 +216,7 @@ class HydrangeaService {
         // Lọc những sản phẩm thực sự liên quan (có điểm > 0)
         scoredProducts = scoredProducts.filter(p => p.aiScore > 0);
         
-        // Sắp xếp giảm dần theo điểm AI, nếu bằng điểm thì ưu tiên sản phẩm mới dể ý
+        // Sắp xếp giảm dần theo điểm AI, ưu tiên điểm cao nhất
         scoredProducts.sort((a, b) => b.aiScore - a.aiScore);
 
         // Trả về top 3 gợi ý phù hợp nhất

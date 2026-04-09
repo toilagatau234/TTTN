@@ -16,6 +16,11 @@ const wishlistRoutes = require('./routes/wishlistRoutes');
 const shippingRoutes = require('./routes/shippingRoutes');
 const statsRoutes = require('./routes/statsRoutes');
 const activityLogRoutes = require('./routes/activityLogRoutes');
+const recommendRoutes = require('./routes/recommendRoutes');
+const imageRoutes = require('./routes/imageRoutes');
+const path = require('path');
+
+
 
 
 dotenv.config();
@@ -27,6 +32,10 @@ const app = express();
 app.use(cors()); // Cho phép React gọi API
 app.use(express.json({ limit: '50mb' })); // Đọc dữ liệu JSON (giới hạn 50MB)
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
+// Serve static files from 'public' folder
+app.use('/public', express.static(path.join(__dirname, 'public')));
+
 
 // Routes
 app.use('/api/auth', authRoutes);
@@ -43,6 +52,10 @@ app.use('/api/wishlist', wishlistRoutes);
 app.use('/api/shipping', shippingRoutes);
 app.use('/api/stats', statsRoutes);
 app.use('/api/logs', activityLogRoutes);
+app.use('/api/recommend', recommendRoutes);
+app.use('/api/generate-image', imageRoutes);
+
+
 
 
 // Cổng chạy
