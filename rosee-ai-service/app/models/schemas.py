@@ -2,7 +2,7 @@
 app/models/schemas.py — All Pydantic request/response schemas.
 """
 from pydantic import BaseModel, Field
-from typing import Dict, Optional, Any
+from typing import Dict, Optional, Any, List
 
 
 # ── Request ──────────────────────────────────────────────────────────────────
@@ -49,14 +49,14 @@ class ProcessedResponse(BaseModel):
     debug: Optional[Dict[str, Any]] = None   # populated when request.debug=True
 
 
-# ── Analyze (Bước 3 — Clean Output) ────────────────────────────────────
 class AnalyzeEntities(BaseModel):
     """Entities được chuẩn hóa, sẵn sàng cho Node.js dùng."""
-    flower_type: Optional[str] = None    # e.g. "rose"
+    category: Optional[str] = None       # e.g. "basket", "bouquet", "box", "stand"
+    flower_types: List[str] = []         # e.g. ["rose", "tulip"]
     color: Optional[str] = None          # e.g. "red"
     occasion: Optional[str] = None       # e.g. "birthday"
     style: Optional[str] = None          # e.g. "luxury"
-    layout: Optional[str] = None         # e.g. "round", "heart"
+    confidence: Dict[str, float] = {}    # e.g. {"color": 0.9, "flower_types": 0.8}
 
 
 class AnalyzeResponse(BaseModel):

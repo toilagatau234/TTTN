@@ -3,7 +3,7 @@ const express = require('express');
 const router = express.Router();
 
 // Import các controllers
-const hydrangeaController = require('../controllers/hydrangeaController');
+const hydrangeaController = require('../ai/hydrangea/hydrangea.controller');
 
 // ==========================================
 // Routes cho Trợ lý Hydrangea (AI Thiết Kế Giỏ Hoa)

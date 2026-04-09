@@ -45,7 +45,20 @@ def classify_intent(text: str) -> dict:
         intent = "Out_Of_Domain"
         forced_ood = True
 
-    logger.debug(f"[Intent] Result: intent={intent}, confidence={confidence}")
+    # ── Map raw labels to simplified intents ─────────────────────────────
+    # Mapping: 
+    #   CREATE_BOUQUET -> CREATE_FLOWER_BASKET
+    #   ASK_PRICE_STOCK -> ASK_PRICE
+    #   Others -> UNKNOWN
+    
+    label_map = {
+        "CREATE_BOUQUET": "CREATE_FLOWER_BASKET",
+        "ASK_PRICE_STOCK": "ASK_PRICE"
+    }
+    
+    intent = label_map.get(intent, "UNKNOWN")
+    
+    logger.debug(f"[Intent] Final Result: intent={intent}, confidence={confidence}")
 
     return {
         "intent": intent,

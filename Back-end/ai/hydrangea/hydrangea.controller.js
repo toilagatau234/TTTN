@@ -1,4 +1,4 @@
-const hydrangeaService = require('../services/hydrangea.service');
+const hydrangeaService = require('./hydrangea.service');
 
 exports.chatWithHydrangea = async (req, res) => {
     try {

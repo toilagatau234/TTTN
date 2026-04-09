@@ -1,5 +1,5 @@
 const axios = require('axios');
-const Product = require('../models/Product');
+const Product = require('../../models/Product');
 
 // Quản lý session hội thoại đơn giản
 const sessions = new Map();

@@ -118,15 +118,25 @@ COLOR_MAP: dict[str, str] = {
     "đậm": "dark",
 }
 
+# ── Category Map (Loại hình sản phẩm — Chuẩn hóa Step 2) ──────────────────────
+CATEGORY_MAP: dict[str, str] = {
+    "giỏ": "basket",
+    "lẵng": "basket",
+    "giỏ hoa": "basket",
+    "lẵng hoa": "basket",
+    "bó": "bouquet",
+    "bó hoa": "bouquet",
+    "hộp": "box",
+    "hộp hoa": "box",
+    "kệ": "stand",
+    "kệ hoa": "stand",
+}
+
 # ── Wrapper / Packaging Map ──────────────────────────────────────────────────
 WRAPPER_MAP: dict[str, str] = {
     "giấy kraft": "kraft paper",
     "kraft": "kraft paper",
     "giấy": "paper",
-    "hộp": "box",
-    "hộp carton": "cardboard box",
-    "giỏ": "basket",
-    "lẵng": "basket",
     "túi": "bag",
     "túi vải": "fabric bag",
     "nơ": "ribbon",
@@ -135,8 +145,6 @@ WRAPPER_MAP: dict[str, str] = {
     "vải tuyn": "tulle",
     "đơn giản": "simple wrap",
     "sang trọng": "luxury wrap",
-    "bó": "bouquet",
-    "bó hoa": "bouquet",
 }
 
 # ── Occasion Map ─────────────────────────────────────────────────────────────
@@ -217,13 +225,6 @@ LAYOUT_MAP: dict[str, str] = {
     "dạng thác": "cascade",
     "thẳng đứng": "vertical",
     "nằm ngang": "horizontal",
-    # Loại giỏ / bó
-    "giỏ": "basket",
-    "lẵng": "basket",
-    "bó": "bouquet",
-    "bó hoa": "bouquet",
-    "hộp": "box",
-    "hộp hoa": "box",
     # Mật độ
     "dày": "dense",
     "dày đặc": "dense",
@@ -233,6 +234,9 @@ LAYOUT_MAP: dict[str, str] = {
 
 
 # ── Public API ────────────────────────────────────────────────────────────────
+def normalize_category(value: str) -> Optional[str]:
+    return _fuzzy_lookup(value, CATEGORY_MAP)
+
 def normalize_flower(value: str) -> Optional[str]:
     return _fuzzy_lookup(value, FLOWER_MAP)
 
@@ -264,13 +268,14 @@ def keyword_scan(text: str) -> dict:
     result: dict = {}
 
     # Try each map in priority order
-    for map_name, mapping, key_name in [
-        ("flower", FLOWER_MAP, "flower"),
-        ("color", COLOR_MAP, "color"),
-        ("occasion", OCCASION_MAP, "occasion"),
-        ("wrapper", WRAPPER_MAP, "wrapper"),
-        ("style", STYLE_MAP, "style"),
-        ("layout", LAYOUT_MAP, "layout"),
+    for mapping, key_name in [
+        (CATEGORY_MAP, "category"),
+        (FLOWER_MAP, "flower"),
+        (COLOR_MAP, "color"),
+        (OCCASION_MAP, "occasion"),
+        (WRAPPER_MAP, "wrapper"),
+        (STYLE_MAP, "style"),
+        (LAYOUT_MAP, "layout"),
     ]:
         for viet_key, eng_val in mapping.items():
             if viet_key in text_lower:

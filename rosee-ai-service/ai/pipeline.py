@@ -46,6 +46,7 @@ def run_ai_pipeline(text: str):
         intent=intent_result["intent"],
         intent_confidence=intent_result["confidence"],
         original_text=text,
+        ner_scores=ner_result.get("scores", {})
     )
 
     logger.info(
