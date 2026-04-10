@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&display=swap');
 @import "tailwindcss";
 /* @plugin "daisyui"; */
 
@@ -12,7 +12,7 @@ body {
 
 /* Fix lỗi Tailwind làm mất background mặc định của AntD Layout */
 .ant-layout {
-  background: #f0f2f5;
+  background: var(--color-neutral-50, #f0f3f8);
 }
 
 /* Đảm bảo các menu không bị dính style list của Tailwind */
@@ -37,28 +37,28 @@ ul.ant-menu {
   --color-nature-soft: #f7fee7;
 
   /* Neutral (Sophisticated Gray) */
-  --color-neutral-50: #f9fafb;
-  --color-neutral-100: #f3f4f6;
-  --color-neutral-200: #e5e7eb;
-  --color-neutral-300: #d1d5db;
-  --color-neutral-400: #9ca3af;
-  --color-neutral-500: #6b7280;
-  --color-neutral-600: #4b5563;
-  --color-neutral-700: #374151;
-  --color-neutral-800: #111827;
-  --color-neutral-900: #030712;
+  --color-neutral-50: #f0f3f8; /* Xanh xám mát mẻ, tăng tương phản */
+  --color-neutral-100: #e4e9f2;
+  --color-neutral-200: #cbd5e1;
+  --color-neutral-300: #94a3b8;
+  --color-neutral-400: #64748b;
+  --color-neutral-500: #475569;
+  --color-neutral-600: #334155;
+  --color-neutral-700: #1e293b;
+  --color-neutral-800: #0f172a;
+  --color-neutral-900: #020617;
 
   /* Navy (Admin context) */
-  --color-navy-700: #2b3674;
-  --color-navy-800: #1b254b;
+  --color-navy-700: #111c44; /* Sâu sắc, rõ nét hơn */
+  --color-navy-800: #0b1437;
 
-  /* Shadows */
-  --shadow-premium: 0 10px 30px -5px rgba(0, 0, 0, 0.05), 0 4px 10px -2px rgba(0, 0, 0, 0.02);
-  --shadow-hover: 0 20px 40px -10px rgba(0, 0, 0, 0.1);
+  /* Shadows - Tăng độ nổi của khối */
+  --shadow-premium: 0 10px 40px -10px rgba(17, 28, 68, 0.08), 0 4px 12px -5px rgba(17, 28, 68, 0.04);
+  --shadow-hover: 0 20px 50px -10px rgba(17, 28, 68, 0.12), 0 10px 20px -8px rgba(17, 28, 68, 0.05);
 
   /* Fonts */
-  --font-sans: "Inter", "system-ui", sans-serif;
-  --font-heading: "DM Sans", sans-serif;
+  --font-sans: "Plus Jakarta Sans", "system-ui", sans-serif;
+  --font-heading: "Plus Jakarta Sans", sans-serif;
 }
 
 body {

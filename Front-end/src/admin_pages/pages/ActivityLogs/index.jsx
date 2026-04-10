@@ -52,6 +52,10 @@ const ActivityLogsPage = () => {
       case 'UPDATE': return <Tag color="blue" className="font-bold">CẬP NHẬT</Tag>;
       case 'DELETE': return <Tag color="red" className="font-bold">XÓA BỎ</Tag>;
       case 'BLOCK': return <Tag color="magenta" className="font-bold">KHÓA</Tag>;
+      case 'IMPORT_GOODS': return <Tag color="cyan" className="font-bold">NHẬP KHO</Tag>;
+      case 'STOCK_ADJUST_ADD': return <Tag color="processing" className="font-bold">KIỂM KÊ (TĂNG)</Tag>;
+      case 'STOCK_ADJUST_SUB': return <Tag color="warning" className="font-bold">BÁO HỦY (GIẢM)</Tag>;
+      case 'STOCK_ADJUSTMENT_BULK': return <Tag color="orange" className="font-bold">ĐIỀU CHỈNH KHO</Tag>;
       default: return <Tag color="default">{action}</Tag>;
     }
   };
@@ -133,6 +137,9 @@ const ActivityLogsPage = () => {
                   <Option value="CREATE">Thêm mới</Option>
                   <Option value="UPDATE">Cập nhật</Option>
                   <Option value="DELETE">Xóa</Option>
+                  <Option value="IMPORT_GOODS">Nhập kho</Option>
+                  <Option value="STOCK_ADJUST_ADD">Kiểm kê (Tăng)</Option>
+                  <Option value="STOCK_ADJUST_SUB">Báo hủy (Giảm)</Option>
                </Select>
             </div>
          </div>

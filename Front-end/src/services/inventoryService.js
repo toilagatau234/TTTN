@@ -30,6 +30,11 @@ const inventoryService = {
   },
   createAdjustment: (data) => {
     return axiosClient.post(ADJUSTMENT_ENDPOINT, data);
+  },
+  
+  // --- STATS ---
+  getStats: () => {
+    return axiosClient.get(`${INVENTORY_ENDPOINT}/stats`);
   }
 };
 

@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Modal, Form, Input, Select, Switch, Upload, message, Button } from 'antd';
 import { LoadingOutlined, PlusOutlined } from '@ant-design/icons';
+import ReactQuill from 'react-quill';
+import 'react-quill/dist/quill.snow.css';
 
 const { Option } = Select;
 const { TextArea } = Input;
@@ -19,20 +21,22 @@ const CreateBlogModal = ({ open, onCancel, onCreate }) => {
 
   const handleOk = async () => {
     try {
+      if (!imageUrl) {
+         message.error('Vui lòng chọn ảnh đại diện cho bài viết');
+         return;
+      }
       const values = await form.validateFields();
-      const newBlog = {
-        key: Date.now(),
-        id: Math.floor(Math.random() * 1000),
-        thumbnail: imageUrl || 'https://via.placeholder.com/150',
-        author: 'Admin',
-        date: new Date().toLocaleDateString('vi-VN'),
-        ...values,
-        status: values.status ? 'Published' : 'Draft'
-      };
-      onCreate(newBlog);
+      if (!values.content || values.content.trim() === '<p><br></p>') {
+         message.error('Vui lòng nhập nội dung bài viết');
+         return;
+      }
+
+      onCreate(
+        { ...values, status: values.status ? 'Published' : 'Draft' },
+        imageUrl
+      );
       form.resetFields();
       setImageUrl(null);
-      message.success('Đăng bài viết thành công!');
     } catch (error) { console.log(error); }
   };
 
@@ -87,8 +91,8 @@ const CreateBlogModal = ({ open, onCancel, onCreate }) => {
             <TextArea rows={2} className="rounded-xl" />
         </Form.Item>
 
-        <Form.Item name="content" label="Nội dung chính">
-            <TextArea rows={8} className="rounded-xl" placeholder="Nội dung bài viết (Hỗ trợ Markdown hoặc HTML cơ bản)..." />
+        <Form.Item name="content" label="Nội dung chính" required>
+            <ReactQuill theme="snow" className="bg-white rounded-xl h-[300px] mb-12" placeholder="Nội dung bài viết..." />
         </Form.Item>
       </Form>
     </Modal>

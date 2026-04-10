@@ -24,10 +24,17 @@ const HydrangeaStudio = () => {
     const [currentEntities, setCurrentEntities] = useState({});
     const [suggestedProducts, setSuggestedProducts] = useState([]);
     
-    // ---- Image Generation States ----
     const [generatedImage, setGeneratedImage] = useState(null);
     const [isGeneratingImage, setIsGeneratingImage] = useState(false);
     const [selectedProduct, setSelectedProduct] = useState(null);
+    
+    // ---- Custom Basket States (TASK 3) ----
+    const [customBasket, setCustomBasket] = useState({
+        products: [],
+        flowers: [],
+        colors: [],
+        totalPrice: 0
+    });
     
     const [sessionId] = useState(() => `sess_${Math.random().toString(36).substring(2, 9)}`);
 
@@ -148,7 +155,7 @@ const HydrangeaStudio = () => {
             if (axios.isCancel(error)) {
                 console.log("[Auto-search] Request canceled due to new input.");
             } else {
-                console.error("[Auto-search] Quick Recommend Error:", error.message);
+                console.error("[Frontend Auto-search] Quick Recommend Error:", error);
                 // We do not purely alert to avoid disturbing the user during typing
             }
         } finally {
@@ -156,9 +163,15 @@ const HydrangeaStudio = () => {
         }
     };
 
-    // Hàm xử lý tìm kiếm sản phẩm nhanh (Debounce 500ms) - TASK 3
+    // Hàm xử lý tìm kiếm sản phẩm nhanh (Debounce 400ms) - TASK 3
     const handleQuickRecommend = (e) => {
-        if (e) e.preventDefault();
+        if (e) {
+            e.preventDefault();
+            // Nếu có event (Enter), clear timeout và gọi ngay
+            if (debounceTimeoutRef.current) clearTimeout(debounceTimeoutRef.current);
+            fetchQuickRecommendAPI(searchQuery);
+            return;
+        }
         
         // Clear old timeout to prevent rapid calls
         if (debounceTimeoutRef.current) {
@@ -168,45 +181,75 @@ const HydrangeaStudio = () => {
         // Set new debounce timeout
         debounceTimeoutRef.current = setTimeout(() => {
             fetchQuickRecommendAPI(searchQuery);
-        }, 500); 
+        }, 400); 
     };
 
-    // Auto-trigger when search query changes significantly (Optional but good UX)
-    useEffect(() => {
+    const handleSearchInputChange = (e) => {
+        setSearchQuery(e.target.value);
+        // Only trigger API via debounce when user stops typing
         handleQuickRecommend();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [searchQuery]);
+    };
 
-    const handleSelectProduct = async (product) => {
+    const handleSelectProduct = (product) => {
         if (isGeneratingImage) return;
         
-        setSelectedProduct(product);
+        setCustomBasket(prev => {
+            const newProducts = [...prev.products, product];
+            const newFlowers = [...prev.flowers, ...(product.main_flowers || [])];
+            const newColors = product.dominant_color ? [...prev.colors, product.dominant_color] : prev.colors;
+            
+            // Deduplicate
+            const uniqueFlowers = [...new Set(newFlowers)];
+            const uniqueColors = [...new Set(newColors)];
+            const newTotal = prev.totalPrice + (product.price || 0);
+
+            return {
+                ...prev,
+                products: newProducts,
+                flowers: uniqueFlowers,
+                colors: uniqueColors,
+                totalPrice: newTotal
+            };
+        });
+        
+        setMessages(prev => [...prev, {
+            role: 'bot',
+            text: `Đã thêm ${product.name} vào giỏ hoa tự chọn của bạn! Nhấn "Tạo giỏ hoa từ lựa chọn" để xem kết quả nhé.`
+        }]);
+    };
+
+    const handleGenerateCustomImage = async () => {
+        if (isGeneratingImage || customBasket.products.length === 0) return;
+        
+        // Use the base (first) product or last, depending on logic. Let's use the most recently added for layout
+        const baseProduct = customBasket.products[customBasket.products.length - 1];
+        setSelectedProduct(baseProduct);
         setIsGeneratingImage(true);
-        setGeneratedImage(null); // Reset cũ
+        setGeneratedImage(null); // Reset cũ, Clear previous image before rendering new one (Issue 4)
         
         try {
             const response = await axios.post('http://localhost:8080/api/generate-image', {
-                product_id: product._id
+                product_id: baseProduct._id
             });
             
             if (response.data.success) {
-                // Thêm tiền tố host vì backend trả về đường dẫn tương đối /public/...
                 const imageUrl = `http://localhost:8080${response.data.image_url}`;
                 setGeneratedImage(imageUrl);
                 
-                // Thêm tin nhắn bot chúc mừng
                 setMessages(prev => [...prev, {
                     role: 'bot',
-                    text: `✨ Oa! Giỏ hoa ${product.name} của bạn đã được các nghệ nhân của Rosee hoàn thiện rồi đây. Bạn thấy thế nào?`
+                    text: `✨ Oa! Giỏ hoa kết hợp của bạn đã hoàn thiện rồi đây. Bạn thấy thế nào?`
                 }]);
             }
         } catch (error) {
-            console.error("Image generation error:", error);
+            console.error("[Frontend] Image generation API error:", error);
             alert("Rất tiếc, hệ thống đang bận không thể cắm hoa ngay lúc này. Bạn thử lại sau nhé!");
         } finally {
             setIsGeneratingImage(false);
         }
     };
+
+    // Removed old handleSelectProduct API call here
 
     // Helper hiển thị Entities
     const renderEntitiesInfo = () => {
@@ -336,7 +379,7 @@ const HydrangeaStudio = () => {
                                                 placeholder="Mô tả nhanh mẫu hoa bạn muốn tìm..."
                                                 className="w-full bg-white border border-pink-200 text-sm px-4 py-3 rounded-xl pr-12 focus:outline-none focus:ring-2 focus:ring-pink-300 shadow-sm"
                                                 value={searchQuery}
-                                                onChange={(e) => setSearchQuery(e.target.value)}
+                                                onChange={handleSearchInputChange}
                                             />
                                             <button 
                                                 type="submit"
@@ -347,6 +390,47 @@ const HydrangeaStudio = () => {
                                             </button>
                                         </form>
                                     </div>
+
+                                {/* Custom Basket Feature UI */}
+                                {customBasket.products.length > 0 && (
+                                    <div className="mb-6 p-4 bg-white rounded-2xl shadow-sm border border-pink-200">
+                                        <div className="flex items-center justify-between mb-3">
+                                            <h4 className="font-bold text-pink-600 text-sm">Giỏ Hoa Tự Chọn Của Bạn</h4>
+                                            <span className="bg-pink-100 text-pink-700 text-xs px-2 py-0.5 rounded-full font-bold">
+                                                {customBasket.products.length} sản phẩm
+                                            </span>
+                                        </div>
+                                        <div className="flex flex-wrap gap-1 mb-3">
+                                            {customBasket.flowers.map((f, i) => (
+                                                <span key={i} className="text-[10px] bg-green-50 text-green-600 px-2 py-0.5 rounded-full border border-green-200">
+                                                    {f}
+                                                </span>
+                                            ))}
+                                            {customBasket.colors.map((c, i) => (
+                                                <span key={i} className="text-[10px] bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full border border-purple-200">
+                                                    {c}
+                                                </span>
+                                            ))}
+                                        </div>
+                                        <div className="flex items-center justify-between mt-2 pt-2 border-t border-pink-50">
+                                            <span className="text-gray-600 font-medium text-sm">Tổng tạm tính:</span>
+                                            <span className="text-pink-600 font-extrabold">{formatPrice(customBasket.totalPrice)}</span>
+                                        </div>
+                                        <button 
+                                            onClick={handleGenerateCustomImage}
+                                            disabled={isGeneratingImage}
+                                            className="mt-4 w-full bg-pink-500 hover:bg-pink-600 text-white font-bold py-2 rounded-xl text-sm transition-all shadow-md cursor-pointer"
+                                        >
+                                            👉 Tạo giỏ hoa từ lựa chọn
+                                        </button>
+                                        <button 
+                                            onClick={() => setCustomBasket({ products: [], flowers: [], colors: [], totalPrice: 0 })}
+                                            className="mt-2 w-full text-gray-500 hover:text-gray-700 text-xs font-medium py-1 transition-all cursor-pointer"
+                                        >
+                                            Xoá lựa chọn
+                                        </button>
+                                    </div>
+                                )}
 
                                 {/* Product Cards */}
                                 <div className="space-y-5">
@@ -466,7 +550,7 @@ const HydrangeaStudio = () => {
                                             placeholder="Gõ mô tả bó hoa bạn muốn..."
                                             className="w-full bg-white border border-pink-200 text-sm px-4 py-3 rounded-xl pr-12 focus:outline-none focus:ring-2 focus:ring-pink-300 shadow-sm"
                                             value={searchQuery}
-                                            onChange={(e) => setSearchQuery(e.target.value)}
+                                            onChange={handleSearchInputChange}
                                         />
                                         <button 
                                             type="submit"
@@ -547,8 +631,8 @@ const HydrangeaStudio = () => {
                                 
                                 <div className="space-y-4">
                                     <div className="flex justify-between items-center bg-gray-50 p-4 rounded-2xl">
-                                        <span className="text-gray-500 font-medium">Giá sản phẩm</span>
-                                        <span className="text-2xl font-bold text-pink-600">{formatPrice(selectedProduct?.price)}</span>
+                                        <span className="text-gray-500 font-medium">Giá tổng sản phẩm hợp nhất</span>
+                                        <span className="text-2xl font-bold text-pink-600">{formatPrice(customBasket.totalPrice > 0 ? customBasket.totalPrice : selectedProduct?.price)}</span>
                                     </div>
                                 </div>
                             </div>

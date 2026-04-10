@@ -104,20 +104,50 @@ exports.recommendProductsSimple = async (req, res) => {
 
 
         // ISSUE 2 — IGNORE INTENT
-        // If intent !== "CREATE_FLOWER_BASKET" -> return fallback
-        if (intent !== 'CREATE_FLOWER_BASKET') {
-            console.log(`[Recommend API] Ignored intent fallback triggered.`);
-            const defaultProducts = await Product.find({ status: 'active' })
-                .sort({ createdAt: -1 })
-                .limit(5)
-                .populate('category', 'name')
-                .lean();
+        // If intent !== "CREATE_FLOWER_BASKET" -> check entities before fallback
+        // NEW RULE: IF entities contain meaningful data (color OR flowers OR occasion), treat as valid and continue.
+        // ONLY fallback if: both intent UNKNOWN AND entities empty
+        
+        const hasMeaningfulData = entities && (
+            (entities.flower_types && entities.flower_types.length > 0) ||
+            entities.flowers && entities.flowers.length > 0 ||
+            entities.color ||
+            entities.occasion ||
+            entities.category ||
+            entities.style
+        );
 
-            return res.status(200).json({
-                filters: {},
-                products: defaultProducts,
-                isAiGenerated: false
-            });
+        if (intent !== 'CREATE_FLOWER_BASKET') {
+            if (intent === 'UNKNOWN' && !hasMeaningfulData) {
+                console.log(`[Recommend API] Fallback triggered: Intent UNKNOWN and no entities.`);
+                const defaultProducts = await Product.find({ status: 'active' })
+                    .sort({ createdAt: -1 })
+                    .limit(5)
+                    .populate('category', 'name')
+                    .lean();
+
+                return res.status(200).json({
+                    filters: {},
+                    products: defaultProducts,
+                    isAiGenerated: false
+                });
+            } else if (!hasMeaningfulData && intent !== 'CREATE_FLOWER_BASKET' && intent !== 'UNKNOWN') {
+                // E.g. Intent is GREETING, gracefully fallback as well
+                console.log(`[Recommend API] Fallback triggered: Intent ${intent} and no entities.`);
+                const defaultProducts = await Product.find({ status: 'active' })
+                    .sort({ createdAt: -1 })
+                    .limit(5)
+                    .populate('category', 'name')
+                    .lean();
+
+                return res.status(200).json({
+                    filters: {},
+                    products: defaultProducts,
+                    isAiGenerated: false
+                });
+            } else {
+                console.log(`[Recommend API] Intent is ${intent} but entities found, proceeding with recommendation.`);
+            }
         }
 
         // 1. Fetch all active products

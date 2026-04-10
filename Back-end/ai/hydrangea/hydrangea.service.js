@@ -85,7 +85,12 @@ class HydrangeaService {
         
         // Nếu AI phân loại Intent = UNKNOWN nhưng MÀ vẫn trích xuất được thực thể (Loài hoa, màu sắc...)
         // -> Chuyển intent thành CREATE_FLOWER_BASKET để bot tiếp tục báo giá và tư vấn
-        const hasCoreEntities = session.entities.flower_types.length > 0 || session.entities.color || session.entities.category;
+        const hasCoreEntities = (session.entities.flower_types && session.entities.flower_types.length > 0) || 
+                                session.entities.color || 
+                                session.entities.category ||
+                                session.entities.occasion ||
+                                session.entities.style;
+
         if (intent === 'UNKNOWN' && hasCoreEntities) {
             resolvedIntent = 'CREATE_FLOWER_BASKET';
             console.log(`[Hydrangea] Tự động ép Intent từ UNKNOWN sang CREATE_FLOWER_BASKET do có chứa Entities.`);
@@ -94,7 +99,7 @@ class HydrangeaService {
         if (resolvedIntent === 'CREATE_FLOWER_BASKET' || resolvedIntent === 'ASK_PRICE') {
             
             // Nếu chưa có thông tin cốt lõi (Loài hoa hoặc Màu hoặc Loại hình), hỏi thêm
-            if (session.entities.flower_types.length === 0 && !session.entities.color && !session.entities.category) {
+            if ((!session.entities.flower_types || session.entities.flower_types.length === 0) && !session.entities.color && !session.entities.category) {
                 return {
                     success: true,
                     reply: "Bạn muốn tìm mẫu hoa theo tông màu gì, loài hoa nào, hay kiểu dáng (giỏ, bó, lẵng) ra sao không?",

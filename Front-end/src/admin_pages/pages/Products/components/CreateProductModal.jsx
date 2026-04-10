@@ -289,8 +289,14 @@ const CreateProductModal = ({ open, onCancel, onSuccess, initialData }) => {
                 name="stock"
                 rules={[{ required: true, message: 'Vui lòng nhập số lượng!' }]}
                 className="mb-1"
+                tooltip={initialData ? "Để đảm bảo quy trình kiểm toán, vui lòng sử dụng chức năng 'Kiểm Kê / Báo Hủy' để thay đổi số lượng tồn kho." : undefined}
               >
-                <InputNumber className="w-full rounded-xl border-gray-200" size="large" min={0} />
+                <InputNumber 
+                  className="w-full rounded-xl border-gray-200" 
+                  size="large" 
+                  min={0} 
+                  disabled={!!initialData}
+                />
               </Form.Item>
             </div>
           </div>

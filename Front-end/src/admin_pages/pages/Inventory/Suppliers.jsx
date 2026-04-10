@@ -1,27 +1,53 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Table, Button, Input, Modal, Form, message, Card } from 'antd';
 import { PlusOutlined, SearchOutlined, PhoneOutlined, EnvironmentOutlined, ShopOutlined } from '@ant-design/icons';
+import inventoryService from '../../../services/inventoryService';
 
 const SuppliersPage = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [form] = Form.useForm();
+  const [suppliers, setSuppliers] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
 
-  // Dữ liệu giả 
-  const [suppliers, setSuppliers] = useState([
-    { key: '1', name: 'Vườn Hoa Đà Lạt Hasfarm', phone: '0263 382 1234', address: '450 Nguyên Tử Lực, Đà Lạt', products: 15 },
-    { key: '2', name: 'Hoa Nhập Khẩu Hà Lan', phone: '0909 888 777', address: 'Quận 1, TP.HCM', products: 8 },
-  ]);
+  const fetchSuppliers = async () => {
+    try {
+      setLoading(true);
+      const res = await inventoryService.getSuppliers({ keyword: searchTerm });
+      if (res.success) {
+        // Map backend _id to antd key
+        const mappedData = res.data.map(item => ({
+          ...item,
+          key: item._id,
+          products: item.products || 0 // Thống kê tuỳ chỉnh thêm sau
+        }));
+        setSuppliers(mappedData);
+      }
+    } catch (error) {
+      message.error('Lỗi tải danh sách nhà cung cấp!');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  const handleAdd = (values) => {
-    const newSupplier = {
-      key: Date.now(),
-      ...values,
-      products: 0
-    };
-    setSuppliers([newSupplier, ...suppliers]);
-    setIsModalOpen(false);
-    form.resetFields();
-    message.success('Thêm nhà cung cấp thành công!');
+  useEffect(() => {
+    // Debounce basic for search term
+    const timer = setTimeout(() => {
+      fetchSuppliers();
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  const handleAdd = async (values) => {
+    try {
+      await inventoryService.createSupplier(values);
+      message.success('Thêm nhà cung cấp thành công!');
+      setIsModalOpen(false);
+      form.resetFields();
+      fetchSuppliers(); // Refresh table
+    } catch (error) {
+      message.error(error.response?.data?.message || 'Có lỗi xảy ra khi thêm NCC');
+    }
   };
 
   const columns = [
@@ -45,9 +71,9 @@ const SuppliersPage = () => {
     },
     {
       title: 'SỐ LẦN NHẬP',
-      dataIndex: 'products',
-      key: 'products',
-      render: (val) => <span className="font-bold text-brand-500">{val} lần</span>
+      dataIndex: 'importCount',
+      key: 'importCount',
+      render: (val) => <span className="font-bold text-brand-500">{val || 0} lần</span>
     }
   ];
 
@@ -62,9 +88,15 @@ const SuppliersPage = () => {
 
       <Card className="rounded-[20px] shadow-sm border-none">
          <div className="mb-4">
-            <Input prefix={<SearchOutlined />} placeholder="Tìm nhà cung cấp..." className="w-[300px] rounded-xl h-[40px] bg-[#F4F7FE] border-none" />
+            <Input 
+              prefix={<SearchOutlined />} 
+              placeholder="Tìm nhà cung cấp..." 
+              className="w-[300px] rounded-xl h-[40px] bg-[#F4F7FE] border-none" 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
          </div>
-         <Table columns={columns} dataSource={suppliers} pagination={false} className="custom-table-metrix" />
+         <Table loading={loading} columns={columns} dataSource={suppliers} pagination={false} className="custom-table-metrix" />
       </Card>
 
       <Modal title="Thêm Nhà Cung Cấp" open={isModalOpen} onCancel={() => setIsModalOpen(false)} onOk={() => form.submit()} centered>

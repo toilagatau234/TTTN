@@ -10,9 +10,13 @@ const renderer = require('../utils/image/renderer');
 exports.generateProductImage = async (req, res) => {
     try {
         const { product_id } = req.body;
+        console.log('[Image Generation Input] req.body:', req.body);
 
         // 1. Fetch product from DB
         const product = await Product.findById(product_id);
+        if (product) {
+            console.log('[Selected Product] Generate image for product:', product.name, product._id);
+        }
         if (!product) {
             return res.status(404).json({ success: false, message: 'Sản phẩm không tồn tại' });
         }

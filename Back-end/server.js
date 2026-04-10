@@ -20,7 +20,10 @@ const recommendRoutes = require('./routes/recommendRoutes');
 const imageRoutes = require('./routes/imageRoutes');
 const path = require('path');
 const recommendController = require('./controllers/recommendController');
-
+const supplierRoutes = require('./routes/supplierRoutes');
+const inventoryRoutes = require('./routes/inventoryRoutes');
+const bannerRoutes = require('./routes/bannerRoutes');
+const blogRoutes = require('./routes/blogRoutes');
 
 
 
@@ -56,6 +59,10 @@ app.use('/api/stats', statsRoutes);
 app.use('/api/logs', activityLogRoutes);
 app.use('/api/recommend', recommendRoutes);
 app.use('/api/generate-image', imageRoutes);
+app.use('/api/suppliers', supplierRoutes);
+app.use('/api/inventory', inventoryRoutes);
+app.use('/api/banners', bannerRoutes);
+app.use('/api/blogs', blogRoutes);
 
 // New Simplified Recommendation API
 app.post('/api/recommend-products', recommendController.recommendProductsSimple);

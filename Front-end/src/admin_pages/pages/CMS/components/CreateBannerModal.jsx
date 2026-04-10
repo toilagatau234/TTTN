@@ -19,15 +19,15 @@ const CreateBannerModal = ({ open, onCancel, onCreate }) => {
 
   const handleOk = async () => {
     try {
+      if (!imageUrl) {
+         message.error('Vui lòng chọn hình ảnh Banner');
+         return;
+      }
       const values = await form.validateFields();
-      const newBanner = {
-        key: Date.now(),
-        id: Math.floor(Math.random() * 1000),
-        image: imageUrl || 'https://via.placeholder.com/800x300',
-        ...values,
-        status: values.status ? 'Active' : 'Inactive'
-      };
-      onCreate(newBanner);
+      onCreate(
+        { ...values, status: values.status ? 'Active' : 'Inactive' },
+        imageUrl
+      );
       form.resetFields();
       setImageUrl(null);
       message.success('Thêm banner thành công!');

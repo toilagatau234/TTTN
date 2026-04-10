@@ -22,6 +22,7 @@ import Register from './client_pages/pages/Auth/Register/Register';
 import AccountLocked from './client_pages/pages/Auth/AccountLocked/AccountLocked';
 import ForgotPassword from './client_pages/pages/Auth/ForgotPassword/ForgotPassword';
 import Error from './client_pages/pages/Error/Error';
+import BlogDetail from './client_pages/pages/Blog/BlogDetail';
 
 function App() {
   return (
@@ -40,6 +41,7 @@ function App() {
           <Route path="customDesign" element={<HydrangeaStudio />} />
           <Route path="miniGame" element={<MiniGame />} />
           <Route path="product/:id" element={<ProductDetail />} />
+          <Route path="blog/:slug" element={<BlogDetail />} />
           <Route path="profile" element={<Profile />} />
           <Route path="shop" element={<Shop />} />
           <Route path="wishlist" element={<Wishlist />} />

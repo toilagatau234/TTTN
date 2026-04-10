@@ -3,6 +3,7 @@ import Features from "../../components/common/user/Features/Features"
 import ProductCard from "../../components/common/user/ProductCard/ProductCard"
 import Banner from "../../components/common/user/Banner/Banner"
 import productService from "../../../services/productService"
+import blogService from "../../../services/blogService"
 import { Link } from "react-router-dom"
 
 import Slider from "react-slick"
@@ -11,23 +12,26 @@ import "slick-carousel/slick/slick-theme.css"
 
 const Home = () => {
   const [featuredProducts, setFeaturedProducts] = useState([]);
+  const [blogs, setBlogs] = useState([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const fetchFeatured = async () => {
+    const fetchHomeData = async () => {
       setLoading(true);
       try {
-        const res = await productService.getAll({ limit: 8, status: 'active' });
-        if (res.success) {
-          setFeaturedProducts(res.data);
-        }
+        const [prodRes, blogRes] = await Promise.all([
+           productService.getAll({ limit: 8, status: 'active' }),
+           blogService.getAll({ limit: 4, status: 'Published' })
+        ]);
+        if (prodRes.success) setFeaturedProducts(prodRes.data);
+        if (blogRes.success) setBlogs(blogRes.data);
       } catch (error) {
-        console.error("Lỗi tải sản phẩm nổi bật:", error);
+        console.error("Lỗi tải trang chủ:", error);
       } finally {
         setLoading(false);
       }
     };
-    fetchFeatured();
+    fetchHomeData();
   }, []);
 
   const settings = {
@@ -114,6 +118,47 @@ const Home = () => {
                 </svg>
               </Link>
           </div>
+        </div>
+      </section>
+
+      {/* BLOG SECTION */}
+      <section className="py-24 bg-white">
+        <div className="container mx-auto px-6">
+           <div className="text-center mb-16 px-4">
+             <span className="text-nature-primary font-bold tracking-[0.2em] uppercase text-xs mb-3 block">
+               Góc Yêu Hoa
+             </span>
+             <h2 className="text-4xl md:text-5xl font-extrabold text-neutral-900 mt-2">
+               Tin Tức & <span className="text-pink-500 italic">Kiến Thức</span>
+             </h2>
+             <div className="w-20 h-1.5 bg-nature-primary mx-auto mt-6 rounded-full opacity-30"></div>
+           </div>
+
+           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+             {blogs.map(blog => (
+                <div key={blog._id} className="bg-neutral-50 rounded-2xl overflow-hidden shadow-sm hover:shadow-premium transition-all duration-300 flex flex-col">
+                   <div className="relative h-48 overflow-hidden group">
+                      <Link to={`/blog/${blog.slug}`}>
+                         <img src={blog.thumbnail?.url} alt={blog.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
+                      </Link>
+                      <div className="absolute top-3 left-3 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-bold text-brand-primary">
+                         {blog.category}
+                      </div>
+                   </div>
+                   <div className="p-6 flex flex-col flex-1">
+                      <div className="text-gray-400 text-xs mb-3 flex items-center gap-2">
+                         <span>📅 {new Date(blog.createdAt).toLocaleDateString('vi-VN')}</span>
+                         <span>👁️ {blog.views} lượt xem</span>
+                      </div>
+                      <Link to={`/blog/${blog.slug}`} className="hover:text-brand-primary transition-colors">
+                         <h3 className="font-bold text-lg text-navy-700 mb-2 line-clamp-2 leading-snug">{blog.title}</h3>
+                      </Link>
+                      <p className="text-gray-500 text-sm line-clamp-3 mb-4 flex-1">{blog.summary}</p>
+                      <Link to={`/blog/${blog.slug}`} className="text-brand-primary font-bold text-sm hover:underline mt-auto">Đọc tiếp &rarr;</Link>
+                   </div>
+                </div>
+             ))}
+           </div>
         </div>
       </section>
 

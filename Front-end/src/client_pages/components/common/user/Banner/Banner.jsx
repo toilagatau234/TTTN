@@ -1,6 +1,53 @@
-import { Link } from "react-router-dom"
+import React, { useState, useEffect } from 'react';
+import { Link } from "react-router-dom";
+import Slider from "react-slick";
+import bannerService from "../../../../../services/bannerService";
+import "slick-carousel/slick/slick.css";
+import "slick-carousel/slick/slick-theme.css";
 
 const Banner = () => {
+  const [banners, setBanners] = useState([]);
+
+  useEffect(() => {
+     const fetchActive = async () => {
+        try {
+           const res = await bannerService.getActive();
+           if (res.success) setBanners(res.data);
+        } catch (error) {
+           console.log("Không tải được banner", error);
+        }
+     };
+     fetchActive();
+  }, []);
+
+  const settings = {
+      dots: true,
+      infinite: true,
+      speed: 800,
+      slidesToShow: 1,
+      slidesToScroll: 1,
+      autoplay: true,
+      autoplaySpeed: 4000,
+      fade: true,
+      arrows: false
+  };
+
+  if (banners.length > 0) {
+      return (
+          <div className="w-full relative overflow-hidden bg-neutral-50 mb-10">
+              <Slider {...settings} className="w-full">
+                  {banners.map((item) => (
+                      <div key={item._id} className="w-full relative outline-none">
+                          <Link to={item.link || '#'}>
+                             <img src={item.image.url} alt={item.title} className="w-full object-cover max-h-[600px] object-center" />
+                          </Link>
+                      </div>
+                  ))}
+              </Slider>
+          </div>
+      );
+  }
+
   return (
     <section className="relative overflow-hidden bg-gradient-to-r from-[#fff0f5] to-[#f0fff4]">
 
