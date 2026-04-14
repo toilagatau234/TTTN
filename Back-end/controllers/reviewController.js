@@ -6,7 +6,7 @@ const Order = require('../models/Order');
 // @route   POST /api/reviews
 const createReview = async (req, res) => {
     try {
-        const { productId, rating, comment, images, orderId } = req.body;
+        const { productId, rating, comment, images } = req.body;
 
         if (!productId || !rating || !comment) {
             return res.status(400).json({
@@ -21,20 +21,18 @@ const createReview = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Sản phẩm không tồn tại' });
         }
 
-        // Kiểm tra user đã mua sản phẩm chưa (tùy chọn)
-        if (orderId) {
-            const order = await Order.findOne({
-                _id: orderId,
-                user: req.user._id,
-                status: 'delivered',
-                'items.product': productId,
+        // BẮT BUỘC: Kiểm tra user đã mua sản phẩm chưa và đơn hàng đã giao thành công
+        const deliveredOrder = await Order.findOne({
+            user: req.user._id,
+            status: 'delivered',
+            'items.product': productId,
+        });
+
+        if (!deliveredOrder) {
+            return res.status(400).json({
+                success: false,
+                message: 'Bạn chỉ có thể đánh giá sản phẩm đã mua và đã nhận hàng thành công',
             });
-            if (!order) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'Bạn chỉ có thể đánh giá sản phẩm đã mua và đã nhận hàng',
-                });
-            }
         }
 
         // Kiểm tra đã review chưa
@@ -49,7 +47,7 @@ const createReview = async (req, res) => {
         const review = await Review.create({
             user: req.user._id,
             product: productId,
-            order: orderId || undefined,
+            order: deliveredOrder._id, // Tự động lấy order gần nhất đã mua
             rating,
             comment,
             images: images || [],
@@ -88,6 +86,25 @@ const getProductReviews = async (req, res) => {
             .skip((page - 1) * limit)
             .limit(Number(limit));
 
+        // Kiểm tra xem user hiện tại đã mua sản phẩm này chưa để hiển thị nút đánh giá
+        let canReview = false;
+        let userReview = null;
+
+        if (req.user) {
+            const deliveredOrder = await Order.findOne({
+                user: req.user._id,
+                status: 'delivered',
+                'items.product': productId,
+            });
+            
+            if (deliveredOrder) {
+                canReview = true;
+                // Nếu đã review rồi thì không được review nữa
+                userReview = await Review.findOne({ user: req.user._id, product: productId });
+                if (userReview) canReview = false;
+            }
+        }
+
         // Thống kê rating
         const stats = await Review.aggregate([
             { $match: { product: require('mongoose').Types.ObjectId.createFromHexString(productId), isApproved: true } },
@@ -106,10 +123,109 @@ const getProductReviews = async (req, res) => {
             success: true,
             data: reviews,
             ratingBreakdown,
+            canReview,
+            userReview,
             pagination: { total, page: Number(page), limit: Number(limit), totalPages: Math.ceil(total / limit) },
         });
     } catch (error) {
         console.error('Get product reviews error:', error.message);
+        res.status(500).json({ success: false, message: 'Lỗi server' });
+    }
+};
+
+// @desc    Cập nhật đánh giá
+// @route   PUT /api/reviews/:id
+const updateReview = async (req, res) => {
+    try {
+        const { rating, comment, images } = req.body;
+        let review = await Review.findById(req.params.id);
+
+        if (!review) {
+            return res.status(404).json({ success: false, message: 'Đánh giá không tồn tại' });
+        }
+
+        // Chỉ chủ review mới sửa được
+        if (review.user.toString() !== req.user._id.toString()) {
+            return res.status(403).json({ success: false, message: 'Bạn không có quyền sửa đánh giá này' });
+        }
+
+        review.rating = rating || review.rating;
+        review.comment = comment || review.comment;
+        if (images) review.images = images;
+
+        // Lưu để trigger middleware tính lại averageRating
+        await review.save();
+
+        res.json({
+            success: true,
+            message: 'Cập nhật đánh giá thành công',
+            data: review,
+        });
+    } catch (error) {
+        console.error('Update review error:', error.message);
+        res.status(500).json({ success: false, message: 'Lỗi server' });
+    }
+};
+
+// @desc    Thích/Bỏ thích đánh giá
+// @route   PUT /api/reviews/:id/like
+const likeReview = async (req, res) => {
+    try {
+        const review = await Review.findById(req.params.id);
+
+        if (!review) {
+            return res.status(404).json({ success: false, message: 'Đánh giá không tồn tại' });
+        }
+
+        // Kiểm tra xem đã like chưa
+        const index = review.likes.indexOf(req.user._id);
+
+        if (index === -1) {
+            review.likes.push(req.user._id);
+        } else {
+            review.likes.splice(index, 1);
+        }
+
+        await review.save();
+
+        res.json({
+            success: true,
+            data: {
+                likesCount: review.likes.length,
+                isLiked: index === -1 // Trả về true nếu vừa mới like
+            }
+        });
+    } catch (error) {
+        console.error('Like review error:', error.message);
+        res.status(500).json({ success: false, message: 'Lỗi server' });
+    }
+};
+
+// @desc    Admin: Phản hồi đánh giá
+// @route   PUT /api/reviews/:id/reply
+const replyReview = async (req, res) => {
+    try {
+        const { reply } = req.body;
+        if (!reply) {
+            return res.status(400).json({ success: false, message: 'Vui lòng nhập nội dung phản hồi' });
+        }
+
+        const review = await Review.findById(req.params.id);
+        if (!review) {
+            return res.status(404).json({ success: false, message: 'Đánh giá không tồn tại' });
+        }
+
+        review.reply = reply;
+        review.repliedAt = Date.now();
+        await review.save();
+
+        res.json({
+            success: true,
+            message: 'Đã gửi phản hồi thành công',
+            data: review,
+        });
+    } catch (error) {
+        console.error('Reply review error:', error.message);
         res.status(500).json({ success: false, message: 'Lỗi server' });
     }
 };
@@ -142,10 +258,13 @@ const deleteReview = async (req, res) => {
 // @route   GET /api/reviews
 const getAllReviews = async (req, res) => {
     try {
-        const { page = 1, limit = 20, isApproved } = req.query;
+        const { page = 1, limit = 20, isApproved, rating, product, user } = req.query;
 
         const filter = {};
         if (isApproved !== undefined) filter.isApproved = isApproved === 'true';
+        if (rating) filter.rating = Number(rating);
+        if (product) filter.product = product;
+        if (user) filter.user = user;
 
         const total = await Review.countDocuments(filter);
         const reviews = await Review.find(filter)
@@ -192,6 +311,9 @@ const toggleApproveReview = async (req, res) => {
 module.exports = {
     createReview,
     getProductReviews,
+    updateReview,
+    likeReview,
+    replyReview,
     deleteReview,
     getAllReviews,
     toggleApproveReview,

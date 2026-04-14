@@ -1,29 +1,27 @@
 """
-app/services/entity_processor.py — Core business logic layer.
+ai/entity/entity_processor.py — Core business logic layer v3.
 
-Converts raw NER output + intent into a fully structured, Node.js-ready
-response. This is the CRITICAL processing layer that bridges AI output
-with your e-commerce backend.
-
-Pipeline:
-  raw NER dict
-    → normalize entities (Vietnamese → English)
-    → extract quantity (NER + regex)
-    → apply keyword fallback if NER is sparse
-    → compute unified confidence score
-    → return ProcessedData
+Output JSON chuẩn:
+{
+  flower_types: [],      # tất cả loài hoa detect được
+  colors: [],            # tất cả màu sắc
+  occasion: "",
+  target: "",
+  budget: number,
+  style: "",
+  role_hint: {}          # { "rose": "main", "orchid": "secondary" }
+}
 """
 import logging
-from typing import Optional
+import re
+from typing import Optional, List, Dict
+
 from app.models.schemas import ProcessedData, AnalyzeEntities, AnalyzeResponse
 from app.utils.normalizer import (
-    normalize_flower,
-    normalize_color,
-    normalize_category,
-    normalize_wrapper,
-    normalize_occasion,
-    normalize_style,
-    keyword_scan,
+    normalize_flower, normalize_color, normalize_category,
+    normalize_wrapper, normalize_occasion, normalize_style,
+    keyword_scan, scan_all_flowers, scan_all_colors,
+    extract_role_hints, extract_target,
 )
 from app.utils.quantity_extractor import extract_quantity
 from app.config import INTENT_WEIGHT, NER_WEIGHT
@@ -31,13 +29,9 @@ from app.config import INTENT_WEIGHT, NER_WEIGHT
 logger = logging.getLogger("rosee.processor")
 
 
+# ── Price helpers ────────────────────────────────────────────────────────────
 def _extract_price_hint(text: str, raw_ner: dict) -> Optional[str]:
-    """
-    Extract raw price mention as a string hint (not normalized to int).
-    Node.js can interpret this further (e.g. "500k", "1 triệu").
-    """
-    import re
-    # Match patterns like: 500k, 1 triệu, 2tr, 300.000
+    """Extract raw price string từ text hoặc NER."""
     price_patterns = [
         r"\d+(?:[.,]\d+)*\s*(?:triệu|tr|k|nghìn|ngàn|đồng|vnđ|vnd)",
     ]
@@ -45,14 +39,155 @@ def _extract_price_hint(text: str, raw_ner: dict) -> Optional[str]:
         m = re.search(pat, text, re.IGNORECASE)
         if m:
             return m.group(0).strip()
-
-    # Use NER PRICE label if present
     if "PRICE" in raw_ner:
         return raw_ner["PRICE"]
-
     return None
 
 
+def _normalize_budget(price_hint: Optional[str]) -> Optional[int]:
+    """
+    "500k" → 500000, "1 triệu" → 1000000, "300.000" → 300000
+    """
+    if not price_hint:
+        return None
+    text = price_hint.lower().strip()
+    m = re.search(r"([\d.,]+)\s*(triệu|trieu|tr|nghìn|nghin|k)?", text)
+    if not m:
+        return None
+    num_str = m.group(1).replace(',', '').replace('.', '')
+    try:
+        num = int(num_str)
+    except ValueError:
+        return None
+    unit = (m.group(2) or '').lower()
+    if unit in ('triệu', 'trieu', 'tr'):
+        num *= 1_000_000
+    elif unit in ('nghìn', 'nghin', 'k'):
+        num *= 1_000
+    return num
+
+
+# ── Modify-intent detection helpers ─────────────────────────────────────────
+MODIFY_PATTERNS = [
+    r"đổi\s+(.+?)\s+(?:thành|sang)\s+(.+?)(?:\s|$)",
+    r"thay\s+(.+?)\s+(?:bằng|thành)\s+(.+?)(?:\s|$)",
+    r"bỏ\s+(.+?)(?:\s|$)",
+    r"thêm\s+(.+?)(?:\s|$)",
+]
+
+def detect_modify_ops(text: str) -> List[Dict]:
+    """
+    Detect modify operations từ text.
+    Returns list of { op: 'replace'|'remove'|'add', from: str|None, to: str }
+    """
+    ops = []
+    text_lower = text.lower()
+    # Replace: "đổi hoa hồng thành hoa lan"
+    for pat in [r"(?:đổi|thay)\s+(.+?)\s+(?:thành|sang|bằng)\s+(.+?)(?:[,.]|$)"]:
+        for m in re.finditer(pat, text_lower):
+            ops.append({ "op": "replace", "from": m.group(1).strip(), "to": m.group(2).strip() })
+    # Remove: "bỏ hoa hồng"
+    for m in re.finditer(r"bỏ\s+(.+?)(?:[,.]|$)", text_lower):
+        ops.append({ "op": "remove", "from": m.group(1).strip(), "to": None })
+    # Add: "thêm hoa cúc"
+    for m in re.finditer(r"thêm\s+(.+?)(?:[,.]|$)", text_lower):
+        ops.append({ "op": "add", "from": None, "to": m.group(1).strip() })
+    return ops
+
+
+# ── Core analyze function ─────────────────────────────────────────────────────
+def analyze_entities(
+    raw_ner: dict,
+    ner_avg_confidence: float,
+    intent: str,
+    intent_confidence: float,
+    original_text: str,
+    ner_scores: dict = {}
+) -> AnalyzeResponse:
+    """
+    Trả về AnalyzeResponse với format chuẩn v3.
+    
+    Key improvements:
+    - scan_all_flowers() — detect nhiều loài hoa
+    - scan_all_colors() — detect nhiều màu
+    - extract_role_hints() — ROLE_MAIN / ROLE_SECONDARY
+    - extract_target() — người nhận
+    - detect_modify_ops() — phân tích lệnh chỉnh sửa
+    """
+    # ── Keyword scan fallback ─────────────────────────────────────────────────
+    scanned = keyword_scan(original_text)
+
+    # ── Flower types: TẤT CẢ matches (NER + keyword scan) ───────────────────
+    flower_types: List[str] = []
+
+    # Từ NER (có thể có nhiều FLOWER spans — entities_multi đã gộp)
+    flower_raw = raw_ner.get("FLOWER", "")
+    if flower_raw:
+        # NER có thể trả "rose orchid" nếu nhiều span — split và normalize
+        for word in flower_raw.split():
+            norm = normalize_flower(word)
+            if norm and norm not in flower_types:
+                flower_types.append(norm)
+
+    # Keyword scan — collect ALL flowers từ text thô
+    scanned_flowers = scan_all_flowers(original_text)
+    for sf in scanned_flowers:
+        if sf not in flower_types:
+            flower_types.append(sf)
+
+    # ── Colors: TẤT CẢ matches ───────────────────────────────────────────────
+    colors: List[str] = []
+    color_raw = raw_ner.get("COLOR", "")
+    if color_raw:
+        norm_color = normalize_color(color_raw)
+        if norm_color:
+            colors.append(norm_color)
+    scanned_colors = scan_all_colors(original_text)
+    for sc_color in scanned_colors:
+        if sc_color not in colors:
+            colors.append(sc_color)
+    # Sunflower color default
+    if not colors and "sunflower" in flower_types:
+        colors = ["yellow"]
+
+    # ── Others ───────────────────────────────────────────────────────────────
+    category = normalize_category(raw_ner.get("CATEGORY", "")) or scanned.get("category")
+    occasion = normalize_occasion(raw_ner.get("OCCASION", "")) or scanned.get("occasion")
+    style    = normalize_style(raw_ner.get("STYLE", "")) or scanned.get("style")
+    target   = extract_target(original_text, raw_ner)
+
+    # ── Price + Budget ────────────────────────────────────────────────────────
+    price_hint = _extract_price_hint(original_text, raw_ner)
+    budget = _normalize_budget(price_hint)
+
+    # ── Role hints ────────────────────────────────────────────────────────────
+    role_hint = extract_role_hints(original_text, flower_types)
+
+    # ── Modify ops (chỉ khi intent == MODIFY) ────────────────────────────────
+    modify_ops = []
+    if intent in ("MODIFY", "modify", "chỉnh sửa"):
+        modify_ops = detect_modify_ops(original_text)
+
+    return AnalyzeResponse(
+        intent=intent,
+        entities=AnalyzeEntities(
+            occasion=occasion.lower() if occasion else None,
+            style=style.lower() if style else None,
+            color=colors[0].lower() if colors else None,   # compat field
+            colors=[c.lower() for c in colors],
+            flowers=flower_types,                          # compat field
+            flower_types=flower_types,
+            layout=category.lower() if category else None,
+            price_hint=price_hint,
+            budget=budget,
+            target=target,
+            role_hint=role_hint,
+            modify_ops=modify_ops,
+        ),
+    )
+
+
+# ── Backward-compat process_entities ─────────────────────────────────────────
 def process_entities(
     raw_ner: dict,
     ner_avg_confidence: float,
@@ -61,67 +196,25 @@ def process_entities(
     intent_confidence: float,
     original_text: str,
 ) -> ProcessedData:
-    """
-    Convert raw NER entities → fully structured ProcessedData.
-
-    Args:
-        raw_ner:            label→string from ner_service.extract_entities()["entities"]
-        ner_avg_confidence: avg NER confidence from ner_service
-        ner_scores:         per-label confidence from ner_service
-        intent:             classified intent string
-        intent_confidence:  intent model confidence score
-        original_text:      the raw user input (for fallback + qty extraction)
-
-    Returns:
-        ProcessedData schema instance
-    """
-    logger.debug(f"[Processor] raw_ner={raw_ner}, intent={intent}")
-
-    # ── Step 1: Normalize Each Entity ──────────────────────────────────────
     scanned = keyword_scan(original_text)
-    
-    # 1a. Category
     category = normalize_category(raw_ner.get("CATEGORY", "")) or scanned.get("category")
-
-    # 1b. Flower Types (Support multiple)
-    # Use raw_ner as fallback if keyword_scan is missing
     flower_input = raw_ner.get("FLOWER", "")
     flower_types = []
     if flower_input:
-        flower_norm = normalize_flower(flower_input)
-        if flower_norm: flower_types = [flower_norm]
-    if not flower_types and scanned.get("flower"):
-        flower_types = [scanned.get("flower")]
+        norm = normalize_flower(flower_input)
+        if norm:
+            flower_types = [norm]
+    if not flower_types:
+        flower_types = scan_all_flowers(original_text)[:1]
 
-    # 1c. Color & Defaults
     color = normalize_color(raw_ner.get("COLOR", "")) or scanned.get("color")
-    
-    # Safe Default Color: sunflower -> yellow (only if color is missing)
     if not color and "sunflower" in flower_types:
         color = "yellow"
 
-    # 1d. Others
     occasion = normalize_occasion(raw_ner.get("OCCASION", "")) or scanned.get("occasion")
-    style  = normalize_style(raw_ner.get("STYLE", "")) or scanned.get("style")
-    wrapper = normalize_wrapper(raw_ner.get("WRAPPER", "")) or scanned.get("wrapper")
+    style    = normalize_style(raw_ner.get("STYLE", "")) or scanned.get("style")
+    wrapper  = normalize_wrapper(raw_ner.get("WRAPPER", "")) or scanned.get("wrapper")
 
-    # ── Step 2: Confidence per entity ──
-    # Map entity types to NER labels for confidence extraction
-    confidence: dict[str, float] = {}
-    label_map = {
-        "flower_types": "FLOWER",
-        "color": "COLOR",
-        "occasion": "OCCASION",
-        "style": "STYLE",
-        "category": "CATEGORY"
-    }
-    for field, label in label_map.items():
-        if ner_scores.get(label):
-            confidence[field] = ner_scores[label]
-        elif scanned.get(field): # Keyword scan defaults to 0.8 if found but NER missed
-            confidence[field] = 0.8
-
-    # ── Step 3: Quantity extraction ──────────────────────────────────────
     qty_raw = raw_ner.get("QTY", "")
     qty: Optional[int] = None
     if qty_raw:
@@ -132,18 +225,12 @@ def process_entities(
     if qty is None:
         qty = extract_quantity(original_text)
 
-    # ── Step 4: Price hint ────────────────────────────────────────────────
     price_hint = _extract_price_hint(original_text, raw_ner)
-
-    # ── Step 5: Unified confidence score ─────────────────────────────────
     ner_contribution = ner_avg_confidence if any([flower_types, color, occasion]) else 0.0
-    unified_confidence = round(
-        intent_confidence * INTENT_WEIGHT + ner_contribution * NER_WEIGHT,
-        4
-    )
+    unified_confidence = round(intent_confidence * INTENT_WEIGHT + ner_contribution * NER_WEIGHT, 4)
 
     return ProcessedData(
-        flower_type=flower_types[0] if flower_types else None, # Back-compat
+        flower_type=flower_types[0] if flower_types else None,
         qty=qty,
         color=color,
         wrapper=wrapper,
@@ -151,56 +238,4 @@ def process_entities(
         style=style,
         price_hint=price_hint,
         confidence=unified_confidence,
-    )
-
-
-def analyze_entities(
-    raw_ner: dict,
-    ner_avg_confidence: float,
-    intent: str,
-    intent_confidence: float,
-    original_text: str,
-    ner_scores: dict = {}
-) -> AnalyzeResponse:
-    """
-    Trả về định dạng chuẩn yêu cầu của Giai đoạn 2 (Bản tinh chỉnh cuối).
-    """
-    # Step 1: Keyword scan hỗ trợ bổ sung
-    scanned = keyword_scan(original_text)
-
-    # Step 2: Hỗ trợ nhiều loài hoa (Flower Types)
-    flower_types = []
-    # Mix multiple flowers if found in NER
-    flower_raw = raw_ner.get("FLOWER", "")
-    if flower_raw:
-        # Check if multiple flowers are present (simplified for now)
-        flower_norm = normalize_flower(flower_raw)
-        if flower_norm: flower_types = [flower_norm]
-    
-    # Fallback/Append from keyword scan
-    if not flower_types and scanned.get("flower"):
-        flower_types = [scanned.get("flower")]
-
-    # Step 3: Category
-    category = normalize_category(raw_ner.get("CATEGORY", "")) or scanned.get("category")
-
-    # Step 4: Color & Defaults
-    color = normalize_color(raw_ner.get("COLOR", "")) or scanned.get("color")
-    if not color and "sunflower" in flower_types:
-        color = "yellow"
-
-    # Step 5: Others
-    occasion = normalize_occasion(raw_ner.get("OCCASION", "")) or scanned.get("occasion")
-    style    = normalize_style(raw_ner.get("STYLE", "")) or scanned.get("style")
-
-    # Step 6: Map to Standardized Output (lowercase normalization)
-    return AnalyzeResponse(
-        intent=intent,
-        entities=AnalyzeEntities(
-            occasion=occasion.lower() if occasion else None,
-            style=style.lower() if style else None,
-            color=color.lower() if color else None,
-            flowers=[f.lower() for f in flower_types],
-            layout=category.lower() if category else None
-        ),
     )

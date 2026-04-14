@@ -1,5 +1,6 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import authService from '../../services/authService';
+import { ROLES } from '../../constants/roles';
 
 const PermissionGate = ({ children }) => {
     const location = useLocation();
@@ -12,8 +13,8 @@ const PermissionGate = ({ children }) => {
         return <Navigate to="/admin/login" state={{ from: location }} replace />;
     }
 
-    // 2. Kiểm tra quyền (Chỉ cho phép Admin hoặc Staff)
-    const allowedRoles = ['Admin', 'Staff'];
+    // 2. Kiểm tra quyền dữa trên các role hợp lệ cho Admin Panel
+    const allowedRoles = [ROLES.ADMIN, ROLES.MANAGER, ROLES.WAREHOUSE, ROLES.STAFF];
     if (!allowedRoles.includes(user.role)) {
         return <Navigate to="/unauthorized" replace />;
     }

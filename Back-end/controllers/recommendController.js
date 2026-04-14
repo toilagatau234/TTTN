@@ -98,65 +98,47 @@ exports.recommendProductsSimple = async (req, res) => {
         const aiResult = await aiService.analyzeText(text);
         const { intent, entities } = aiResult;
         
+        // Create Strict Entities Map for matching
+        const { createStrictEntitiesMap } = require('../utils/normalizer');
+        const strictEntities = createStrictEntitiesMap(entities, text);
+        
         // TASK 7: Minimal Logging
         console.log(`[Recommend API] AI Intent: ${intent}`);
-        console.log(`[Recommend API] AI Filters:`, JSON.stringify(entities));
+        console.log(`[Recommend API] AI Filters (RAW):`, JSON.stringify(entities));
+        console.log(`[Recommend API] Strict Entities:`, JSON.stringify(strictEntities));
 
+        const hasMeaningfulData = 
+            (strictEntities.flowers.main.length > 0) ||
+            (strictEntities.flowers.secondary.length > 0) ||
+            (strictEntities.color.length > 0) ||
+            strictEntities.occasion || 
+            strictEntities.budget > 0 ||
+            strictEntities.style;
 
-        // ISSUE 2 — IGNORE INTENT
-        // If intent !== "CREATE_FLOWER_BASKET" -> check entities before fallback
-        // NEW RULE: IF entities contain meaningful data (color OR flowers OR occasion), treat as valid and continue.
+        // NEW RULE: IF entities contain meaningful data, treat as valid and continue.
         // ONLY fallback if: both intent UNKNOWN AND entities empty
-        
-        const hasMeaningfulData = entities && (
-            (entities.flower_types && entities.flower_types.length > 0) ||
-            entities.flowers && entities.flowers.length > 0 ||
-            entities.color ||
-            entities.occasion ||
-            entities.category ||
-            entities.style
-        );
+        if (intent === 'UNKNOWN' && !hasMeaningfulData) {
+            console.log(`[Recommend API] Fallback triggered: Intent UNKNOWN and no meaningful entities.`);
+            const defaultProducts = await Product.find({ status: 'active' })
+                .sort({ createdAt: -1 })
+                .limit(5)
+                .populate('category', 'name')
+                .lean();
 
-        if (intent !== 'CREATE_FLOWER_BASKET') {
-            if (intent === 'UNKNOWN' && !hasMeaningfulData) {
-                console.log(`[Recommend API] Fallback triggered: Intent UNKNOWN and no entities.`);
-                const defaultProducts = await Product.find({ status: 'active' })
-                    .sort({ createdAt: -1 })
-                    .limit(5)
-                    .populate('category', 'name')
-                    .lean();
-
-                return res.status(200).json({
-                    filters: {},
-                    products: defaultProducts,
-                    isAiGenerated: false
-                });
-            } else if (!hasMeaningfulData && intent !== 'CREATE_FLOWER_BASKET' && intent !== 'UNKNOWN') {
-                // E.g. Intent is GREETING, gracefully fallback as well
-                console.log(`[Recommend API] Fallback triggered: Intent ${intent} and no entities.`);
-                const defaultProducts = await Product.find({ status: 'active' })
-                    .sort({ createdAt: -1 })
-                    .limit(5)
-                    .populate('category', 'name')
-                    .lean();
-
-                return res.status(200).json({
-                    filters: {},
-                    products: defaultProducts,
-                    isAiGenerated: false
-                });
-            } else {
-                console.log(`[Recommend API] Intent is ${intent} but entities found, proceeding with recommendation.`);
-            }
+            return res.status(200).json({
+                filters: strictEntities,
+                products: defaultProducts,
+                isAiGenerated: false
+            });
         }
+        
+        console.log(`[Recommend API] Proceeding with recommendation...`);
 
         // 1. Fetch all active products
-        const allProducts = await Product.find({ status: 'active' })
-            .populate('category', 'name')
-            .lean();
+        const allProducts = await Product.find({ status: 'active' }).populate('category', 'name').lean();
 
         // 2. Perform Matching and Scoring
-        const scoredProducts = matchProducts(entities, allProducts);
+        const scoredProducts = matchProducts(strictEntities, allProducts, true);
 
         // TASK 5: LIMIT RESULT SIZE
         let finalProducts = scoredProducts
@@ -166,9 +148,8 @@ exports.recommendProductsSimple = async (req, res) => {
         // TASK 6 — FALLBACK LOGIC (STRICT)
         let isAiGenerated = true;
         
-        // If no products match OR top product score === 0
-        if (finalProducts.length === 0 || finalProducts[0].matchScore === 0) {
-            console.log(`[Recommend API] Score 0 Fallback triggered.`);
+        if (finalProducts.length === 0) {
+            console.log(`[Recommend API] Zero Match Fallback triggered.`);
             finalProducts = await Product.find({ status: 'active' })
                 .sort({ createdAt: -1 })
                 .limit(5)
@@ -181,7 +162,7 @@ exports.recommendProductsSimple = async (req, res) => {
 
         // Return standardized format EXACTLY as required
         return res.status(200).json({
-            filters: entities,
+            filters: strictEntities,
             products: finalProducts,
             isAiGenerated // TASK 6: UX Clarity Flag
         });

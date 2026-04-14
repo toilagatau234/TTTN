@@ -1,260 +1,326 @@
+/**
+ * Back-end/ai/hydrangea/hydrangea.service.js v3
+ * 
+ * Features:
+ * - Multi-turn: create / modify intents
+ * - MODIFY: "đổi hoa hồng thành hoa lan" → update session + re-suggest
+ * - Session state: current_bouquet (flowers, colors, occasion, style, budget)
+ * - Graceful AI fallback nếu Python service timeout
+ * - Structured output theo BouquetOutput schema
+ */
 const axios = require('axios');
 const Product = require('../../models/Product');
+const { classifyProducts, resolveLayoutName, buildExplanation } = require('../../utils/scoringService');
+const { normalizeString } = require('../../utils/normalizer');
 
-// Quản lý session hội thoại đơn giản
+const AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://localhost:8000';
+
+// ── In-memory session store ─────────────────────────────────────────────────
 const sessions = new Map();
+const SESSION_TTL_MS = 30 * 60 * 1000; // 30 min
 
 class HydrangeaService {
-    
-    async processChat(sessionId, message, isConfirming, incomingEntities) {
-        
-        // Bỏ logic tạo ảnh Gemini - giờ không hỗ trợ nữa
-        if (isConfirming) {
-             return {
-                 success: false,
-                 reply: "Chức năng AI tự tạo ảnh đang bảo trì, bù lại Rosee đã gợi ý cho bạn những giỏ hoa thật đẹp nhất dựa theo ý thích bên dưới nhé!",
-                 status: "suggesting"
-             };
-        }
 
-        // Khởi tạo session nếu chưa có
-        if (!sessions.has(sessionId)) {
-            sessions.set(sessionId, {
-                entities: {
-                    category: null,
-                    flower_types: [],
-                    color: null,
-                    occasion: null,
-                    style: null
-                },
-                history: []
-            });
-        }
-        const session = sessions.get(sessionId);
-
-        // NẾU TÍN HIỆU (message) TRỐNG -> dùng thực thể cũ gọi ý luôn
-        if (!message || message.trim() === '') {
-             const suggestions = await this.scoreAndMatchProducts(session.entities);
-             return {
-                 success: true,
-                 reply: "Đây là các mẫu hoa gợi ý dựa trên yêu cầu hiện tại của bạn:",
-                 extractedEntities: session.entities,
-                 status: "suggesting",
-                 suggestedProducts: suggestions
-             };
-         }
-
-        // Gọi FastAPI mới để phân tích câu chat
-        let analyzeResult = null;
-        try {
-            console.log(`[Hydrangea] Đang gửi message đến AI Service: "${message}"`);
-            const apiResponse = await axios.post('http://localhost:8000/api/hydrangea/analyze', { text: message });
-            analyzeResult = apiResponse.data;
-            console.log(`[Hydrangea] AI Service Response:`, analyzeResult);
-        } catch (error) {
-            console.error("[Hydrangea] Lỗi gọi AI Service:", error.message);
-            return {
-                success: false,
-                reply: "Tin nhắn không gửi được. Xin lỗi, hệ thống AI đang bảo trì. Vui lòng thử lại sau!",
-                status: "error"
-            };
-        }
-
-        const { intent, entities } = analyzeResult;
-
-        // ── Cập nhật session entities (Merge mới vào cũ) ──
-        if (entities) {
-            // Category, Color, Occasion, Style (Ghi đè nếu có giá trị mới)
-            ['category', 'color', 'occasion', 'style'].forEach(key => {
-                if (entities[key]) {
-                    session.entities[key] = entities[key];
-                }
-            });
-
-            // Flower Types (Merge danh sách loài hoa)
-            if (entities.flower_types && entities.flower_types.length > 0) {
-                const combined = new Set([...session.entities.flower_types, ...entities.flower_types]);
-                session.entities.flower_types = Array.from(combined);
-            }
-        }
-
-        console.log(`[Hydrangea] Session sau khi cập nhật:`, session.entities);
-
-        // ── Xử lý theo Intent chuẩn mới ──
-        let resolvedIntent = intent;
-        
-        // Nếu AI phân loại Intent = UNKNOWN nhưng MÀ vẫn trích xuất được thực thể (Loài hoa, màu sắc...)
-        // -> Chuyển intent thành CREATE_FLOWER_BASKET để bot tiếp tục báo giá và tư vấn
-        const hasCoreEntities = (session.entities.flower_types && session.entities.flower_types.length > 0) || 
-                                session.entities.color || 
-                                session.entities.category ||
-                                session.entities.occasion ||
-                                session.entities.style;
-
-        if (intent === 'UNKNOWN' && hasCoreEntities) {
-            resolvedIntent = 'CREATE_FLOWER_BASKET';
-            console.log(`[Hydrangea] Tự động ép Intent từ UNKNOWN sang CREATE_FLOWER_BASKET do có chứa Entities.`);
-        }
-
-        if (resolvedIntent === 'CREATE_FLOWER_BASKET' || resolvedIntent === 'ASK_PRICE') {
-            
-            // Nếu chưa có thông tin cốt lõi (Loài hoa hoặc Màu hoặc Loại hình), hỏi thêm
-            if ((!session.entities.flower_types || session.entities.flower_types.length === 0) && !session.entities.color && !session.entities.category) {
-                return {
-                    success: true,
-                    reply: "Bạn muốn tìm mẫu hoa theo tông màu gì, loài hoa nào, hay kiểu dáng (giỏ, bó, lẵng) ra sao không?",
-                    extractedEntities: session.entities,
-                    status: "continue",
-                    suggestedProducts: []
-                };
-            }
-
-            // Gọi hàm tính điểm gợi ý sản phẩm
-            const suggestions = await this.scoreAndMatchProducts(session.entities);
-
-            if (suggestions.length === 0) {
-                 return {
-                    success: true,
-                    reply: "Tiếc quá, hiện kho Roseer chưa có mẫu nào khớp hoàn toàn với yêu cầu này. Bạn có muốn đổi sang tông màu khác hoặc loài hoa khác không?",
-                    extractedEntities: session.entities,
-                    status: "continue",
-                    suggestedProducts: []
-                 };
-            }
-
-            const flowerDisplay = session.entities.flower_types.join(', ') || 'tự chọn';
-            const categoryDisplay = session.entities.category || 'mẫu';
-            let replyMsg = `Mình đã tìm thấy một số ${categoryDisplay} cực kỳ phù hợp với yêu cầu hoa ${flowerDisplay} dưới đây nhé! Bạn có ưng mẫu nào không?`;
-            
-            if (resolvedIntent === 'ASK_PRICE') {
-                replyMsg = `Dưới đây là giá của các ${categoryDisplay} hoa ${flowerDisplay} mà bạn quan tâm:`;
-            }
-
-            return {
-                success: true,
-                reply: replyMsg,
-                extractedEntities: session.entities,
-                status: "suggesting",
-                suggestedProducts: suggestions
-            };
-        }
-
-        // Với các Intent UNKNOWN thực sự (Không có entity nào bắt được)
-        if (resolvedIntent === 'UNKNOWN') {
-             return {
-                 success: true,
-                 reply: "Mình chưa hiểu rõ ý bạn lắm. Bạn có thể nói rõ hơn về loài hoa, màu sắc hoặc dịp tặng (sinh nhật, khai trương...) mà bạn muốn không?",
-                 extractedEntities: session.entities,
-                 status: "continue"
-             };
-        }
-
-        // Fallback catch-all
+    // ── Session management ───────────────────────────────────────────────────
+    _makeSession() {
         return {
-            success: true,
-            reply: "Mình đã ghi nhận yêu cầu của bạn! Để mình tìm kiếm những mẫu hoa phù hợp nhất nhé.",
-            extractedEntities: session.entities,
-            status: "continue",
-            suggestedProducts: []
+            entities: {
+                flower_types: [],
+                colors: [],
+                color: null,         // compat
+                occasion: null,
+                style: null,
+                budget: 0,
+                target: null,
+                role_hint: {},
+            },
+            current_bouquet: {
+                items: [],
+                image_url: null,
+                total_price: 0,
+                explanation: ''
+            },
+            intent: null,
+            history: [],
+            lastActivity: Date.now()
         };
     }
 
-    // ===============================================
-    // BƯỚC 5: RULE-BASED MATCHING & SCORING PRODUCTS
-    // ===============================================
-    async scoreAndMatchProducts(entities) {
-        if (!entities || Object.keys(entities).length === 0) return [];
-
-        // Lấy danh sách toàn bộ sản phẩm đang active
-        const products = await Product.find({ status: 'active' }).populate('category', 'name').lean();
-        
-        let scoredProducts = products.map(product => {
-            let score = 0;
-
-            // 1. Match Category (Loại hình: basket, bouquet, box, stand) => +4 điểm
-            if (entities.category) {
-                const targetCat = entities.category.toLowerCase();
-                const productCat = (product.category && product.category.name) ? product.category.name.toLowerCase() : '';
-                const productLayout = product.layout ? product.layout.toLowerCase() : '';
-
-                if (productCat.includes(targetCat) || productLayout.includes(targetCat)) {
-                    score += 4;
-                }
-            }
-
-            // 2. Match Flower Types (Hỗ trợ nhiều loài hoa) => +5 điểm mỗi loài
-            if (entities.flower_types && entities.flower_types.length > 0) {
-                const mainFlowers = (product.main_flowers || []).map(f => typeof f === 'string' ? f.toLowerCase() : '');
-                const productName = product.name ? product.name.toLowerCase() : '';
-
-                entities.flower_types.forEach(targetFlower => {
-                    const flower = targetFlower.toLowerCase();
-                    if (mainFlowers.includes(flower) || productName.includes(flower)) {
-                        score += 5;
-                    }
-                });
-            }
-
-            // 3. Match Màu sắc (Dominant color) => +3 điểm
-            if (entities.color) {
-                const targetColor = entities.color.toLowerCase();
-                const colorMatches = product.dominant_color && product.dominant_color.toLowerCase() === targetColor;
-                const descMatches = product.description && product.description.toLowerCase().includes(targetColor);
-                const nameMatches = product.name && product.name.toLowerCase().includes(targetColor);
-
-                if (colorMatches || descMatches || nameMatches) {
-                    score += 3;
-                }
-            }
-
-            // 4. Match Dịp tặng (Occasion) => +2 điểm
-            if (entities.occasion && product.occasion && product.occasion.length > 0) {
-                 const targetOcc = entities.occasion.toLowerCase();
-                 const occs = product.occasion.map(o => typeof o === 'string' ? o.toLowerCase() : '');
-                 if (occs.includes(targetOcc)) {
-                     score += 2;
-                 }
-            }
-
-            // 5. Match Phong cách (Style) => +1 điểm
-            if (entities.style && product.style && product.style.length > 0) {
-                 const targetStyle = entities.style.toLowerCase();
-                 const styles = product.style.map(s => typeof s === 'string' ? s.toLowerCase() : '');
-                 if (styles.includes(targetStyle)) {
-                     score += 1;
-                 }
-            }
-
-            return { ...product, aiScore: score };
-        });
-
-        // Lọc những sản phẩm thực sự liên quan (có điểm > 0)
-        scoredProducts = scoredProducts.filter(p => p.aiScore > 0);
-        
-        // Sắp xếp giảm dần theo điểm AI, ưu tiên điểm cao nhất
-        scoredProducts.sort((a, b) => b.aiScore - a.aiScore);
-
-        // Trả về top 3 gợi ý phù hợp nhất
-        return scoredProducts.slice(0, 3);
+    getSession(sessionId) {
+        const s = sessions.get(sessionId);
+        if (!s || (Date.now() - s.lastActivity > SESSION_TTL_MS)) {
+            const fresh = this._makeSession();
+            sessions.set(sessionId, fresh);
+            return fresh;
+        }
+        s.lastActivity = Date.now();
+        return s;
     }
 
-    // ===============================================
-    // BƯỚC 8: TẠO ẢNH TỪ TEMPLATE QUA AI SERVICE
-    // ===============================================
-    async generateImage(layout, mainColor, subColor) {
-        try {
-            console.log(`[Hydrangea] Requesting image generation: layout=${layout}, main=${mainColor}`);
-            const response = await axios.post('http://localhost:8000/api/hydrangea/generate-image', {
-                layout: layout || "round",
-                main_color: mainColor || "red",
-                sub_color: subColor || "white",
-                add_randomness: true
-            });
-            return response.data;
-        } catch (error) {
-            console.error("[Hydrangea] Lỗi gọi AI Service (Image Gen):", error.message);
-            throw new Error("Không thể tạo ảnh lúc này.");
+    // ── Entity merge ─────────────────────────────────────────────────────────
+    mergeEntities(sessionEntities, newEntities) {
+        if (!newEntities) return;
+
+        // Scalar overwrite
+        ['occasion', 'style', 'target'].forEach(k => {
+            if (newEntities[k]) sessionEntities[k] = newEntities[k];
+        });
+
+        // Budget
+        if (newEntities.budget > 0) sessionEntities.budget = newEntities.budget;
+
+        // Flowers: deduplicated union
+        const newFlowers = [
+            ...(newEntities.flower_types || []),
+            ...(newEntities.flowers || []),
+            ...(newEntities.flower_type ? [newEntities.flower_type] : [])
+        ];
+        if (newFlowers.length > 0) {
+            const merged = new Set([...sessionEntities.flower_types, ...newFlowers]);
+            sessionEntities.flower_types = Array.from(merged);
         }
+
+        // Colors: deduplicated union
+        const newColors = [
+            ...(newEntities.colors || []),
+            ...(newEntities.color ? [newEntities.color] : [])
+        ];
+        if (newColors.length > 0) {
+            const merged = new Set([...sessionEntities.colors, ...newColors]);
+            sessionEntities.colors = Array.from(merged);
+            sessionEntities.color = sessionEntities.colors[0] || null;
+        }
+
+        // Role hint: merge (new overwrites per-flower)
+        if (newEntities.role_hint && Object.keys(newEntities.role_hint).length > 0) {
+            sessionEntities.role_hint = {
+                ...sessionEntities.role_hint,
+                ...newEntities.role_hint
+            };
+        }
+    }
+
+    // ── Budget parser (fallback khi AI service down) ─────────────────────────
+    parseBudget(text) {
+        const m = text.match(/(\d[\d.,]*)\s*(triệu|trieu|tr|nghìn|nghin|k)?\b/i);
+        if (!m) return 0;
+        let num = parseFloat(m[1].replace(/[.,]/g, ''));
+        const unit = (m[2] || '').toLowerCase();
+        if (['triệu', 'trieu', 'tr'].includes(unit)) num *= 1_000_000;
+        else if (['nghìn', 'nghin', 'k'].includes(unit)) num *= 1_000;
+        return num;
+    }
+
+    // ── Intent inference khi AI timeout ────────────────────────────────────
+    inferIntent(text, session) {
+        const t = text.toLowerCase();
+        if (['đổi', 'thay', 'chỉnh', 'sửa', 'bỏ', 'thêm vào'].some(k => t.includes(k))) return 'MODIFY';
+        if (['giá', 'bao nhiêu', 'chi phí', 'tổng'].some(k => t.includes(k))) return 'ASK_PRICE';
+        if (this.hasCoreEntities(session.entities)) return 'CREATE_FLOWER_BASKET';
+        return 'UNKNOWN';
+    }
+
+    hasCoreEntities(e) {
+        return (e.flower_types?.length > 0) || (e.colors?.length > 0) || e.occasion || e.style;
+    }
+
+    // ── MODIFY: extract flower changes từ text ────────────────────────────────
+    applyModifyOps(sessionEntities, modifyOps = []) {
+        if (!modifyOps || modifyOps.length === 0) return false;
+
+        let changed = false;
+        const norm = v => normalizeString(String(v || ''));
+
+        modifyOps.forEach(op => {
+            if (op.op === 'replace' && op.from && op.to) {
+                // Tìm và thay thế loài hoa trong flower_types
+                const fromNorm = norm(op.from);
+                const toNorm = norm(op.to);
+                const idx = sessionEntities.flower_types.findIndex(f =>
+                    norm(f).includes(fromNorm) || fromNorm.includes(norm(f))
+                );
+                if (idx >= 0) {
+                    sessionEntities.flower_types[idx] = toNorm;
+                    changed = true;
+                    // Cập nhật role_hint
+                    if (sessionEntities.role_hint[fromNorm]) {
+                        const role = sessionEntities.role_hint[fromNorm];
+                        delete sessionEntities.role_hint[fromNorm];
+                        sessionEntities.role_hint[toNorm] = role;
+                    }
+                }
+            } else if (op.op === 'remove' && op.from) {
+                const fromNorm = norm(op.from);
+                const before = sessionEntities.flower_types.length;
+                sessionEntities.flower_types = sessionEntities.flower_types.filter(f =>
+                    !norm(f).includes(fromNorm) && !fromNorm.includes(norm(f))
+                );
+                if (sessionEntities.flower_types.length !== before) changed = true;
+            } else if (op.op === 'add' && op.to) {
+                const toNorm = norm(op.to);
+                if (!sessionEntities.flower_types.includes(toNorm)) {
+                    sessionEntities.flower_types.push(toNorm);
+                    changed = true;
+                }
+            }
+        });
+
+        return changed;
+    }
+
+    // ── Main chat processor ──────────────────────────────────────────────────
+    async processChat(sessionId, message, isConfirming = false, incomingEntities = null) {
+        const session = this.getSession(sessionId);
+
+        // Client gửi entities trực tiếp
+        if (incomingEntities && Object.keys(incomingEntities).length > 0) {
+            this.mergeEntities(session.entities, incomingEntities);
+        }
+
+        if (isConfirming) {
+            return this._handleConfirm(session);
+        }
+
+        if (!message?.trim()) {
+            return this._handleSuggest(session);
+        }
+
+        // ── Gọi Python AI service ────────────────────────────────────────
+        let aiResult = null;
+        try {
+            const resp = await axios.post(`${AI_SERVICE_URL}/api/hydrangea/analyze`, {
+                text: message
+            }, { timeout: 8000 });
+            aiResult = resp.data;
+            console.log('[Hydrangea] AI result:', JSON.stringify(aiResult.entities || {}).substring(0, 200));
+        } catch (err) {
+            console.warn('[Hydrangea] AI service unavailable:', err.message, '— using keyword fallback');
+        }
+
+        // ── Merge AI entities ────────────────────────────────────────────
+        const aiEntities = aiResult?.entities || {};
+        this.mergeEntities(session.entities, aiEntities);
+
+        // ── Budget fallback ──────────────────────────────────────────────
+        if (!session.entities.budget) {
+            const b = this.parseBudget(message);
+            if (b > 0) session.entities.budget = b;
+        }
+
+        // ── Intent routing ───────────────────────────────────────────────
+        const intent = aiResult?.intent || this.inferIntent(message, session);
+        session.intent = intent;
+        session.history.push({ role: 'user', text: message, ts: Date.now() });
+        console.log(`[Hydrangea] intent=${intent}, entities:`, session.entities);
+
+        // ── MODIFY: apply changes ─────────────────────────────────────────
+        if (intent === 'MODIFY' && aiEntities.modify_ops?.length > 0) {
+            const changed = this.applyModifyOps(session.entities, aiEntities.modify_ops);
+            if (changed) {
+                const opsDesc = aiEntities.modify_ops
+                    .map(op => op.op === 'replace'
+                        ? `đổi "${op.from}" → "${op.to}"`
+                        : op.op === 'remove' ? `bỏ "${op.from}"`
+                        : `thêm "${op.to}"`)
+                    .join(', ');
+                session.history.push({ role: 'bot', text: `Đã ${opsDesc}. Đang tìm lại cho bạn...` });
+                return this._handleSuggest(session, `Đã cập nhật! `);
+            }
+        }
+
+        // ── ASK_PRICE ─────────────────────────────────────────────────────
+        if (intent === 'ASK_PRICE') {
+            const totalPrice = session.current_bouquet.total_price;
+            const reply = totalPrice > 0
+                ? `Giỏ hoa hiện tại tổng khoảng **${new Intl.NumberFormat('vi-VN').format(totalPrice)}đ**. Bạn muốn điều chỉnh ngân sách không?`
+                : `Bạn muốn ngân sách khoảng bao nhiêu? (ví dụ: 500k, 1 triệu...)`;
+            return { success: true, reply, extractedEntities: session.entities, status: 'continue', suggestedProducts: [] };
+        }
+
+        // ── Không đủ info → hỏi thêm ────────────────────────────────────
+        if (!this.hasCoreEntities(session.entities)) {
+            return {
+                success: true,
+                reply: 'Mình cần biết thêm chút xíu! 🌸 Bạn muốn tặng ai, dịp gì, hay thích tông màu/loài hoa nào không?',
+                extractedEntities: session.entities,
+                status: 'continue',
+                suggestedProducts: []
+            };
+        }
+
+        return this._handleSuggest(session);
+    }
+
+    // ── Suggest products ─────────────────────────────────────────────────────
+    async _handleSuggest(session, prefixMsg = '') {
+        const products = await Product.find({ status: 'active', stock: { $gt: 0 } })
+            .select('name price images dominant_color secondary_colors main_flowers sub_flowers occasion style sold priority _id')
+            .lean();
+
+        const { main, secondary, all } = classifyProducts(products, session.entities);
+
+        const topProducts = [...main, ...secondary]
+            .sort((a, b) => b._score - a._score)
+            .slice(0, 6)
+            .map(p => ({
+                ...p,
+                aiScore: Math.round(p._score * 10),
+                role: main.includes(p) ? 'main' : 'secondary'
+            }));
+
+        // Fallback: hàng phổ biến nhất
+        if (topProducts.length === 0) {
+            const fallback = await Product.find({ status: 'active' })
+                .sort({ sold: -1 }).limit(4).lean();
+            return {
+                success: true,
+                reply: 'Kho hàng chưa có mẫu khớp chính xác! Đây là những mẫu bán chạy nhất:',
+                extractedEntities: session.entities,
+                status: 'suggesting',
+                suggestedProducts: fallback,
+                classification: { main: [], secondary: [] }
+            };
+        }
+
+        // Cập nhật current_bouquet state
+        const totalPrice = topProducts.slice(0, 3).reduce((s, p) => s + (p.price || 0), 0);
+        const explanation = buildExplanation(session.entities, main, secondary);
+        session.current_bouquet = {
+            items: topProducts.slice(0, 3),
+            total_price: totalPrice,
+            explanation
+        };
+
+        const flowerStr = session.entities.flower_types?.join(', ') || 'đẹp';
+        const colorStr = session.entities.colors?.[0] || session.entities.color || '';
+        const reply = prefixMsg +
+            `Tìm thấy ${topProducts.length} mẫu ${flowerStr}${colorStr ? ' tông ' + colorStr : ''} phù hợp nhất! 🌸 Bạn thích mẫu nào?`;
+
+        return {
+            success: true,
+            reply,
+            extractedEntities: session.entities,
+            status: 'suggesting',
+            suggestedProducts: topProducts,
+            classification: {
+                main: main.map(p => p._id),
+                secondary: secondary.map(p => p._id)
+            },
+            current_bouquet: session.current_bouquet
+        };
+    }
+
+    // ── Confirm (trigger image gen) ──────────────────────────────────────────
+    async _handleConfirm(session) {
+        return {
+            success: true,
+            reply: '✨ Đang cắm hoa cho bạn, chờ mình xíu nhé...',
+            extractedEntities: session.entities,
+            status: 'generating',
+            triggerImageGeneration: true,
+            imageEntities: session.entities,
+            current_bouquet: session.current_bouquet
+        };
     }
 }
 

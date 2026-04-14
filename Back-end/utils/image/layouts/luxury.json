@@ -1,0 +1,52 @@
+{
+  "canvas": { "width": 500, "height": 500 },
+  "style": "luxury",
+  "layers": {
+    "basket": {
+      "zone": "bottom",
+      "x": 250, "y": 395,
+      "width": 220, "height": 150,
+      "zIndex": 0,
+      "randomize": false
+    },
+    "leaves": {
+      "zone": "surrounding",
+      "positions": [
+        { "x": 175, "y": 265 },
+        { "x": 325, "y": 265 },
+        { "x": 250, "y": 190 }
+      ],
+      "size": 50,
+      "zIndex": 1,
+      "randomize": false
+    },
+    "secondary": {
+      "zone": "sides",
+      "positions": [
+        { "x": 155, "y": 255 },
+        { "x": 345, "y": 255 }
+      ],
+      "size": 70,
+      "zIndex": 2,
+      "randomize": false
+    },
+    "main": {
+      "zone": "center",
+      "positions": [
+        { "x": 250, "y": 215 },
+        { "x": 220, "y": 265 },
+        { "x": 280, "y": 265 }
+      ],
+      "size": 110,
+      "zIndex": 2,
+      "randomize": false
+    },
+    "ribbon": {
+      "zone": "top",
+      "x": 250, "y": 105,
+      "size": 120,
+      "zIndex": 3,
+      "randomize": false
+    }
+  }
+}

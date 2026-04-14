@@ -60,9 +60,18 @@ const CreateProductModal = ({ open, onCancel, onSuccess, initialData }) => {
           originalPrice: initialData.originalPrice,
           stock: initialData.stock,
           category: initialData.category?._id || initialData.category, // handle populated object or ID
-          status: initialData.status,
+           status: initialData.status,
           isHot: initialData.isHot,
-          isNewProduct: initialData.isNewProduct
+          isNewProduct: initialData.isNewProduct,
+          // AI Attributes
+          occasion: initialData.occasion,
+          style: initialData.style,
+          main_flowers: initialData.main_flowers,
+          sub_flowers: initialData.sub_flowers,
+          dominant_color: initialData.dominant_color,
+          secondary_colors: initialData.secondary_colors,
+          layout: initialData.layout,
+          elements: initialData.elements
         });
 
         // Fill images
@@ -335,6 +344,60 @@ const CreateProductModal = ({ open, onCancel, onSuccess, initialData }) => {
                 className="mb-0"
               >
                 <Input.TextArea rows={4} placeholder="Mô tả chi tiết về sản phẩm..." className="rounded-xl border-gray-200" />
+              </Form.Item>
+            </div>
+          </div>
+          
+          {/* Section 4: Phân loại AI (Mới) */}
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-1 h-5 bg-purple-500 rounded-full"></div>
+              <span className="font-bold text-navy-700">Phân loại AI (AI Matching)</span>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50/40 p-4 rounded-2xl border border-gray-100/70">
+              <Form.Item label="Dịp tặng (Occasions)" name="occasion" className="mb-1">
+                <Select mode="tags" placeholder="Ví dụ: Birthday, Anniversary..." size="large" className="rounded-xl" />
+              </Form.Item>
+
+              <Form.Item label="Phong cách (Styles)" name="style" className="mb-1">
+                <Select mode="tags" placeholder="Ví dụ: Luxury, Vintage, Minimalist..." size="large" className="rounded-xl" />
+              </Form.Item>
+
+              <Form.Item label="Hoa chính (Main Flowers)" name="main_flowers" className="mb-1">
+                <Select mode="tags" placeholder="Ví dụ: Rose, Tulip, Lily..." size="large" className="rounded-xl" />
+              </Form.Item>
+
+              <Form.Item label="Hoa phụ & Lá (Sub Flowers)" name="sub_flowers" className="mb-1">
+                <Select mode="tags" placeholder="Ví dụ: Baby Breath, Eucalyptus..." size="large" className="rounded-xl" />
+              </Form.Item>
+
+              <Form.Item label="Màu chủ đạo" name="dominant_color" className="mb-1">
+                <Select placeholder="Chọn màu chủ đạo" size="large" className="rounded-xl">
+                  <Option value="red">Đỏ (Red)</Option>
+                  <Option value="pink">Hồng (Pink)</Option>
+                  <Option value="white">Trắng (White)</Option>
+                  <Option value="yellow">Vàng (Yellow)</Option>
+                  <Option value="orange">Cam (Orange)</Option>
+                  <Option value="purple">Tím (Purple)</Option>
+                  <Option value="blue">Xanh dương (Blue)</Option>
+                </Select>
+              </Form.Item>
+
+              <Form.Item label="Màu phối hợp" name="secondary_colors" className="mb-1">
+                <Select mode="tags" placeholder="Chọn các màu phối" size="large" className="rounded-xl" />
+              </Form.Item>
+
+              <Form.Item label="Bố cục (Layout)" name="layout" className="mb-1">
+                <Select placeholder="Chọn bố cục" size="large" className="rounded-xl">
+                  <Option value="round">Tròn (Round)</Option>
+                  <Option value="heart">Trái tim (Heart)</Option>
+                  <Option value="cascade">Dòng thác (Cascade)</Option>
+                  <Option value="one-sided">Một mặt (One-sided)</Option>
+                </Select>
+              </Form.Item>
+
+              <Form.Item label="Yếu tố trang trí" name="elements" className="mb-1">
+                <Select mode="tags" placeholder="Ví dụ: Ribbon, Box, Pearl..." size="large" className="rounded-xl" />
               </Form.Item>
             </div>
           </div>

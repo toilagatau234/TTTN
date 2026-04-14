@@ -83,7 +83,11 @@ const createProduct = async (req, res) => {
         const {
             name, description, price, originalPrice,
             stock, category, status, isHot, isNewProduct,
-            images // Array of { url, publicId } from frontend
+            images, // Array of { url, publicId } from frontend
+            // AI Matching Attributes
+            occasion, style, main_flowers, sub_flowers,
+            dominant_color, secondary_colors, layout, elements,
+            processed_image
         } = req.body;
 
         // Validate images
@@ -111,7 +115,17 @@ const createProduct = async (req, res) => {
             status: stock == 0 ? 'out_of_stock' : (status || 'active'),
             isHot,
             isNewProduct,
-            images: productImages
+            images: productImages,
+            // AI Matching Attributes
+            occasion,
+            style,
+            main_flowers,
+            sub_flowers,
+            dominant_color,
+            secondary_colors,
+            layout,
+            elements,
+            processed_image
         });
 
         await newProduct.save();
