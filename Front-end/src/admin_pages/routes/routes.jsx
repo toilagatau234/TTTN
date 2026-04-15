@@ -11,7 +11,6 @@ import SettingsPage from '../pages/Settings';
 import NotFoundPage from '../components/NotFoundPage';
 import VoucherPage from '../pages/Vouchers';
 import ReviewsPage from '../pages/Reviews';
-import ChatPage from '../pages/Chat';
 
 import InventoryPage from '../pages/Inventory';
 import CreateImport from '../pages/Inventory/CreateImport';
@@ -69,7 +68,6 @@ const AdminRoutes = () => {
         <Route path="minigames" element={<MinigamePage />} />
         <Route path="minigames/:id" element={<GameDetail />} />
         <Route path="reviews" element={<ReviewsPage />} />
-        <Route path="chat" element={<ChatPage />} />
         <Route path="cms/banners" element={<BannerPage />} />
         <Route path="cms/blogs" element={<BlogPage />} />
 
@@ -81,8 +79,9 @@ const AdminRoutes = () => {
         <Route path="settings" element={<SettingsPage />} />
       </Route>
 
-      {/* Mặc định: /admin → chuyển về /admin/login */}
-      <Route index element={<Navigate to="login" replace />} />
+      {/* Mặc định: /admin → chuyển về /admin/dashboard */}
+      {/* (PermissionGate sẽ lo phần bắt lỗi nếu chưa đăng nhập) */}
+      <Route index element={<Navigate to="dashboard" replace />} />
 
       {/* 404 cho admin */}
       <Route path="*" element={<NotFoundPage />} />

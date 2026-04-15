@@ -14,7 +14,6 @@ export const MENU_PERMISSIONS = {
   '/admin/orders':        [ROLES.ADMIN, ROLES.MANAGER, ROLES.STAFF],
   '/admin/customers':     [ROLES.ADMIN, ROLES.MANAGER, ROLES.STAFF],
   '/admin/reviews':       [ROLES.ADMIN, ROLES.MANAGER, ROLES.STAFF],
-  '/admin/chat':          [ROLES.ADMIN, ROLES.MANAGER, ROLES.STAFF],
   
   // Nhóm Marketing
   '/admin/vouchers':      [ROLES.ADMIN, ROLES.MANAGER, ROLES.STAFF],

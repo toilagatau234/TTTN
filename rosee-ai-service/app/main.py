@@ -14,6 +14,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.models.ml_models import lifespan
 from app.routes import hydrangea
+from app.routes import image as image_routes
 from app.config import HOST, PORT, ALLOWED_ORIGINS, DEBUG_MODE
 
 # ── Logging configuration ────────────────────────────────────────────────────
@@ -47,6 +48,7 @@ app.add_middleware(
 
 # ── Routers ───────────────────────────────────────────────────────────────────
 app.include_router(hydrangea.router)
+app.include_router(image_routes.router)
 
 
 # ── Health check ──────────────────────────────────────────────────────────────

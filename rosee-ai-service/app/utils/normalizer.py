@@ -1,33 +1,29 @@
 """
-app/utils/normalizer.py — Vietnamese → English normalization dictionaries.
+app/utils/normalizer.py — Vietnamese → English normalization dictionaries + role extraction.
 
-All keys are lowercase, accent-normalized Vietnamese strings.
-Fuzzy matching via difflib for robustness against typos/slang.
+Changes v2:
+- keyword_scan() trả về TẤT CẢ matches (không dừng ở first), dùng để detect nhiều loài hoa
+- Thêm TARGET_MAP
+- Thêm extract_role_hints() — detect ROLE_MAIN / ROLE_SECONDARY từ context
 """
+import re
 from difflib import get_close_matches
-from typing import Optional
+from typing import Optional, List, Dict
 import unicodedata
 
 
 # ── Normalizer helpers ───────────────────────────────────────────────────────
 def _normalize_key(text: str) -> str:
-    """Lowercase + strip. Keys in maps are already in this form."""
     return text.lower().strip()
 
 
-def _fuzzy_lookup(value: str, mapping: dict[str, str], cutoff: float = 0.6) -> Optional[str]:
-    """
-    Try exact match first, then fuzzy match against mapping keys.
-    Returns None if no match found above cutoff.
-    """
+def _fuzzy_lookup(value: str, mapping: dict, cutoff: float = 0.6) -> Optional[str]:
     key = _normalize_key(value)
     if key in mapping:
         return mapping[key]
-    # Try loose substring match first (faster than difflib for short texts)
     for map_key, map_val in mapping.items():
         if map_key in key or key in map_key:
             return map_val
-    # Fall back to difflib fuzzy match
     candidates = get_close_matches(key, mapping.keys(), n=1, cutoff=cutoff)
     if candidates:
         return mapping[candidates[0]]
@@ -35,202 +31,113 @@ def _fuzzy_lookup(value: str, mapping: dict[str, str], cutoff: float = 0.6) -> O
 
 
 # ── Flower Map ───────────────────────────────────────────────────────────────
-# Vietnamese name (incl. common variants/slang) → English product name
-FLOWER_MAP: dict[str, str] = {
-    # Hoa hồng
-    "hoa hồng": "rose",
-    "hồng": "rose",
-    "hoa hong": "rose",
-    "hong": "rose",
-    "bó hoa hồng": "rose",
-    # Tulip
-    "hoa tulip": "tulip",
-    "tulip": "tulip",
-    "tu líp": "tulip",
-    # Lan hồ điệp
-    "lan hồ điệp": "phalaenopsis orchid",
-    "hồ điệp": "phalaenopsis orchid",
-    "lan ho diep": "phalaenopsis orchid",
-    "lẵng lan": "phalaenopsis orchid",
-    # Cúc
-    "hoa cúc": "chrysanthemum",
-    "cúc": "chrysanthemum",
-    "cúc vạn thọ": "marigold",
-    # Tú cầu
-    "tú cầu": "hydrangea",
-    "hortensie": "hydrangea",
-    # Cát tường
-    "cát tường": "eustoma",
-    "lisianthus": "eustoma",
-    # Baby
-    "baby": "baby's breath",
-    "hoa baby": "baby's breath",
-    "hoa phấn": "baby's breath",
-    # Hướng dương
-    "hướng dương": "sunflower",
-    "hoa hướng dương": "sunflower",
-    # Cẩm chướng
-    "cẩm chướng": "carnation",
-    "hoa cẩm chướng": "carnation",
-    # Ly
-    "hoa ly": "lily",
-    "ly": "lily",
-    "lily": "lily",
-    # Đồng tiền
-    "đồng tiền": "gerbera",
-    "hoa đồng tiền": "gerbera",
-    # Mix / tổng hợp
-    "hoa mix": "mixed flowers",
-    "mix": "mixed flowers",
-    "bó hoa mix": "mixed flowers",
+FLOWER_MAP: dict = {
+    "hoa hồng": "rose", "hồng": "rose", "hoa hong": "rose", "hong": "rose",
+    "hoa tulip": "tulip", "tulip": "tulip", "tu líp": "tulip",
+    "lan hồ điệp": "orchid", "hồ điệp": "orchid", "lan ho diep": "orchid", "lẵng lan": "orchid", "hoa lan": "orchid", "lan": "orchid",
+    "hoa cúc": "chrysanthemum", "cúc": "chrysanthemum", "cúc vạn thọ": "marigold",
+    "tú cầu": "hydrangea", "hortensie": "hydrangea",
+    "cát tường": "eustoma", "lisianthus": "eustoma",
+    "baby": "baby's breath", "hoa baby": "baby's breath", "hoa phấn": "baby's breath",
+    "hướng dương": "sunflower", "hoa hướng dương": "sunflower",
+    "cẩm chướng": "carnation", "hoa cẩm chướng": "carnation",
+    "hoa ly": "lily", "ly": "lily", "lily": "lily",
+    "đồng tiền": "gerbera", "hoa đồng tiền": "gerbera",
+    "hoa mix": "mixed flowers", "mix": "mixed flowers",
+    "sen": "lotus", "hoa sen": "lotus",
+    "huệ": "tuberose", "hoa huệ": "tuberose",
+    "thủy tiên": "narcissus", "hoa thủy tiên": "narcissus",
+    "hướng": "sunflower",  # viết tắt
 }
 
 # ── Color Map ────────────────────────────────────────────────────────────────
-COLOR_MAP: dict[str, str] = {
-    "đỏ": "red",
-    "do": "red",
-    "đỏ tươi": "bright red",
-    "đỏ trầm": "deep red",
-    "hồng": "pink",
-    "hồng phấn": "light pink",
-    "hồng đậm": "hot pink",
-    "trắng": "white",
-    "trang": "white",
-    "vàng": "yellow",
-    "vàng kem": "cream",
-    "vàng chanh": "lemon yellow",
+COLOR_MAP: dict = {
+    "đỏ": "red", "do": "red", "đỏ tươi": "bright red", "đỏ trầm": "deep red",
+    "hồng": "pink", "hồng phấn": "light pink", "hồng đậm": "hot pink", "hồng pastel": "pink",
+    "trắng": "white", "trang": "white",
+    "vàng": "yellow", "vàng kem": "cream", "vàng chanh": "lemon yellow",
     "cam": "orange",
-    "tím": "purple",
-    "tím lavender": "lavender",
-    "tím hoa cà": "violet",
-    "xanh": "blue",
-    "xanh dương": "blue",
-    "xanh lá": "green",
-    "xanh mint": "mint",
-    "xanh bơ": "avocado green",
-    "be": "beige",
-    "be/kem": "beige",
-    "nâu": "brown",
-    "đen": "black",
-    "trầm": "deep tone",
-    "pastel": "pastel",
-    "nhạt": "light",
-    "đậm": "dark",
+    "tím": "purple", "tím lavender": "lavender", "tím hoa cà": "violet",
+    "xanh": "blue", "xanh dương": "blue", "xanh lá": "green",
+    "xanh mint": "mint", "xanh bơ": "avocado green",
+    "be": "beige", "be/kem": "beige", "kem": "cream",
+    "nâu": "brown", "đen": "black",
+    "trầm": "deep tone", "pastel": "pastel", "nhạt": "light", "đậm": "dark",
+    "nude": "nude",
 }
 
-# ── Category Map (Loại hình sản phẩm — Chuẩn hóa Step 2) ──────────────────────
-CATEGORY_MAP: dict[str, str] = {
-    "giỏ": "basket",
-    "lẵng": "basket",
-    "giỏ hoa": "basket",
-    "lẵng hoa": "basket",
-    "bó": "bouquet",
-    "bó hoa": "bouquet",
-    "hộp": "box",
-    "hộp hoa": "box",
-    "kệ": "stand",
-    "kệ hoa": "stand",
+# ── Category Map ─────────────────────────────────────────────────────────────
+CATEGORY_MAP: dict = {
+    "giỏ": "basket", "lẵng": "basket", "giỏ hoa": "basket", "lẵng hoa": "basket",
+    "bó": "bouquet", "bó hoa": "bouquet",
+    "hộp": "box", "hộp hoa": "box",
+    "kệ": "stand", "kệ hoa": "stand",
 }
 
-# ── Wrapper / Packaging Map ──────────────────────────────────────────────────
-WRAPPER_MAP: dict[str, str] = {
-    "giấy kraft": "kraft paper",
-    "kraft": "kraft paper",
-    "giấy": "paper",
-    "túi": "bag",
-    "túi vải": "fabric bag",
-    "nơ": "ribbon",
-    "có nơ": "ribbon",
-    "vải": "fabric",
-    "vải tuyn": "tulle",
-    "đơn giản": "simple wrap",
-    "sang trọng": "luxury wrap",
+# ── Wrapper Map ──────────────────────────────────────────────────────────────
+WRAPPER_MAP: dict = {
+    "giấy kraft": "kraft paper", "kraft": "kraft paper", "giấy": "paper",
+    "túi": "bag", "túi vải": "fabric bag", "nơ": "ribbon", "có nơ": "ribbon",
+    "vải": "fabric", "vải tuyn": "tulle", "đơn giản": "simple wrap", "sang trọng": "luxury wrap",
 }
 
 # ── Occasion Map ─────────────────────────────────────────────────────────────
-OCCASION_MAP: dict[str, str] = {
-    "sinh nhật": "birthday",
-    "sn": "birthday",
-    "sinh nhat": "birthday",
-    "tặng sinh nhật": "birthday",
-    "kỷ niệm": "anniversary",
-    "ky niem": "anniversary",
-    "ngày kỷ niệm": "anniversary",
-    "khai trương": "opening",
-    "khai truong": "opening",
-    "tốt nghiệp": "graduation",
-    "tot nghiep": "graduation",
+OCCASION_MAP: dict = {
+    "sinh nhật": "birthday", "sn": "birthday", "sinh nhat": "birthday", "tặng sinh nhật": "birthday",
+    "kỷ niệm": "anniversary", "ky niem": "anniversary", "ngày kỷ niệm": "anniversary",
+    "khai trương": "opening", "khai truong": "opening",
+    "tốt nghiệp": "graduation", "tot nghiep": "graduation",
     "valentine": "valentine",
-    "8/3": "women's day",
-    "20/10": "vietnamese women's day",
-    "20/11": "teachers' day",
-    "ngày của mẹ": "mother's day",
-    "tặng mẹ": "for mother",
-    "cho mẹ": "for mother",
-    "mẹ": "for mother",
-    "tặng bạn gái": "for girlfriend",
-    "bạn gái": "for girlfriend",
-    "tặng vợ": "for wife",
-    "vợ": "for wife",
-    "tang le": "condolence",
-    "tang lễ": "condolence",
-    "chia buồn": "condolence",
-    "chúc mừng": "congratulations",
-    "chuc mung": "congratulations",
-    "ốm": "get well",
-    "thăm bệnh": "get well",
-    "ra viện": "get well",
+    "8/3": "women's day", "8 3": "women's day", "mùng 8": "women's day",
+    "20/10": "vietnamese women's day", "20/11": "teachers' day",
+    "ngày của mẹ": "mother's day", "tặng mẹ": "birthday", "cho mẹ": "birthday",
+    "tang le": "condolence", "tang lễ": "condolence", "chia buồn": "condolence",
+    "chúc mừng": "congratulations", "chuc mung": "congratulations",
+    "ốm": "get well", "thăm bệnh": "get well", "ra viện": "get well",
+    "cưới": "wedding", "dam cuoi": "wedding", "hôn lễ": "wedding",
+}
+
+# ── Target Map (người nhận) ──────────────────────────────────────────────────
+TARGET_MAP: dict = {
+    "mẹ": "mother", "má": "mother", "ba": "father", "bố": "father",
+    "bạn gái": "girlfriend", "bạn trai": "boyfriend",
+    "vợ": "wife", "chồng": "husband",
+    "người yêu": "partner", "bạn bè": "friend", "ban be": "friend",
+    "sếp": "boss", "đồng nghiệp": "colleague",
+    "thầy": "teacher", "cô giáo": "teacher", "thầy giáo": "teacher",
+    "bé": "child", "con": "child", "anh": "sibling", "chị": "sibling",
+    "ông": "grandparent", "bà": "grandparent",
 }
 
 # ── Style Map ────────────────────────────────────────────────────────────────
-STYLE_MAP: dict[str, str] = {
-    "hoàng gia": "royal",
-    "sang trọng": "luxury",
-    "tối giản": "minimalist",
-    "đơn giản": "simple",
-    "vintage": "vintage",
-    "cổ điển": "classic",
-    "hiện đại": "modern",
-    "bohemian": "bohemian",
-    "rustic": "rustic",
-    "tinh tế": "elegant",
-    "thanh lịch": "elegant",
-    "kawaii": "cute",
-    "dễ thương": "cute",
-    "mộng mơ": "dreamy",
-    "cá tính": "bold",
+STYLE_MAP: dict = {
+    "hoàng gia": "luxury", "sang trọng": "luxury", "tối giản": "luxury",
+    "đơn giản": "simple", "vintage": "vintage", "cổ điển": "classic",
+    "hiện đại": "modern", "bohemian": "bohemian", "rustic": "rustic",
+    "tinh tế": "elegant", "thanh lịch": "elegant", "elegant": "elegant",
+    "kawaii": "cute", "dễ thương": "cute", "mộng mơ": "dreamy", "cá tính": "bold",
+    "vui tươi": "cute", "nhiều màu": "cute", "colorful": "cute",
 }
 
-# ── Layout Map (bố cục / hình dạng giỏ hoa) ──────────────────────────────────
-LAYOUT_MAP: dict[str, str] = {
-    # Hình dạng cơ bản
-    "tròn": "round",
-    "hình tròn": "round",
-    "oval": "oval",
-    "hình oval": "oval",
-    "vuông": "square",
-    "hình vuông": "square",
-    "chữ nhật": "rectangular",
-    "hình chữ nhật": "rectangular",
-    # Hình đặc biệt
-    "trái tim": "heart",
-    "hình trái tim": "heart",
-    "tim": "heart",
-    "ngôi sao": "star",
-    "hình sao": "star",
-    # Bố cục chiều cao
-    "tháp": "tower",
-    "hình tháp": "tower",
-    "thác": "cascade",
-    "dạng thác": "cascade",
-    "thẳng đứng": "vertical",
-    "nằm ngang": "horizontal",
-    # Mật độ
-    "dày": "dense",
-    "dày đặc": "dense",
-    "thưa": "sparse",
-    "thưa thoáng": "sparse",
+# ── Layout Map ───────────────────────────────────────────────────────────────
+LAYOUT_MAP: dict = {
+    "tròn": "round", "hình tròn": "round", "oval": "oval",
+    "vuông": "square", "chữ nhật": "rectangular",
+    "trái tim": "heart", "hình trái tim": "heart", "tim": "heart",
+    "ngôi sao": "star", "tháp": "tower", "thác": "cascade",
+    "thẳng đứng": "vertical", "nằm ngang": "horizontal",
+    "dày": "dense", "thưa": "sparse",
 }
+
+# ── Role hint keywords (ROLE_MAIN / ROLE_SECONDARY) ──────────────────────────
+ROLE_MAIN_KEYWORDS = [
+    "chủ đạo", "chính", "main", "nổi bật", "highlight", "featured",
+    "trung tâm", "chủ yếu", "chú trọng",
+]
+ROLE_SECONDARY_KEYWORDS = [
+    "phụ", "mix", "kết hợp", "bổ sung", "thêm", "điểm xuyến",
+    "tô điểm", "xen kẽ", "secondary", "hỗ trợ",
+]
 
 
 # ── Public API ────────────────────────────────────────────────────────────────
@@ -255,31 +162,124 @@ def normalize_style(value: str) -> Optional[str]:
 def normalize_layout(value: str) -> Optional[str]:
     return _fuzzy_lookup(value, LAYOUT_MAP)
 
+def normalize_target(value: str) -> Optional[str]:
+    return _fuzzy_lookup(value, TARGET_MAP)
+
+
+def scan_all_flowers(text: str) -> List[str]:
+    """
+    Scan text và collect TẤT CẢ loài hoa tìm thấy (không dừng ở first).
+    Returns list of normalized English flower names.
+    """
+    text_lower = text.lower()
+    found = []
+    seen = set()
+    # Sort by key length desc để match "hoa hướng dương" trước "hướng"
+    for viet_key, eng_val in sorted(FLOWER_MAP.items(), key=lambda x: -len(x[0])):
+        if viet_key in text_lower and eng_val not in seen:
+            found.append(eng_val)
+            seen.add(eng_val)
+    return found
+
+
+def scan_all_colors(text: str) -> List[str]:
+    """Collect tất cả màu sắc được đề cập."""
+    text_lower = text.lower()
+    found = []
+    seen = set()
+    for viet_key, eng_val in sorted(COLOR_MAP.items(), key=lambda x: -len(x[0])):
+        if viet_key in text_lower and eng_val not in seen:
+            found.append(eng_val)
+            seen.add(eng_val)
+    return found
+
+
+def extract_role_hints(text: str, flower_types: List[str]) -> Dict[str, str]:
+    """
+    Extract ROLE_MAIN / ROLE_SECONDARY từ context.
+    
+    Ví dụ:
+      "hoa hồng chủ đạo, mix thêm hoa cúc"
+      → { "rose": "main", "chrysanthemum": "secondary" }
+    
+    Algorithm:
+      1. Tìm keyword ROLE_MAIN/ROLE_SECONDARY
+      2. Tìm loài hoa gần nhất trước/sau keyword đó (window ±20 tokens)
+      3. Map loài hoa → role
+    """
+    if not flower_types:
+        return {}
+
+    text_lower = text.lower()
+    role_hints: Dict[str, str] = {}
+
+    # Detect main role keywords
+    for kw in ROLE_MAIN_KEYWORDS:
+        idx = text_lower.find(kw)
+        if idx == -1:
+            continue
+        # Tìm loài hoa gần nhất (±50 chars window)
+        window = text_lower[max(0, idx - 50): idx + 50]
+        for viet_key, eng_val in sorted(FLOWER_MAP.items(), key=lambda x: -len(x[0])):
+            if viet_key in window:
+                role_hints[eng_val] = "main"
+                break
+
+    # Detect secondary role keywords
+    for kw in ROLE_SECONDARY_KEYWORDS:
+        idx = text_lower.find(kw)
+        if idx == -1:
+            continue
+        window = text_lower[max(0, idx - 50): idx + 50]
+        for viet_key, eng_val in sorted(FLOWER_MAP.items(), key=lambda x: -len(x[0])):
+            if viet_key in window and role_hints.get(eng_val) != "main":
+                role_hints[eng_val] = "secondary"
+                break
+
+    # Nếu không detect được gì nhưng có > 1 flower → flower[0] = main, rest = secondary
+    if not role_hints and len(flower_types) > 1:
+        role_hints[flower_types[0]] = "main"
+        for f in flower_types[1:]:
+            role_hints[f] = "secondary"
+
+    return role_hints
+
+
+def extract_target(text: str, raw_ner: dict) -> Optional[str]:
+    """Extract người nhận từ text."""
+    # Từ NER
+    if raw_ner.get("TARGET"):
+        return normalize_target(raw_ner["TARGET"])
+    # Keyword scan
+    text_lower = text.lower()
+    for viet_key, eng_val in sorted(TARGET_MAP.items(), key=lambda x: -len(x[0])):
+        if viet_key in text_lower:
+            return eng_val
+    return None
+
 
 def keyword_scan(text: str) -> dict:
     """
-    Fallback: scan raw text directly against all map keys.
-    Returns a partial dict with whatever was found.
-    Used when NER fails or returns empty.
-    Bao gồm cả layout (bố cục giỏ hoa) — PhoBERT chưa có nhãn LAYOUT
-    nên luôn trích xuất qua keyword scan.
+    Backward-compat fallback (single-value per category).
+    Trả về first-match per category.
     """
     text_lower = text.lower()
     result: dict = {}
-
-    # Try each map in priority order
     for mapping, key_name in [
         (CATEGORY_MAP, "category"),
-        (FLOWER_MAP, "flower"),
         (COLOR_MAP, "color"),
         (OCCASION_MAP, "occasion"),
         (WRAPPER_MAP, "wrapper"),
         (STYLE_MAP, "style"),
         (LAYOUT_MAP, "layout"),
+        (TARGET_MAP, "target"),
     ]:
-        for viet_key, eng_val in mapping.items():
+        for viet_key, eng_val in sorted(mapping.items(), key=lambda x: -len(x[0])):
             if viet_key in text_lower:
                 result[key_name] = eng_val
-                break  # Take first match per category
-
+                break
+    # Flower: take first match for backward compat
+    flowers = scan_all_flowers(text)
+    if flowers:
+        result["flower"] = flowers[0]
     return result

@@ -84,6 +84,10 @@ const productSchema = new mongoose.Schema({
         // Các yếu tố trang trí khác vd: 'ribbon', 'pearl'
     }],
     // ==========================================
+    processed_image: {
+        type: String,
+        trim: true
+    },
     images: [
         {
             url: { type: String, required: true },

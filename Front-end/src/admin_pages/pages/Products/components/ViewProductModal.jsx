@@ -115,13 +115,49 @@ const ViewProductModal = ({ open, onCancel, data }) => {
             </div>
 
             {/* Description Card */}
-            <div className="flex-1 bg-gray-50/50 p-4 rounded-xl border border-gray-100/80">
+            <div className="bg-gray-50/50 p-4 rounded-xl border border-gray-100/80 mb-4 h-32 overflow-y-auto">
               <Title level={5} className="flex items-center gap-1 text-navy-700 m-0 mb-2 text-sm font-bold">
                 <FileTextOutlined className="text-sm" /> Mô tả sản phẩm
               </Title>
-              <Paragraph className="text-gray-600 text-sm max-h-[160px] overflow-y-auto pr-1 m-0 leading-relaxed">
+              <Paragraph className="text-gray-600 text-[13px] m-0 leading-relaxed">
                 {data.description || 'Không có mô tả cho sản phẩm này.'}
               </Paragraph>
+            </div>
+
+            {/* AI Metadata Section (NEW) */}
+            <div className="bg-purple-50/30 p-4 rounded-2xl border border-purple-100/50">
+               <Title level={5} className="text-purple-700 m-0 mb-3 text-xs font-black uppercase tracking-widest flex items-center gap-2">
+                 ⚡ Phân loại AI
+               </Title>
+               <div className="space-y-3">
+                  <div>
+                    <span className="text-[11px] font-bold text-gray-400 uppercase mr-2">Dịp & Phong cách:</span>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {data.occasion?.map(o => <Tag key={o} color="purple" className="border-none rounded-md text-[10px]">{o}</Tag>)}
+                      {data.style?.map(s => <Tag key={s} color="blue" className="border-none rounded-md text-[10px]">{s}</Tag>)}
+                      {(!data.occasion?.length && !data.style?.length) && <span className="text-xs text-gray-400 italic">Chưa cập nhật</span>}
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <span className="text-[11px] font-bold text-gray-400 uppercase block mb-1">Hoa chủ đạo:</span>
+                      <div className="flex flex-wrap gap-1">
+                        {data.main_flowers?.map(f => <Tag key={f} className="m-0 text-[10px] font-medium bg-white border-gray-200">{f}</Tag>)}
+                      </div>
+                    </div>
+                    <div>
+                      <span className="text-[11px] font-bold text-gray-400 uppercase block mb-1">Màu sắc:</span>
+                      <div className="flex items-center gap-1">
+                        {data.dominant_color && <Badge color={data.dominant_color} text={<span className="text-[10px] font-bold uppercase">{data.dominant_color}</span>} />}
+                        {data.secondary_colors?.length > 0 && <span className="text-[10px] text-gray-400">+{data.secondary_colors.length}</span>}
+                      </div>
+                    </div>
+                  </div>
+                  <div>
+                    <span className="text-[11px] font-bold text-gray-400 uppercase mr-2">Bố cục:</span>
+                    <Text className="text-xs font-bold text-navy-700 capitalize">{data.layout || 'Mặc định'}</Text>
+                  </div>
+               </div>
             </div>
             
           </div>

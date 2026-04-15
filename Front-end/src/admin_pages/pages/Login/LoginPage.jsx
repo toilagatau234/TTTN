@@ -10,11 +10,15 @@ const LoginPage = () => {
     const location = useLocation();
 
     useEffect(() => {
+        if (authService.isLoggedIn()) {
+            navigate('/admin/dashboard', { replace: true });
+        }
+
         const searchParams = new URLSearchParams(location.search);
         if (searchParams.get("expired") === "true") {
             message.warning("Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.");
         }
-    }, [location]);
+    }, [location, navigate]);
 
     const onFinish = async (values) => {
         setLoading(true);

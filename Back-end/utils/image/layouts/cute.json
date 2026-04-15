@@ -1,0 +1,63 @@
+{
+  "canvas": { "width": 500, "height": 500 },
+  "style": "cute",
+  "layers": {
+    "basket": {
+      "zone": "bottom",
+      "x": 250, "y": 390,
+      "width": 250, "height": 165,
+      "zIndex": 0,
+      "randomize": false
+    },
+    "leaves": {
+      "zone": "surrounding",
+      "positions": [
+        { "x": 140, "y": 280 },
+        { "x": 360, "y": 280 },
+        { "x": 180, "y": 210 },
+        { "x": 320, "y": 210 },
+        { "x": 250, "y": 165 },
+        { "x": 155, "y": 320 },
+        { "x": 345, "y": 320 }
+      ],
+      "size": 50,
+      "zIndex": 1,
+      "randomize": true
+    },
+    "secondary": {
+      "zone": "sides",
+      "positions": [
+        { "x": 120, "y": 245 },
+        { "x": 380, "y": 245 },
+        { "x": 150, "y": 305 },
+        { "x": 350, "y": 305 },
+        { "x": 175, "y": 355 },
+        { "x": 325, "y": 355 }
+      ],
+      "size": 70,
+      "zIndex": 2,
+      "randomize": true
+    },
+    "main": {
+      "zone": "center",
+      "positions": [
+        { "x": 250, "y": 210 },
+        { "x": 190, "y": 260 },
+        { "x": 310, "y": 260 },
+        { "x": 220, "y": 310 },
+        { "x": 280, "y": 310 },
+        { "x": 250, "y": 360 }
+      ],
+      "size": 85,
+      "zIndex": 2,
+      "randomize": true
+    },
+    "ribbon": {
+      "zone": "top",
+      "x": 250, "y": 110,
+      "size": 100,
+      "zIndex": 3,
+      "randomize": true
+    }
+  }
+}

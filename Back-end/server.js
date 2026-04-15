@@ -40,6 +40,8 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // Serve static files from 'public' folder
 app.use('/public', express.static(path.join(__dirname, 'public')));
+// Serve processed images (rembg output)
+app.use('/data', express.static(path.join(__dirname, 'data')));
 
 
 // Routes
@@ -59,6 +61,7 @@ app.use('/api/stats', statsRoutes);
 app.use('/api/logs', activityLogRoutes);
 app.use('/api/recommend', recommendRoutes);
 app.use('/api/generate-image', imageRoutes);
+app.use('/api/images', imageRoutes);
 app.use('/api/suppliers', supplierRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/banners', bannerRoutes);

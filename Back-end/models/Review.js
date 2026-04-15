@@ -34,6 +34,17 @@ const reviewSchema = new mongoose.Schema({
     isApproved: {
         type: Boolean,
         default: true  // Tự duyệt, admin có thể ẩn sau
+    },
+    likes: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+    }],
+    reply: {
+        type: String,
+        trim: true
+    },
+    repliedAt: {
+        type: Date
     }
 }, {
     timestamps: true

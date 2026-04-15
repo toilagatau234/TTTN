@@ -1,51 +1,51 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import axios from 'axios';
-import { Send, Sparkles, ShoppingCart, Star, Search } from 'lucide-react';
+import { Send, Sparkles, ShoppingCart, Star, Search, RefreshCw, ImageIcon, Tag, Flower2, Package } from 'lucide-react';
 import authService from '../../../services/authService';
 
+const API = 'http://localhost:8080/api';
+
 const HydrangeaStudio = () => {
-    // ---- State ----
+    // ── State ────────────────────────────────────────────────────────
     const [messages, setMessages] = useState([
-        { role: 'bot', text: 'Chào mừng bạn đến với Studio Thiết Kế của Rosee! Tớ là Hydrangea 🌸. Bạn muốn tìm giỏ hoa tông màu gì, hay dành tặng ai nhỉ?' }
+        { role: 'bot', text: 'Chào mừng bạn đến với Hydrangea Studio! 🌸 Mình là trợ lý AI thiết kế giỏ hoa của Rosee. Bạn muốn giỏ hoa như thế nào — tông màu, loài hoa, hay dịp tặng gì?' }
     ]);
     const [inputText, setInputText] = useState('');
     const [isLoading, setIsLoading] = useState(false);
-    const [isAddingToCart, setIsAddingToCart] = useState(null); // productId đang add
-    
-    // ---- Search Recommendation States ----
+    const [isAddingToCart, setIsAddingToCart] = useState(null);
+
+    // Search
     const [searchQuery, setSearchQuery] = useState('');
     const [isSearching, setIsSearching] = useState(false);
-    const [isAiGeneratedData, setIsAiGeneratedData] = useState(true); // TASK 6
+    const [isAiMode, setIsAiMode] = useState(true);
+    const abortRef = useRef(null);
+    const debounceRef = useRef(null);
 
-    // References for Debounce & Abort (TASK 3 & 4)
-    const abortControllerRef = useRef(null);
-    const debounceTimeoutRef = useRef(null);
-
+    // AI state
     const [currentEntities, setCurrentEntities] = useState({});
+    const [classification, setClassification] = useState({ main: [], secondary: [] });
     const [suggestedProducts, setSuggestedProducts] = useState([]);
-    
+
+    // Image state
     const [generatedImage, setGeneratedImage] = useState(null);
     const [isGeneratingImage, setIsGeneratingImage] = useState(false);
-    const [selectedProduct, setSelectedProduct] = useState(null);
-    
-    // ---- Custom Basket States (TASK 3) ----
-    const [customBasket, setCustomBasket] = useState({
-        products: [],
-        flowers: [],
-        colors: [],
-        totalPrice: 0
-    });
-    
+    const [showImageModal, setShowImageModal] = useState(false);
+    const [imageGenerated, setImageGenerated] = useState(false); // inline preview
+
+    // Basket
+    const [customBasket, setCustomBasket] = useState({ products: [], flowers: [], colors: [], totalPrice: 0 });
+    // AI Bouquet summary (từ handleSuggest response)
+    const [bouquetSummary, setBouquetSummary] = useState(null); // { items, total_price, explanation }
     const [sessionId] = useState(() => `sess_${Math.random().toString(36).substring(2, 9)}`);
 
     const chatEndRef = useRef(null);
-
-    // Auto scroll chat
     useEffect(() => {
         chatEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }, [messages]);
 
-    // ---- Handlers ----
+    const formatPrice = (price) => new Intl.NumberFormat('vi-VN').format(price) + 'đ';
+
+    // ── Send message ─────────────────────────────────────────────────
     const handleSendMessage = async (e) => {
         e.preventDefault();
         if (!inputText.trim() || isLoading) return;
@@ -56,606 +56,573 @@ const HydrangeaStudio = () => {
         setIsLoading(true);
 
         try {
-            const response = await axios.post('http://localhost:8080/api/ai/hydrangea/chat', {
-                sessionId: sessionId,
+            const resp = await axios.post(`${API}/ai/hydrangea/chat`, {
+                sessionId,
                 message: userMsg.text
             });
 
-            const { success, reply, extractedEntities, suggestedProducts: products } = response.data;
+            const { success, reply, extractedEntities, suggestedProducts: products, classification: cls, current_bouquet } = resp.data;
 
             if (success) {
                 setMessages(prev => [...prev, { role: 'bot', text: reply }]);
-
-                if (extractedEntities) {
-                    setCurrentEntities(prev => ({ ...prev, ...extractedEntities }));
-                }
-
-                // Nếu Backend trả về sản phẩm gợi ý
-                if (products && products.length > 0) {
-                    setSuggestedProducts(products);
-                }
+                if (extractedEntities) setCurrentEntities(prev => ({ ...prev, ...extractedEntities }));
+                if (products?.length > 0) setSuggestedProducts(products);
+                if (cls) setClassification(cls);
+                if (current_bouquet) setBouquetSummary(current_bouquet);
             } else {
-                setMessages(prev => [...prev, { role: 'bot', text: reply || 'Có lỗi xảy ra, mong bạn thử lại sau.' }]);
+                setMessages(prev => [...prev, { role: 'bot', text: reply || 'Có lỗi xảy ra.' }]);
             }
         } catch (error) {
-            console.error("Hydrangea API Error:", error);
-            setMessages(prev => [...prev, { role: 'bot', text: 'Máy chủ đang bảo trì, bạn thông cảm nhé!' }]);
+            console.error('[Chat error]:', error);
+            setMessages(prev => [...prev, { role: 'bot', text: '😔 Máy chủ đang bảo trì, bạn thử lại chút sau nhé!' }]);
         } finally {
             setIsLoading(false);
         }
     };
 
-    // Hàm thêm sản phẩm thật vào giỏ hàng
-    const handleAddToCart = async (productId) => {
-        setIsAddingToCart(productId);
-        try {
-            const token = authService.getToken();
-            if (!token) {
-                alert("Vui lòng đăng nhập để thêm vào giỏ hàng!");
-                return;
-            }
-
-            const response = await axios.post('http://localhost:8080/api/cart', {
-                productId: productId,
-                quantity: 1
-            }, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-
-            if (response.data.success) {
-                setMessages(prev => [...prev, {
-                    role: 'bot',
-                    text: '🎉 Đã thêm sản phẩm vào giỏ hàng thành công! Bạn có thể tiếp tục tìm thêm hoặc vào giỏ hàng để thanh toán.'
-                }]);
-            }
-        } catch (error) {
-            console.error("Add to cart error:", error);
-            const errMsg = error.response?.data?.message || "Vui lòng đăng nhập để thêm vào giỏ hàng!";
-            alert(errMsg);
-        } finally {
-            setIsAddingToCart(null);
-        }
-    };
-    
-    // Hàm gọi API thực tế kèm AbortController
-    const fetchQuickRecommendAPI = async (queryText) => {
-        if (!queryText.trim()) return;
-
-        // Cancel previous request if still pending
-        if (abortControllerRef.current) {
-            abortControllerRef.current.abort();
-        }
-        
-        // Create new AbortController
-        abortControllerRef.current = new AbortController();
-        setIsSearching(true);
-
-        try {
-            const response = await axios.post('http://localhost:8080/api/recommend-products', {
-                text: queryText
-            }, {
-                signal: abortControllerRef.current.signal
-            });
-            
-            if (response.data && response.data.products) {
-                setSuggestedProducts(response.data.products);
-                
-                // Cập nhật UX Label (TASK 6)
-                if (typeof response.data.isAiGenerated !== 'undefined') {
-                    setIsAiGeneratedData(response.data.isAiGenerated);
-                }
-                
-                // Cập nhật info thực thể nếu có
-                if (response.data.filters) {
-                    setCurrentEntities(prev => ({ ...prev, ...response.data.filters }));
-                }
-            }
-        } catch (error) {
-            // Safe Error Handling & Task 7 Logging
-            if (axios.isCancel(error)) {
-                console.log("[Auto-search] Request canceled due to new input.");
-            } else {
-                console.error("[Frontend Auto-search] Quick Recommend Error:", error);
-                // We do not purely alert to avoid disturbing the user during typing
-            }
-        } finally {
-            setIsSearching(false);
-        }
-    };
-
-    // Hàm xử lý tìm kiếm sản phẩm nhanh (Debounce 400ms) - TASK 3
-    const handleQuickRecommend = (e) => {
-        if (e) {
-            e.preventDefault();
-            // Nếu có event (Enter), clear timeout và gọi ngay
-            if (debounceTimeoutRef.current) clearTimeout(debounceTimeoutRef.current);
-            fetchQuickRecommendAPI(searchQuery);
-            return;
-        }
-        
-        // Clear old timeout to prevent rapid calls
-        if (debounceTimeoutRef.current) {
-            clearTimeout(debounceTimeoutRef.current);
-        }
-        
-        // Set new debounce timeout
-        debounceTimeoutRef.current = setTimeout(() => {
-            fetchQuickRecommendAPI(searchQuery);
-        }, 400); 
-    };
-
-    const handleSearchInputChange = (e) => {
-        setSearchQuery(e.target.value);
-        // Only trigger API via debounce when user stops typing
-        handleQuickRecommend();
-    };
-
-    const handleSelectProduct = (product) => {
-        if (isGeneratingImage) return;
-        
-        setCustomBasket(prev => {
-            const newProducts = [...prev.products, product];
-            const newFlowers = [...prev.flowers, ...(product.main_flowers || [])];
-            const newColors = product.dominant_color ? [...prev.colors, product.dominant_color] : prev.colors;
-            
-            // Deduplicate
-            const uniqueFlowers = [...new Set(newFlowers)];
-            const uniqueColors = [...new Set(newColors)];
-            const newTotal = prev.totalPrice + (product.price || 0);
-
-            return {
-                ...prev,
-                products: newProducts,
-                flowers: uniqueFlowers,
-                colors: uniqueColors,
-                totalPrice: newTotal
-            };
-        });
-        
-        setMessages(prev => [...prev, {
-            role: 'bot',
-            text: `Đã thêm ${product.name} vào giỏ hoa tự chọn của bạn! Nhấn "Tạo giỏ hoa từ lựa chọn" để xem kết quả nhé.`
-        }]);
-    };
-
-    const handleGenerateCustomImage = async () => {
-        if (isGeneratingImage || customBasket.products.length === 0) return;
-        
-        // Use the base (first) product or last, depending on logic. Let's use the most recently added for layout
-        const baseProduct = customBasket.products[customBasket.products.length - 1];
-        setSelectedProduct(baseProduct);
+    // ── Generate image from entities (AI chat flow) ──────────────────
+    const handleGenerateFromEntities = async () => {
+        if (isGeneratingImage || !Object.keys(currentEntities).length) return;
         setIsGeneratingImage(true);
-        setGeneratedImage(null); // Reset cũ, Clear previous image before rendering new one (Issue 4)
-        
+        setGeneratedImage(null);
+        setImageGenerated(false);
+
         try {
-            const response = await axios.post('http://localhost:8080/api/generate-image', {
-                product_id: baseProduct._id
-            });
-            
-            if (response.data.success) {
-                const imageUrl = `http://localhost:8080${response.data.image_url}`;
-                setGeneratedImage(imageUrl);
-                
+            const resp = await axios.post(`${API}/generate-image`, { entities: currentEntities });
+            if (resp.data.success) {
+                const url = `http://localhost:8080${resp.data.image_url}`;
+                setGeneratedImage(url);
+                setImageGenerated(true);
+
+                // Cập nhật bouquet summary từ output chuẩn
+                if (resp.data.items) {
+                    setBouquetSummary({
+                        items: resp.data.items,
+                        total_price: resp.data.total_price || 0,
+                        explanation: resp.data.explanation || ''
+                    });
+                }
+
+                const layoutMsg = resp.data.layout_used ? ` (layout: ${resp.data.layout_used})` : '';
+                const priceMsg = resp.data.total_price
+                    ? ` — Tổng khoảng ${new Intl.NumberFormat('vi-VN').format(resp.data.total_price)}đ`
+                    : '';
                 setMessages(prev => [...prev, {
                     role: 'bot',
-                    text: `✨ Oa! Giỏ hoa kết hợp của bạn đã hoàn thiện rồi đây. Bạn thấy thế nào?`
+                    text: `✨ Giỏ hoa của bạn đã hoàn thiện!${layoutMsg}${priceMsg}`
                 }]);
             }
-        } catch (error) {
-            console.error("[Frontend] Image generation API error:", error);
-            alert("Rất tiếc, hệ thống đang bận không thể cắm hoa ngay lúc này. Bạn thử lại sau nhé!");
+        } catch (err) {
+            console.error('[Image gen error]:', err);
+            setMessages(prev => [...prev, { role: 'bot', text: '🌸 Chưa thể render giỏ hoa ngay lúc này. Thử lại sau nhé!' }]);
         } finally {
             setIsGeneratingImage(false);
         }
     };
 
-    // Removed old handleSelectProduct API call here
 
-    // Helper hiển thị Entities
-    const renderEntitiesInfo = () => {
-        const parts = [];
-        if (currentEntities.flower_type) parts.push(`Hoa: ${currentEntities.flower_type}`);
-        if (currentEntities.color) parts.push(`Màu: ${currentEntities.color}`);
-        if (currentEntities.occasion) parts.push(`Dịp: ${currentEntities.occasion}`);
-        if (currentEntities.style) parts.push(`Style: ${currentEntities.style}`);
-        if (currentEntities.layout) parts.push(`Kiểu: ${currentEntities.layout}`);
+    // ── Generate from product ─────────────────────────────────────────
+    const handleGenerateFromProduct = async (productId) => {
+        if (isGeneratingImage) return;
+        setIsGeneratingImage(true);
+        setGeneratedImage(null);
+        setImageGenerated(false);
 
-        if (parts.length === 0) return 'Đang chờ thông tin...';
-        return parts.join(' • ');
+        try {
+            const resp = await axios.post(`${API}/generate-image`, { product_id: productId });
+            if (resp.data.success) {
+                const url = `http://localhost:8080${resp.data.image_url}`;
+                setGeneratedImage(url);
+                setImageGenerated(true);
+                setShowImageModal(true);
+            }
+        } catch (err) {
+            console.error('[Image gen product error]:', err);
+        } finally {
+            setIsGeneratingImage(false);
+        }
     };
 
-    // Format giá VND
-    const formatPrice = (price) => {
-        return new Intl.NumberFormat('vi-VN').format(price) + 'đ';
+    // ── Add to cart ───────────────────────────────────────────────────
+    const handleAddToCart = async (productId) => {
+        setIsAddingToCart(productId);
+        try {
+            const token = authService.getToken();
+            if (!token) { alert('Vui lòng đăng nhập!'); return; }
+
+            const resp = await axios.post(`${API}/cart`, { productId, quantity: 1 }, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            if (resp.data.success) {
+                setMessages(prev => [...prev, { role: 'bot', text: '🎉 Đã thêm vào giỏ hàng! Bạn muốn tiếp tục tìm thêm không?' }]);
+            }
+        } catch (err) {
+            alert(err.response?.data?.message || 'Vui lòng đăng nhập!');
+        } finally {
+            setIsAddingToCart(null);
+        }
     };
 
+    // ── Quick search ──────────────────────────────────────────────────
+    const fetchRecommend = useCallback(async (query) => {
+        if (!query.trim()) return;
+        if (abortRef.current) abortRef.current.abort();
+        abortRef.current = new AbortController();
+        setIsSearching(true);
+
+        try {
+            const resp = await axios.post(`${API}/recommend-products`, { text: query }, {
+                signal: abortRef.current.signal
+            });
+            if (resp.data?.products) {
+                setSuggestedProducts(resp.data.products);
+                setIsAiMode(resp.data.isAiGenerated ?? true);
+                if (resp.data.filters) setCurrentEntities(prev => ({ ...prev, ...resp.data.filters }));
+            }
+        } catch (err) {
+            if (!axios.isCancel(err)) console.error('[Quick search]:', err);
+        } finally {
+            setIsSearching(false);
+        }
+    }, []);
+
+    const handleSearchChange = (e) => {
+        setSearchQuery(e.target.value);
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+        debounceRef.current = setTimeout(() => fetchRecommend(e.target.value), 400);
+    };
+
+    // ── Custom basket selection ────────────────────────────────────────
+    const handleSelectProduct = (product) => {
+        setCustomBasket(prev => {
+            const newProducts = [...prev.products, product];
+            const newFlowers = [...new Set([...prev.flowers, ...(product.main_flowers || [])])];
+            const newColors = product.dominant_color ? [...new Set([...prev.colors, product.dominant_color])] : prev.colors;
+            return { products: newProducts, flowers: newFlowers, colors: newColors, totalPrice: prev.totalPrice + (product.price || 0) };
+        });
+        setMessages(prev => [...prev, { role: 'bot', text: `✅ Đã thêm "${product.name}" vào giỏ tự chọn!` }]);
+    };
+
+    // ── Render entities summary ───────────────────────────────────────
+    const renderEntitiesChips = () => {
+        const chips = [];
+        if (currentEntities.flower_types?.length) chips.push({ label: currentEntities.flower_types.join(', '), color: 'green' });
+        if (currentEntities.color?.length) chips.push({ label: Array.isArray(currentEntities.color) ? currentEntities.color.join(', ') : currentEntities.color, color: 'pink' });
+        if (currentEntities.occasion) chips.push({ label: currentEntities.occasion, color: 'orange' });
+        if (currentEntities.style) chips.push({ label: currentEntities.style, color: 'purple' });
+        if (currentEntities.budget) chips.push({ label: formatPrice(currentEntities.budget), color: 'blue' });
+        return chips;
+    };
+
+    const chips = renderEntitiesChips();
+    const hasEntities = chips.length > 0;
+
+    const chipColors = {
+        green: 'bg-green-50 text-green-700 border-green-200',
+        pink: 'bg-pink-50 text-pink-700 border-pink-200',
+        orange: 'bg-orange-50 text-orange-700 border-orange-200',
+        purple: 'bg-purple-50 text-purple-700 border-purple-200',
+        blue: 'bg-blue-50 text-blue-700 border-blue-200',
+    };
+
+    // ── Classify product badge ────────────────────────────────────────
+    const getProductRole = (productId) => {
+        const id = String(productId);
+        if (classification.main?.some(m => String(m) === id)) return { label: 'Chính', color: 'bg-pink-500 text-white' };
+        if (classification.secondary?.some(s => String(s) === id)) return { label: 'Phụ', color: 'bg-purple-400 text-white' };
+        return null;
+    };
+
+    // ── Render ───────────────────────────────────────────────────────
     return (
-        <div className="min-h-screen bg-[#FDFBF7] pt-24 pb-12">
+        <div className="min-h-screen bg-gradient-to-br from-pink-50 via-rose-50 to-fuchsia-50 pt-24 pb-12">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
-                {/* Tiêu đề & Giới thiệu */}
+                {/* Header */}
                 <div className="text-center mb-10">
-                    <h1 className="text-4xl font-extrabold text-pink-600 tracking-tight flex items-center justify-center gap-2">
-                        <Sparkles className="text-yellow-400" /> Hydrangea Studio <Sparkles className="text-yellow-400" />
+                    <div className="inline-flex items-center gap-2 bg-white/80 backdrop-blur-md border border-pink-100 px-6 py-2 rounded-full shadow-sm mb-4">
+                        <Sparkles size={16} className="text-yellow-400" />
+                        <span className="text-xs font-semibold text-pink-600 uppercase tracking-widest">AI Thiết Kế Giỏ Hoa</span>
+                    </div>
+                    <h1 className="text-4xl font-extrabold bg-gradient-to-r from-pink-600 to-fuchsia-600 bg-clip-text text-transparent tracking-tight">
+                        Hydrangea Studio
                     </h1>
-                    <p className="mt-3 text-lg text-gray-600 max-w-2xl mx-auto">
-                        Mô tả giỏ hoa trong mơ của bạn, AI của Rosee sẽ tìm kiếm những mẫu hoa phù hợp nhất từ kho hàng thật!
+                    <p className="mt-3 text-base text-gray-500 max-w-xl mx-auto">
+                        Mô tả giỏ hoa trong mơ — AI sẽ tìm hoa, bố trí layout và render ảnh cho bạn!
                     </p>
                 </div>
 
-                {/* Main Dashboard Layout */}
-                <div className="flex flex-col lg:flex-row gap-8 bg-white rounded-3xl shadow-xl overflow-hidden border border-pink-100">
+                {/* Main layout: 3 columns */}
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
-                    {/* Cột 1: Chat Interface */}
-                    <div className="w-full lg:w-1/2 flex flex-col border-r border-pink-50 min-h-[600px] h-[70vh]">
-                        {/* Chat Header */}
-                        <div className="p-5 border-b border-pink-50 bg-pink-50/30 flex items-center gap-4">
-                            <div className="w-12 h-12 rounded-full overflow-hidden bg-white shadow-sm border border-pink-200">
-                                <img src="/logo-rosee.png" alt="Hydrangea AI" className="w-full h-full object-cover p-1" onError={(e) => { e.target.src = "https://ui-avatars.com/api/?name=AI&background=EC4899&color=fff"; }} />
+                    {/* ── Cột 1: Chat ── */}
+                    <div className="lg:col-span-4 bg-white rounded-3xl shadow-xl border border-pink-100 flex flex-col overflow-hidden min-h-[600px]">
+                        {/* Chat header */}
+                        <div className="p-4 border-b border-pink-50 bg-gradient-to-r from-pink-50 to-fuchsia-50 flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-pink-500 flex items-center justify-center shadow-md">
+                                <Flower2 size={20} className="text-white" />
                             </div>
-                            <div>
-                                <h2 className="font-bold text-gray-800">Trợ Lý Hydrangea</h2>
-                                <p className="text-xs text-green-500 font-medium tracking-wide flex items-center gap-1">
-                                    <span className="w-2 h-2 rounded-full bg-green-500 inline-block animate-pulse"></span>
-                                    {renderEntitiesInfo()}
+                            <div className="flex-1 min-w-0">
+                                <h2 className="font-bold text-gray-800 text-sm">Hydrangea AI</h2>
+                                <p className="text-[10px] text-green-500 flex items-center gap-1">
+                                    <span className="w-1.5 h-1.5 bg-green-500 rounded-full inline-block animate-pulse"></span>
+                                    Đang hoạt động
                                 </p>
                             </div>
                         </div>
 
-                        {/* Chat Messages */}
-                        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                        {/* Entity chips */}
+                        {hasEntities && (
+                            <div className="px-4 py-2 bg-gray-50 border-b border-gray-100 flex flex-wrap gap-1">
+                                {chips.map((chip, i) => (
+                                    <span key={i} className={`text-[10px] font-medium px-2 py-0.5 rounded-full border ${chipColors[chip.color]}`}>
+                                        {chip.label}
+                                    </span>
+                                ))}
+                            </div>
+                        )}
+
+                        {/* Messages */}
+                        <div className="flex-1 overflow-y-auto p-4 space-y-4">
                             {messages.map((msg, idx) => (
                                 <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                    <div className={`max-w-[85%] rounded-2xl px-5 py-3 ${msg.role === 'user'
-                                        ? 'bg-pink-500 text-white rounded-tr-sm shadow-md'
-                                        : 'bg-gray-50 text-gray-800 border border-gray-100 rounded-tl-sm shadow-sm'
-                                        }`}>
-                                        <p className="leading-relaxed whitespace-pre-wrap">{msg.text}</p>
+                                    <div className={`max-w-[88%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${
+                                        msg.role === 'user'
+                                            ? 'bg-gradient-to-br from-pink-500 to-fuchsia-500 text-white rounded-tr-sm shadow-md'
+                                            : 'bg-gray-50 text-gray-800 border border-gray-100 rounded-tl-sm shadow-sm'
+                                    }`}>
+                                        {msg.text}
                                     </div>
                                 </div>
                             ))}
 
-                            {/* Loading State */}
                             {isLoading && (
-                                <div className="flex justify-start items-center gap-2">
-                                    <div className="w-2 h-2 rounded-full bg-pink-300 animate-bounce"></div>
-                                    <div className="w-2 h-2 rounded-full bg-pink-300 animate-bounce" style={{ animationDelay: '75ms' }}></div>
-                                    <div className="w-2 h-2 rounded-full bg-pink-300 animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                                    <span className="text-xs text-gray-400 ml-2 italic">
-                                        Đang phân tích yêu cầu...
-                                    </span>
+                                <div className="flex items-center gap-2">
+                                    {[0, 75, 150].map(delay => (
+                                        <div key={delay} className="w-2 h-2 bg-pink-400 rounded-full animate-bounce" style={{ animationDelay: `${delay}ms` }} />
+                                    ))}
+                                    <span className="text-xs text-gray-400 italic">Đang phân tích...</span>
                                 </div>
                             )}
                             <div ref={chatEndRef} />
                         </div>
 
-                        {/* Chat Input */}
-                        <div className="p-4 bg-white border-t border-pink-50">
-                            <form onSubmit={handleSendMessage} className="relative flex items-center">
-                                <input
-                                    type="text"
-                                    disabled={isLoading}
-                                    placeholder="Tôi muốn giỏ hoa hồng đỏ tặng sinh nhật..."
-                                    className="w-full bg-gray-50 border border-gray-200 text-gray-800 px-6 py-4 rounded-full pr-16 focus:outline-none focus:ring-2 focus:ring-pink-300 transition-all shadow-inner disabled:bg-gray-100"
-                                    value={inputText}
-                                    onChange={(e) => setInputText(e.target.value)}
-                                />
-                                <button
-                                    type="submit"
-                                    disabled={!inputText.trim() || isLoading}
-                                    className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 bg-pink-500 hover:bg-pink-600 disabled:bg-gray-300 text-white rounded-full flex justify-center items-center shadow transition-colors cursor-pointer"
-                                >
-                                    <Send size={18} className="translate-x-[1px] translate-y-[1px]" />
-                                </button>
-                            </form>
-                        </div>
-                    </div>
-
-                    {/* Cột 2: Right Panel - Gợi ý sản phẩm */}
-                    <div className="w-full lg:w-1/2 bg-pink-50/20 p-6 flex flex-col relative min-h-[600px] overflow-y-auto">
-                        {/* Decorative background */}
-                        <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-10">
-                            <svg className="absolute left-[10%] top-[10%] w-64 h-64 text-pink-300 transform -rotate-12" fill="currentColor" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" /></svg>
-                        </div>
-
-                        {suggestedProducts.length > 0 ? (
-                            <div className="relative z-10">
-                                {/* Tiêu đề gợi ý */}
-                                    <div className="flex items-center gap-2 mb-2">
-                                        <div className="w-8 h-8 bg-pink-500 rounded-full flex items-center justify-center">
-                                            <Sparkles size={16} className="text-white" />
-                                        </div>
-                                        <h3 className="text-lg font-bold text-gray-800">
-                                            {isAiGeneratedData ? '✨ Gợi Ý Dành Riêng Cho Bạn' : '🔥 Sản Phẩm Phổ Biến'}
-                                        </h3>
-                                    </div>
-
-                                    
-                                    {/* Quick Search Bar */}
-                                    <div className="mb-6">
-                                        <form onSubmit={handleQuickRecommend} className="relative">
-                                            <input 
-                                                type="text"
-                                                placeholder="Mô tả nhanh mẫu hoa bạn muốn tìm..."
-                                                className="w-full bg-white border border-pink-200 text-sm px-4 py-3 rounded-xl pr-12 focus:outline-none focus:ring-2 focus:ring-pink-300 shadow-sm"
-                                                value={searchQuery}
-                                                onChange={handleSearchInputChange}
-                                            />
-                                            <button 
-                                                type="submit"
-                                                disabled={isSearching}
-                                                className="absolute right-2 top-1/2 -translate-y-1/2 text-pink-500 hover:text-pink-600 p-2 cursor-pointer"
-                                            >
-                                                {isSearching ? <span className="animate-spin block w-4 h-4 border-2 border-pink-500 border-t-transparent rounded-full"></span> : <Search size={20} />}
-                                            </button>
-                                        </form>
-                                    </div>
-
-                                {/* Custom Basket Feature UI */}
-                                {customBasket.products.length > 0 && (
-                                    <div className="mb-6 p-4 bg-white rounded-2xl shadow-sm border border-pink-200">
-                                        <div className="flex items-center justify-between mb-3">
-                                            <h4 className="font-bold text-pink-600 text-sm">Giỏ Hoa Tự Chọn Của Bạn</h4>
-                                            <span className="bg-pink-100 text-pink-700 text-xs px-2 py-0.5 rounded-full font-bold">
-                                                {customBasket.products.length} sản phẩm
-                                            </span>
-                                        </div>
-                                        <div className="flex flex-wrap gap-1 mb-3">
-                                            {customBasket.flowers.map((f, i) => (
-                                                <span key={i} className="text-[10px] bg-green-50 text-green-600 px-2 py-0.5 rounded-full border border-green-200">
-                                                    {f}
-                                                </span>
-                                            ))}
-                                            {customBasket.colors.map((c, i) => (
-                                                <span key={i} className="text-[10px] bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full border border-purple-200">
-                                                    {c}
-                                                </span>
-                                            ))}
-                                        </div>
-                                        <div className="flex items-center justify-between mt-2 pt-2 border-t border-pink-50">
-                                            <span className="text-gray-600 font-medium text-sm">Tổng tạm tính:</span>
-                                            <span className="text-pink-600 font-extrabold">{formatPrice(customBasket.totalPrice)}</span>
-                                        </div>
-                                        <button 
-                                            onClick={handleGenerateCustomImage}
-                                            disabled={isGeneratingImage}
-                                            className="mt-4 w-full bg-pink-500 hover:bg-pink-600 text-white font-bold py-2 rounded-xl text-sm transition-all shadow-md cursor-pointer"
-                                        >
-                                            👉 Tạo giỏ hoa từ lựa chọn
-                                        </button>
-                                        <button 
-                                            onClick={() => setCustomBasket({ products: [], flowers: [], colors: [], totalPrice: 0 })}
-                                            className="mt-2 w-full text-gray-500 hover:text-gray-700 text-xs font-medium py-1 transition-all cursor-pointer"
-                                        >
-                                            Xoá lựa chọn
-                                        </button>
-                                    </div>
-                                )}
-
-                                {/* Product Cards */}
-                                <div className="space-y-5">
-                                    {suggestedProducts.map((product, idx) => (
-                                        <div
-                                            key={product._id || idx}
-                                            className="bg-white rounded-2xl shadow-md border border-pink-100 overflow-hidden hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1"
-                                            style={{ animationDelay: `${idx * 150}ms` }}
-                                        >
-                                            <div className="flex">
-                                                {/* Product Image */}
-                                                <div className="w-32 h-32 sm:w-40 sm:h-40 flex-shrink-0 bg-gray-100 relative overflow-hidden">
-                                                    <img
-                                                        src={product.images?.[0]?.url || 'https://via.placeholder.com/200x200?text=Hoa'}
-                                                        alt={product.name}
-                                                        className="w-full h-full object-cover transition-transform duration-500 hover:scale-110"
-                                                    />
-                                                    {/* Score Badge */}
-                                                    {product.aiScore > 0 && (
-                                                        <div className="absolute top-2 left-2 bg-yellow-400 text-yellow-900 text-[10px] uppercase font-bold px-2 py-0.5 rounded-full flex items-center gap-1 shadow">
-                                                            <Star size={10} fill="currentColor" /> {product.aiScore} điểm
-                                                        </div>
-                                                    )}
-                                                    {/* Ranking Badge */}
-                                                    {idx === 0 && (
-                                                        <div className="absolute top-2 right-2 bg-pink-500 text-white text-[10px] uppercase font-bold px-2 py-0.5 rounded-full shadow">
-                                                            #1 Phù hợp nhất
-                                                        </div>
-                                                    )}
-                                                </div>
-
-                                                {/* Product Info */}
-                                                <div className="flex-1 p-4 flex flex-col justify-between">
-                                                    <div>
-                                                        <h4 className="font-bold text-gray-800 text-sm leading-tight line-clamp-2">
-                                                            {product.name}
-                                                        </h4>
-                                                        {/* Tags */}
-                                                        <div className="flex flex-wrap gap-1 mt-2">
-                                                            {product.dominant_color && (
-                                                                <span className="text-[10px] bg-pink-50 text-pink-600 px-2 py-0.5 rounded-full border border-pink-200">
-                                                                    {product.dominant_color}
-                                                                </span>
-                                                            )}
-                                                            {product.layout && (
-                                                                <span className="text-[10px] bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full border border-purple-200">
-                                                                    {product.layout}
-                                                                </span>
-                                                            )}
-                                                            {product.main_flowers?.slice(0, 2).map((f, i) => (
-                                                                <span key={i} className="text-[10px] bg-green-50 text-green-600 px-2 py-0.5 rounded-full border border-green-200">
-                                                                    {f}
-                                                                </span>
-                                                            ))}
-                                                        </div>
-                                                    </div>
-
-                                                    <div className="flex items-end justify-between mt-3 gap-2">
-                                                        <div>
-                                                            <p className="text-pink-600 font-extrabold text-lg">
-                                                                {formatPrice(product.price)}
-                                                            </p>
-                                                            {product.originalPrice && product.originalPrice > product.price && (
-                                                                <p className="text-gray-400 text-xs line-through">
-                                                                    {formatPrice(product.originalPrice)}
-                                                                </p>
-                                                            )}
-                                                        </div>
-                                                        <div className="flex gap-2">
-                                                            <button
-                                                                onClick={() => handleSelectProduct(product)}
-                                                                className="border border-pink-500 text-pink-500 hover:bg-pink-50 text-[10px] font-bold px-3 py-2 rounded-full transition-all cursor-pointer"
-                                                            >
-                                                                Chọn
-                                                            </button>
-                                                            <button
-                                                                onClick={() => handleAddToCart(product._id)}
-                                                                disabled={isAddingToCart === product._id}
-                                                                className="bg-pink-500 hover:bg-pink-600 disabled:bg-pink-300 text-white text-[10px] font-bold px-4 py-2 rounded-full shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
-                                                            >
-                                                                {isAddingToCart === product._id ? (
-                                                                    <span className="animate-spin w-3 h-3 border-2 border-white border-t-transparent rounded-full"></span>
-                                                                ) : (
-                                                                    <ShoppingCart size={14} />
-                                                                )}
-                                                                {isAddingToCart === product._id ? 'Đang thêm...' : 'Thêm giỏ'}
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-
-                                {/* Gợi ý tiếp tục */}
-                                <p className="text-center text-xs text-gray-400 mt-6 italic">
-                                    Nhắn thêm yêu cầu để mình tìm chính xác hơn nhé! 🌸
-                                </p>
-                            </div>
-                        ) : (
-                            /* Empty State */
-                            <div className="relative z-10 flex-1 flex flex-col items-center justify-center text-center px-6">
-                                <div className="w-24 h-24 bg-white rounded-full shadow-lg flex items-center justify-center text-pink-300 mb-6 border border-pink-50 transition-transform hover:scale-110">
-                                    <Search size={40} />
-                                </div>
-                                <h3 className="text-xl font-bold text-gray-800 mb-2">Khám Phá Sắc Hoa</h3>
-                                <p className="text-gray-500 leading-relaxed text-sm max-w-xs">
-                                    Hãy trò chuyện với Hydrangea ở bên trái để mình tìm ra những mẫu hoa phù hợp nhất với mong muốn của bạn!
-                                </p>
-                                {/* Gợi ý nhanh */}
-                                <div className="mt-8 space-y-2 w-full max-w-xs">
-                                    <p className="text-xs text-gray-400 uppercase font-semibold tracking-wider">Hoặc tìm kiếm nhanh:</p>
-                                    <form onSubmit={handleQuickRecommend} className="relative mb-4">
-                                        <input 
-                                            type="text"
-                                            placeholder="Gõ mô tả bó hoa bạn muốn..."
-                                            className="w-full bg-white border border-pink-200 text-sm px-4 py-3 rounded-xl pr-12 focus:outline-none focus:ring-2 focus:ring-pink-300 shadow-sm"
-                                            value={searchQuery}
-                                            onChange={handleSearchInputChange}
-                                        />
-                                        <button 
-                                            type="submit"
-                                            className="absolute right-2 top-1/2 -translate-y-1/2 text-pink-500 cursor-pointer"
-                                        >
-                                            <Search size={20} />
-                                        </button>
-                                    </form>
-                                    <p className="text-xs text-gray-400 uppercase font-semibold tracking-wider">Gợi ý từ Hydrangea:</p>
-                                    {['Giỏ hoa hồng đỏ tặng sinh nhật', 'Lẵng hoa sang trọng tone hồng', 'Hộp hoa hướng dương vui vẻ'].map((hint, i) => (
-                                        <button
-                                            key={i}
-                                            onClick={() => {
-                                                setSearchQuery(hint);
-                                                // Removed manual timeout since useEffect will handle it automatically
-                                            }}
-
-                                            className="w-full text-left text-sm text-pink-600 bg-pink-50 hover:bg-pink-100 px-4 py-2.5 rounded-xl border border-pink-100 transition-colors cursor-pointer"
-                                        >
+                        {/* Gợi ý nhanh */}
+                        {messages.length <= 2 && (
+                            <div className="px-4 pb-2">
+                                <p className="text-[10px] text-gray-400 mb-1.5 uppercase tracking-wider">Gợi ý nhanh:</p>
+                                <div className="flex flex-wrap gap-1.5">
+                                    {['Giỏ hoa hồng đỏ sinh nhật', 'Hoa tím lavender 500k', 'Lẵng hướng dương khai trương'].map((hint, i) => (
+                                        <button key={i} onClick={() => setInputText(hint)}
+                                            className="text-[10px] bg-pink-50 hover:bg-pink-100 text-pink-600 border border-pink-100 px-2.5 py-1 rounded-full transition-colors cursor-pointer">
                                             💬 {hint}
                                         </button>
                                     ))}
                                 </div>
                             </div>
                         )}
+
+                        {/* Chat input */}
+                        <div className="p-3 bg-white border-t border-pink-50">
+                            <form onSubmit={handleSendMessage} className="flex items-center gap-2">
+                                <input
+                                    type="text"
+                                    disabled={isLoading}
+                                    placeholder="Mô tả giỏ hoa bạn muốn..."
+                                    value={inputText}
+                                    onChange={e => setInputText(e.target.value)}
+                                    className="flex-1 bg-gray-50 border border-gray-200 text-gray-800 text-sm px-4 py-3 rounded-full focus:outline-none focus:ring-2 focus:ring-pink-300 transition-all disabled:bg-gray-100"
+                                />
+                                <button type="submit" disabled={!inputText.trim() || isLoading}
+                                    className="w-10 h-10 bg-gradient-to-br from-pink-500 to-fuchsia-500 text-white rounded-full flex items-center justify-center shadow-lg disabled:opacity-50 cursor-pointer flex-shrink-0">
+                                    <Send size={16} strokeWidth={2.5} />
+                                </button>
+                            </form>
+                        </div>
                     </div>
 
+                    {/* ── Cột 2: Ảnh giỏ hoa ── */}
+                    <div className="lg:col-span-4 flex flex-col gap-4">
+                        {/* Image preview card */}
+                        <div className="bg-white rounded-3xl shadow-xl border border-pink-100 overflow-hidden flex-1">
+                            <div className="p-4 border-b border-pink-50 flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <ImageIcon size={16} className="text-pink-500" />
+                                    <span className="font-bold text-gray-800 text-sm">Preview Giỏ Hoa</span>
+                                </div>
+                                {imageGenerated && (
+                                    <button onClick={() => setShowImageModal(true)}
+                                        className="text-xs text-pink-500 hover:text-pink-600 font-medium cursor-pointer">
+                                        Xem to →
+                                    </button>
+                                )}
+                            </div>
+
+                            <div className="relative aspect-square bg-gradient-to-br from-pink-50 to-fuchsia-50 flex items-center justify-center">
+                                {imageGenerated && generatedImage ? (
+                                    <img src={generatedImage} alt="Generated basket" className="w-full h-full object-contain p-2" />
+                                ) : isGeneratingImage ? (
+                                    <div className="flex flex-col items-center gap-3 text-center p-6">
+                                        <div className="w-16 h-16 border-4 border-pink-200 border-t-pink-500 rounded-full animate-spin" />
+                                        <p className="text-sm text-gray-500 font-medium animate-pulse">Đang cắm hoa...</p>
+                                    </div>
+                                ) : (
+                                    <div className="text-center p-6">
+                                        <div className="w-16 h-16 bg-pink-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                                            <Flower2 size={28} className="text-pink-300" />
+                                        </div>
+                                        <p className="text-sm text-gray-400">Ảnh giỏ hoa sẽ hiện ở đây</p>
+                                        <p className="text-xs text-gray-300 mt-1">Chat với AI để bắt đầu</p>
+                                    </div>
+                                )}
+                            </div>
+
+                            {hasEntities && (
+                                <div className="p-4 border-t border-pink-50">
+                                    <button
+                                        onClick={handleGenerateFromEntities}
+                                        disabled={isGeneratingImage}
+                                        className="w-full bg-gradient-to-r from-pink-500 to-fuchsia-500 hover:from-pink-600 hover:to-fuchsia-600 disabled:opacity-50 text-white font-bold py-3 rounded-2xl shadow-lg flex items-center justify-center gap-2 transition-all cursor-pointer">
+                                        {isGeneratingImage ? (
+                                            <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Đang render...</>
+                                        ) : (
+                                            <><Sparkles size={16} /> Render giỏ hoa từ AI</>
+                                        )}
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+
+
+                        {/* ── AI Bouquet Summary ── */}
+                        {bouquetSummary && (
+                            <div className="bg-white rounded-2xl shadow-md border border-pink-100 p-4">
+                                <div className="flex items-center justify-between mb-2">
+                                    <div className="flex items-center gap-2">
+                                        <Sparkles size={14} className="text-yellow-400" />
+                                        <h4 className="font-bold text-gray-800 text-sm">Tổng hợp AI</h4>
+                                    </div>
+                                    {bouquetSummary.total_price > 0 && (
+                                        <span className="font-extrabold text-pink-600 text-sm">
+                                            {formatPrice(bouquetSummary.total_price)}
+                                        </span>
+                                    )}
+                                </div>
+                                {bouquetSummary.explanation && (
+                                    <p className="text-[10px] text-gray-500 italic leading-relaxed mb-2 border-l-2 border-pink-200 pl-2">
+                                        {bouquetSummary.explanation}
+                                    </p>
+                                )}
+                                <div className="flex flex-wrap gap-1">
+                                    {(bouquetSummary.items || []).slice(0, 3).map((item, i) => (
+                                        <span key={i} className={`text-[9px] font-bold px-2 py-0.5 rounded-full border ${
+                                            item.role === 'main'
+                                                ? 'bg-pink-100 text-pink-700 border-pink-200'
+                                                : 'bg-purple-50 text-purple-600 border-purple-200'
+                                        }`}>
+                                            {item.role === 'main' ? '🌸' : '✿'} {item.name?.substring(0, 16)}
+                                        </span>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Manual basket summary */}
+                        {customBasket.products.length > 0 && (
+                            <div className="bg-white rounded-2xl shadow-md border border-pink-100 p-4">
+                                <div className="flex items-center justify-between mb-3">
+                                    <div className="flex items-center gap-2">
+                                        <Package size={14} className="text-pink-500" />
+                                        <h4 className="font-bold text-gray-800 text-sm">Tuyển chọn thủ công</h4>
+                                    </div>
+                                    <span className="text-xs bg-pink-100 text-pink-700 px-2 py-0.5 rounded-full font-bold">
+                                        {customBasket.products.length} sản phẩm
+                                    </span>
+                                </div>
+                                <div className="flex items-center justify-between pt-2 border-t border-pink-50">
+                                    <span className="text-xs text-gray-500">Tổng:</span>
+                                    <span className="font-extrabold text-pink-600">{formatPrice(customBasket.totalPrice)}</span>
+                                </div>
+                                <button
+                                    onClick={() => setCustomBasket({ products: [], flowers: [], colors: [], totalPrice: 0 })}
+                                    className="mt-2 w-full text-gray-400 hover:text-gray-600 text-xs py-1 cursor-pointer">
+                                    Xóa lựa chọn
+                                </button>
+                            </div>
+                        )}
+                    </div>
+
+
+                    {/* ── Cột 3: Sản phẩm gợi ý ── */}
+                    <div className="lg:col-span-4 bg-white rounded-3xl shadow-xl border border-pink-100 flex flex-col overflow-hidden min-h-[600px]">
+                        {/* Header */}
+                        <div className="p-4 border-b border-pink-50 flex items-center gap-2">
+                            <Tag size={16} className="text-pink-500" />
+                            <h3 className="font-bold text-gray-800 text-sm flex-1">
+                                {isAiMode ? '✨ Gợi ý phù hợp nhất' : '🔥 Sản phẩm nổi bật'}
+                            </h3>
+                            {suggestedProducts.length > 0 && (
+                                <span className="text-[10px] text-gray-400">{suggestedProducts.length} kết quả</span>
+                            )}
+                        </div>
+
+                        {/* Quick search */}
+                        <div className="p-3 border-b border-gray-50">
+                            <div className="relative">
+                                <input type="text"
+                                    placeholder="Tìm nhanh mẫu hoa..."
+                                    value={searchQuery}
+                                    onChange={handleSearchChange}
+                                    className="w-full bg-gray-50 border border-gray-200 text-sm px-4 py-2.5 rounded-xl pr-10 focus:outline-none focus:ring-2 focus:ring-pink-300"
+                                />
+                                <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                                    {isSearching ? (
+                                        <span className="w-4 h-4 border-2 border-pink-400 border-t-transparent rounded-full animate-spin block" />
+                                    ) : (
+                                        <Search size={15} className="text-gray-400" />
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Product list */}
+                        <div className="flex-1 overflow-y-auto p-3 space-y-3">
+                            {suggestedProducts.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center h-full text-center py-12 px-4">
+                                    <div className="w-16 h-16 bg-pink-50 rounded-full flex items-center justify-center mb-4">
+                                        <Search size={24} className="text-pink-200" />
+                                    </div>
+                                    <p className="text-gray-400 text-sm mb-4">Chat với Hydrangea để xem gợi ý nhé!</p>
+                                    <div className="space-y-2 w-full max-w-xs">
+                                        {['Giỏ hoa hồng đỏ tặng sinh nhật', 'Lẵng hoa sang trọng tone hồng', 'Hộp hoa hướng dương vui vẻ'].map((hint, i) => (
+                                            <button key={i}
+                                                onClick={() => { setSearchQuery(hint); fetchRecommend(hint); }}
+                                                className="w-full text-left text-xs text-pink-600 bg-pink-50 hover:bg-pink-100 px-3 py-2 rounded-xl border border-pink-100 transition-colors cursor-pointer">
+                                                💬 {hint}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            ) : (
+                                suggestedProducts.map((product, idx) => {
+                                    const role = getProductRole(product._id);
+                                    return (
+                                        <div key={product._id || idx}
+                                            className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 overflow-hidden">
+                                            <div className="flex">
+                                                {/* Image */}
+                                                <div className="w-24 h-24 flex-shrink-0 bg-gray-50 relative">
+                                                    <img
+                                                        src={product.images?.[0]?.url || 'https://via.placeholder.com/96?text=🌸'}
+                                                        alt={product.name}
+                                                        className="w-full h-full object-cover"
+                                                    />
+                                                    {role && (
+                                                        <span className={`absolute top-1 left-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full ${role.color}`}>
+                                                            {role.label}
+                                                        </span>
+                                                    )}
+                                                    {idx === 0 && (
+                                                        <span className="absolute top-1 right-1 text-[9px] bg-yellow-400 text-yellow-900 font-bold px-1.5 py-0.5 rounded-full">
+                                                            #1
+                                                        </span>
+                                                    )}
+                                                </div>
+
+                                                {/* Info */}
+                                                <div className="flex-1 p-3 flex flex-col justify-between min-w-0">
+                                                    <div>
+                                                        <h4 className="font-bold text-gray-800 text-xs leading-tight line-clamp-2">{product.name}</h4>
+                                                        <div className="flex flex-wrap gap-1 mt-1">
+                                                            {product.dominant_color && (
+                                                                <span className="text-[9px] bg-pink-50 text-pink-600 px-1.5 py-0.5 rounded-full border border-pink-100">{product.dominant_color}</span>
+                                                            )}
+                                                            {product.main_flowers?.slice(0, 1).map((f, i) => (
+                                                                <span key={i} className="text-[9px] bg-green-50 text-green-600 px-1.5 py-0.5 rounded-full border border-green-100">{f}</span>
+                                                            ))}
+                                                            {product.aiScore > 0 && (
+                                                                <span className="text-[9px] bg-yellow-50 text-yellow-700 px-1.5 py-0.5 rounded-full border border-yellow-100 flex items-center gap-0.5">
+                                                                    <Star size={8} fill="currentColor" />{product.aiScore}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="flex items-center justify-between mt-2 gap-1">
+                                                        <div>
+                                                            <p className="text-pink-600 font-extrabold text-sm">{formatPrice(product.price)}</p>
+                                                            {product.originalPrice > product.price && (
+                                                                <p className="text-gray-400 text-[10px] line-through">{formatPrice(product.originalPrice)}</p>
+                                                            )}
+                                                        </div>
+                                                        <div className="flex gap-1">
+                                                            <button onClick={() => handleSelectProduct(product)}
+                                                                className="text-[9px] border border-pink-400 text-pink-500 hover:bg-pink-50 px-2 py-1 rounded-full cursor-pointer transition-colors">
+                                                                Chọn
+                                                            </button>
+                                                            <button onClick={() => handleGenerateFromProduct(product._id)}
+                                                                disabled={isGeneratingImage}
+                                                                className="text-[9px] bg-purple-100 text-purple-600 hover:bg-purple-200 px-2 py-1 rounded-full cursor-pointer transition-colors disabled:opacity-50">
+                                                                <ImageIcon size={9} className="inline" />
+                                                            </button>
+                                                            <button onClick={() => handleAddToCart(product._id)}
+                                                                disabled={isAddingToCart === product._id}
+                                                                className="bg-pink-500 hover:bg-pink-600 disabled:bg-pink-300 text-white text-[9px] font-bold px-2 py-1 rounded-full flex items-center gap-1 cursor-pointer transition-colors">
+                                                                {isAddingToCart === product._id ? (
+                                                                    <span className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin" />
+                                                                ) : <ShoppingCart size={10} />}
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })
+                            )}
+                        </div>
+                    </div>
                 </div>
             </div>
-            
-            {/* 1. Loading Overlay (Cắm hoa) */}
-            {isGeneratingImage && (
-                <div className="fixed inset-0 z-[60] flex flex-col items-center justify-center bg-white/80 backdrop-blur-md">
-                    <div className="relative w-40 h-40">
-                        <div className="absolute inset-0 border-4 border-pink-100 rounded-full"></div>
-                        <div className="absolute inset-0 border-4 border-pink-500 border-t-transparent rounded-full animate-spin"></div>
-                        <img src="/logo-rosee.png" className="absolute inset-8 w-24 h-24 object-contain animate-pulse" alt="Logo" />
+
+            {/* ── Image Modal ── */}
+            {showImageModal && generatedImage && (
+                <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+                    <div className="bg-white rounded-3xl overflow-hidden shadow-2xl max-w-lg w-full relative">
+                        <button onClick={() => setShowImageModal(false)}
+                            className="absolute top-4 right-4 w-8 h-8 bg-black/20 hover:bg-black/40 text-white rounded-full flex items-center justify-center z-10 cursor-pointer">
+                            ✕
+                        </button>
+                        <img src={generatedImage} alt="Generated basket" className="w-full object-contain" />
+                        <div className="p-5 bg-white border-t">
+                            <div className="flex items-center justify-between mb-3">
+                                <span className="font-bold text-gray-800">Giỏ hoa AI tạo</span>
+                                {customBasket.totalPrice > 0 && (
+                                    <span className="text-pink-600 font-extrabold text-lg">{formatPrice(customBasket.totalPrice)}</span>
+                                )}
+                            </div>
+                            <div className="flex gap-2">
+                                <button onClick={() => { setShowImageModal(false); handleGenerateFromEntities(); }}
+                                    className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-600 text-sm py-2.5 rounded-xl font-medium flex items-center justify-center gap-2 cursor-pointer">
+                                    <RefreshCw size={14} /> Tạo lại
+                                </button>
+                                <button onClick={() => setShowImageModal(false)}
+                                    className="flex-1 bg-gradient-to-r from-pink-500 to-fuchsia-500 text-white text-sm py-2.5 rounded-xl font-bold cursor-pointer">
+                                    Tiếp tục
+                                </button>
+                            </div>
+                        </div>
                     </div>
-                    <h3 className="mt-8 text-2xl font-bold text-gray-800 animate-bounce">Nghệ nhân đang cắm hoa...</h3>
-                    <p className="text-gray-500 italic">Vui lòng chờ trong giây lát bạn nhé! 🌸</p>
                 </div>
             )}
 
-            {/* 2. Result Modal (Giỏ hoa hoàn thiện) */}
-            {generatedImage && (
-                <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
-                    <div className="bg-white rounded-3xl overflow-hidden shadow-2xl max-w-4xl w-full flex flex-col md:flex-row relative animate-in zoom-in-95 duration-300">
-                        {/* Close button */}
-                        <button 
-                            onClick={() => setGeneratedImage(null)}
-                            className="absolute top-4 right-4 w-10 h-10 bg-black/20 hover:bg-black/40 text-white rounded-full flex items-center justify-center transition-colors z-10 cursor-pointer"
-                        >
-                            ✕
-                        </button>
-
-                        {/* Image Panel */}
-                        <div className="w-full md:w-3/5 bg-gray-100 aspect-square md:aspect-auto">
-                            <img 
-                                src={generatedImage} 
-                                alt="Generated Basket" 
-                                className="w-full h-full object-cover"
-                            />
-                        </div>
-
-                        {/* Content Panel */}
-                        <div className="w-full md:w-2/5 p-8 flex flex-col justify-between bg-white">
-                            <div>
-                                <div className="flex items-center gap-2 mb-4">
-                                    <Sparkles className="text-yellow-400" size={24} />
-                                    <span className="text-xs font-bold text-pink-500 uppercase tracking-widest">Tuyệt tác hoàn thiện</span>
-                                </div>
-                                <h2 className="text-2xl font-extrabold text-gray-800 mb-2 leading-tight">
-                                    {selectedProduct?.name}
-                                </h2>
-                                <p className="text-gray-600 text-sm leading-relaxed mb-6">
-                                    Dựa trên yêu cầu của bạn, đây là phiên bản giỏ hoa thực tế được phối và cắm bởi nghệ nhân Rosee. Mọi thành phần đều được chọn lọc kỹ lưỡng để đảm bảo vẻ đẹp hoàn mỹ nhất.
-                                </p>
-                                
-                                <div className="space-y-4">
-                                    <div className="flex justify-between items-center bg-gray-50 p-4 rounded-2xl">
-                                        <span className="text-gray-500 font-medium">Giá tổng sản phẩm hợp nhất</span>
-                                        <span className="text-2xl font-bold text-pink-600">{formatPrice(customBasket.totalPrice > 0 ? customBasket.totalPrice : selectedProduct?.price)}</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="mt-8 space-y-3">
-                                <button 
-                                    onClick={() => {
-                                        handleAddToCart(selectedProduct._id);
-                                        setGeneratedImage(null);
-                                    }}
-                                    className="w-full bg-pink-500 hover:bg-pink-600 text-white font-bold py-4 rounded-2xl shadow-lg shadow-pink-200 transition-all flex items-center justify-center gap-3 cursor-pointer"
-                                >
-                                    <ShoppingCart size={20} />
-                                    Đặt mua ngay
-                                </button>
-                                <button 
-                                    onClick={() => setGeneratedImage(null)}
-                                    className="w-full text-gray-400 hover:text-gray-600 text-sm font-medium py-2 transition-colors cursor-pointer"
-                                >
-                                    Tiếp tục thiết kế khác
-                                </button>
-                            </div>
-                        </div>
+            {/* ── Global render loading overlay ── */}
+            {isGeneratingImage && !showImageModal && (
+                <div className="fixed bottom-8 right-8 z-50 bg-white rounded-2xl shadow-2xl border border-pink-100 p-4 flex items-center gap-3">
+                    <div className="w-8 h-8 border-3 border-pink-200 border-t-pink-500 rounded-full animate-spin" />
+                    <div>
+                        <p className="text-sm font-bold text-gray-800">Đang render...</p>
+                        <p className="text-xs text-gray-400">Cắm hoa đẹp cần vài giây</p>
                     </div>
                 </div>
             )}

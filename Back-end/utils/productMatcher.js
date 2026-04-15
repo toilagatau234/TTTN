@@ -41,67 +41,85 @@ const matchInArray = (targetValue, sourceArray) => {
  * @param {Array} products - List of products from database
  * @returns {Array} - All products with calculated 'matchScore'
  */
-const matchProducts = (filters = {}, products = []) => {
-    return products.map(product => {
+const matchProducts = (filters = {}, products = [], strictMode = true) => {
+    let validProducts = [];
+
+    for (let product of products) {
+        if (product.stock <= 0) continue; // Skip out of stock
+
+        if (strictMode && filters.budget > 0) {
+            const minBudget = filters.budget * 0.8;
+            const maxBudget = filters.budget * 1.2;
+            if (product.price < minBudget || product.price > maxBudget) continue;
+        }
+
         let score = 0;
 
-        // TASK 1 & 2: Safe Null Handling & Normalization
-        
-        // 1. Color Match (Weight: 3)
-        // match dominant_color OR secondary_colors with SOFT MATCHING
-        if (filters.color) {
-            const normalizedFilterColor = normalize(filters.color);
-            const normalizedDominantColor = normalize(product.dominant_color);
-            
-            // SOFT MATCH: (e.g., "red" matches "dark red")
-            const isDominantMatch = normalizedDominantColor.includes(normalizedFilterColor) || 
-                                    normalizedFilterColor.includes(normalizedDominantColor);
-            
-            const isSecondaryMatch = matchInArray(filters.color, product.secondary_colors);
-            
-            if (isDominantMatch || isSecondaryMatch) {
-                score += 3;
+        // 1. Color Match (Array) (Weight: 3)
+        if (Array.isArray(filters.color) && filters.color.length > 0) {
+            let colorMatched = false;
+            for (let c of filters.color) {
+                const normalizedFilterColor = normalize(c);
+                const normalizedDominantColor = normalize(product.dominant_color || "");
+                const isDominantMatch = normalizedDominantColor.includes(normalizedFilterColor) || normalizedFilterColor.includes(normalizedDominantColor);
+                const isSecondaryMatch = matchInArray(c, product.secondary_colors);
+                if (isDominantMatch || isSecondaryMatch) colorMatched = true;
+            }
+            if (strictMode) {
+                if (colorMatched) score += 3;
+            } else {
+                // In relaxed mode, ignore color penalty if color doesn't match, but still reward if it does
+                if (colorMatched) score += 3;
             }
         }
 
-        // 2. Occasion Match (Weight: 3)
-        // TASK 4: Safe Array Matching
+        // 2. Occasion
         if (filters.occasion) {
-            if (matchInArray(filters.occasion, product.occasion)) {
-                score += 3;
-            }
+            if (matchInArray(filters.occasion, product.occasion)) score += 3;
         }
 
-        // 3. Style Match (Weight: 2)
+        // 3. Style
         if (filters.style) {
-            if (matchInArray(filters.style, product.style)) {
-                score += 2;
-            }
+            if (matchInArray(filters.style, product.style)) score += 2;
         }
 
-        // 4. Flower Match (Weight: 1)
-        // TASK 3: Correct Flower Matching (main_flowers.type) with SOFT MATCHING
-        if (Array.isArray(filters.flowers) && filters.flowers.length > 0) {
-            const aiFlowers = filters.flowers.map(f => normalize(f));
-            const productFlowers = Array.isArray(product.main_flowers) 
-                ? product.main_flowers.map(f => normalize(f.type)) 
-                : [];
-            
-            // If ANY AI flower SOFT-MATCHES product.main_flowers.type
-            if (aiFlowers.some(aiTarget => 
-                productFlowers.some(prodFlower => 
-                    prodFlower.includes(aiTarget) || aiTarget.includes(prodFlower)
-                )
-            )) {
-                score += 1;
+        // 4. Flowers (Main and Secondary)
+        if (filters.flowers) {
+            if (Array.isArray(filters.flowers.main) && filters.flowers.main.length > 0) {
+                const productMainFlowers = (Array.isArray(product.main_flowers) ? product.main_flowers.map(f => normalize(typeof f === 'string' ? f : f.type)) : []);
+                const matchedMain = filters.flowers.main.some(f => {
+                    const normFlower = normalize(f);
+                    return productMainFlowers.some(pmf => pmf.includes(normFlower) || normFlower.includes(pmf));
+                });
+                if (matchedMain) score += 3;
+            }
+
+            if (Array.isArray(filters.flowers.secondary) && filters.flowers.secondary.length > 0) {
+                const productSubFlowers = (Array.isArray(product.sub_flowers) ? product.sub_flowers.map(f => normalize(typeof f === 'string' ? f : f.type)) : []);
+                const matchedSub = filters.flowers.secondary.some(f => {
+                    const normFlower = normalize(f);
+                    return productSubFlowers.some(pmf => pmf.includes(normFlower) || normFlower.includes(pmf));
+                });
+                if (matchedSub) score += 1;
             }
         }
-
-        return {
-            ...product.toObject ? product.toObject() : product,
+        
+        validProducts.push({
+            ...(product.toObject ? product.toObject() : product),
             matchScore: score
-        };
-    });
+        });
+    }
+
+    // Filter products that matched at least one criteria
+    let matchedProducts = validProducts.filter(p => p.matchScore > 0);
+    
+    // MISSING FALLBACK STRATEGY 
+    if (strictMode && matchedProducts.length === 0) {
+        // Fallback: Relax constraints (ignore budget/color limits)
+        return matchProducts(filters, products, false);
+    }
+
+    return matchedProducts;
 };
 
 module.exports = {

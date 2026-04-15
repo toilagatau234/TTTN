@@ -3,8 +3,9 @@ import { Table, Rate, Avatar, Button, Tag, Input, Select, Dropdown, Menu, Modal,
 import { 
   SearchOutlined, FilterOutlined, MoreOutlined, 
   MessageOutlined, EyeInvisibleOutlined, DeleteOutlined,
-  CheckCircleOutlined, StarFilled
+  CheckCircleOutlined, StarFilled, EyeOutlined
 } from '@ant-design/icons';
+import reviewService from '../../../services/reviewService';
 
 const { Option } = Select;
 const { TextArea } = Input;
@@ -23,63 +24,133 @@ const ReviewStat = ({ title, value, icon, color }) => (
 );
 
 const ReviewsPage = () => {
+  const [loading, setLoading] = useState(false);
+  const [data, setData] = useState([]);
+  const [pagination, setPagination] = useState({ current: 1, pageSize: 10, total: 0 });
+  const [filters, setFilters] = useState({ isApproved: undefined, rating: undefined, search: '' });
+  
   const [replyModalOpen, setReplyModalOpen] = useState(false);
   const [currentReview, setCurrentReview] = useState(null);
+  const [replyText, setReplyText] = useState('');
 
-  const [data, setData] = useState([
-    {
-      key: '1', id: 1, 
-      user: 'Nguyễn Văn A', avatar: 'https://i.pravatar.cc/150?img=1',
-      product: 'Bó Hoa Hồng Đỏ Valentine', productImage: 'https://images.unsplash.com/photo-1562690868-60bbe7293e94?auto=format&fit=crop&w=100&q=80',
-      rating: 5, comment: 'Hoa rất tươi, gói đẹp, giao hàng nhanh. Sẽ ủng hộ shop tiếp!',
-      date: '10:30 24/01/2026', status: 'Approved', reply: ''
-    },
-    {
-      key: '2', id: 2, 
-      user: 'Trần Thị B', avatar: 'https://i.pravatar.cc/150?img=5',
-      product: 'Lan Hồ Điệp Vàng', productImage: 'https://images.unsplash.com/photo-1566929369-1c255c5e0682?auto=format&fit=crop&w=100&q=80',
-      rating: 4, comment: 'Hoa đẹp nhưng giao hơi trễ một chút.',
-      date: '09:15 24/01/2026', status: 'Pending', reply: ''
-    },
-    {
-      key: '3', id: 3, 
-      user: 'Lê Hoàng C', avatar: 'https://i.pravatar.cc/150?img=3',
-      product: 'Hoa Cẩm Tú Cầu', productImage: 'https://images.unsplash.com/photo-1588825838638-349f291350a4?auto=format&fit=crop&w=100&q=80',
-      rating: 1, comment: 'Hoa bị dập nát khi nhận. Yêu cầu hoàn tiền!',
-      date: '08:00 23/01/2026', status: 'Spam', reply: ''
-    },
-  ]);
+  const fetchReviews = async (page = 1, pageSize = 10, currentFilters = filters) => {
+    setLoading(true);
+    try {
+      const params = {
+        page,
+        limit: pageSize,
+        ...currentFilters
+      };
+      const res = await reviewService.getAllReviews(params);
+      if (res.success) {
+        setData(res.data.map(item => ({ ...item, key: item._id })));
+        setPagination({
+          current: res.pagination.page,
+          pageSize: res.pagination.limit,
+          total: res.pagination.total
+        });
+      }
+    } catch (error) {
+      message.error("Lỗi khi tải danh sách đánh giá");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  React.useEffect(() => {
+    fetchReviews();
+  }, []);
+
+  const handleTableChange = (pag) => {
+    fetchReviews(pag.current, pag.pageSize);
+  };
+
+  const handleFilterChange = (key, value) => {
+    const newFilters = { ...filters, [key]: value === 'all' ? undefined : value };
+    setFilters(newFilters);
+    fetchReviews(1, pagination.pageSize, newFilters);
+  };
+
+  const handleToggleApprove = async (id) => {
+    try {
+      const res = await reviewService.toggleApprove(id);
+      if (res.success) {
+        message.success(res.message);
+        fetchReviews(pagination.current, pagination.pageSize);
+      }
+    } catch (error) {
+      message.error("Lỗi khi cập nhật trạng thái");
+    }
+  };
+
+  const handleDelete = async (id) => {
+    Modal.confirm({
+      title: 'Xác nhận xóa',
+      content: 'Bạn có chắc chắn muốn xóa đánh giá này không? Hành động này không thể hoàn tác.',
+      okText: 'Xóa',
+      okType: 'danger',
+      cancelText: 'Hủy',
+      onOk: async () => {
+        try {
+          const res = await reviewService.deleteReview(id);
+          if (res.success) {
+            message.success("Đã xóa đánh giá");
+            fetchReviews(pagination.current, pagination.pageSize);
+          }
+        } catch (error) {
+          message.error("Lỗi khi xóa đánh giá");
+        }
+      }
+    });
+  };
 
   const handleOpenReply = (record) => {
     setCurrentReview(record);
+    setReplyText(record.reply || '');
     setReplyModalOpen(true);
   };
 
-  const handleReplySubmit = () => {
-    message.success('Đã gửi phản hồi thành công!');
-    setReplyModalOpen(false);
+  const handleReplySubmit = async () => {
+    if (!replyText.trim()) {
+      message.warning("Vui lòng nhập nội dung phản hồi");
+      return;
+    }
+    
+    setLoading(true);
+    try {
+      const res = await reviewService.replyReview(currentReview._id, replyText);
+      if (res.success) {
+        message.success('Đã gửi phản hồi thành công!');
+        setReplyModalOpen(false);
+        fetchReviews(pagination.current, pagination.pageSize);
+      }
+    } catch (error) {
+      message.error("Lỗi khi gửi phản hồi");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const columns = [
     {
       title: 'SẢN PHẨM',
-      width: 250,
+      width: 200,
       render: (_, record) => (
         <div className="flex items-center gap-3">
-           <img src={record.productImage} alt="prod" className="w-10 h-10 rounded-lg object-cover" />
-           <span className="font-bold text-navy-700 text-sm line-clamp-1">{record.product}</span>
+           <img src={record.product?.images?.[0]?.url} alt="prod" className="w-10 h-10 rounded-lg object-cover" />
+           <span className="font-bold text-navy-700 text-sm line-clamp-1">{record.product?.name}</span>
         </div>
       )
     },
     {
       title: 'KHÁCH HÀNG',
-      width: 200,
+      width: 180,
       render: (_, record) => (
         <div className="flex items-center gap-2">
-           <Avatar src={record.avatar} size="small" />
+           <Avatar src={record.user?.avatar} size="small" />
            <div>
-              <div className="font-bold text-sm text-navy-700">{record.user}</div>
-              <div className="text-xs text-gray-400">{record.date}</div>
+              <div className="font-bold text-sm text-navy-700">{record.user?.name}</div>
+              <div className="text-[10px] text-gray-400">{new Date(record.createdAt).toLocaleString('vi-VN')}</div>
            </div>
         </div>
       )
@@ -97,19 +168,27 @@ const ReviewsPage = () => {
     },
     {
       title: 'TRẠNG THÁI',
-      dataIndex: 'status',
-      render: (status) => {
-         let color = status === 'Approved' ? 'green' : (status === 'Pending' ? 'orange' : 'red');
-         return <Tag color={color}>{status}</Tag>;
-      }
+      dataIndex: 'isApproved',
+      width: 120,
+      render: (isApproved) => (
+        <Tag color={isApproved ? 'green' : 'red'}>
+          {isApproved ? 'Đang hiện' : 'Đang ẩn'}
+        </Tag>
+      )
     },
     {
       title: 'THAO TÁC',
+      width: 150,
       render: (_, record) => (
         <div className="flex gap-2">
-           <Button icon={<MessageOutlined />} size="small" onClick={() => handleOpenReply(record)} className="text-blue-500 border-blue-100 bg-blue-50" />
-           <Button icon={<EyeInvisibleOutlined />} size="small" className="text-orange-500 border-orange-100 bg-orange-50" />
-           <Button icon={<DeleteOutlined />} size="small" danger className="bg-red-50 border-red-100" />
+           <Button 
+            icon={record.isApproved ? <EyeInvisibleOutlined /> : <EyeOutlined />} 
+            size="small" 
+            onClick={() => handleToggleApprove(record._id)}
+            className={record.isApproved ? "text-orange-500 border-orange-100 bg-orange-50" : "text-green-500 border-green-100 bg-green-50"} 
+            title={record.isApproved ? "Ẩn đánh giá" : "Hiện đánh giá"}
+           />
+           <Button icon={<DeleteOutlined />} size="small" danger className="bg-red-50 border-red-100" onClick={() => handleDelete(record._id)} />
         </div>
       )
     }
@@ -125,20 +204,44 @@ const ReviewsPage = () => {
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-6">
-         <ReviewStat title="Tổng đánh giá" value="1,204" icon={<MessageOutlined />} color="bg-light-primary text-brand-500" />
-         <ReviewStat title="Đánh giá 5 sao" value="980" icon={<StarFilled />} color="bg-yellow-50 text-yellow-500" />
-         <ReviewStat title="Chờ duyệt" value="15" icon={<FilterOutlined />} color="bg-orange-50 text-orange-500" />
+         <ReviewStat title="Tổng đánh giá" value={pagination.total} icon={<MessageOutlined />} color="bg-light-primary text-brand-500" />
+         <ReviewStat title="Bình luận mới" value={data.length} icon={<StarFilled />} color="bg-yellow-50 text-yellow-500" />
+         <ReviewStat title="Trang hiện tại" value={pagination.current} icon={<FilterOutlined />} color="bg-orange-50 text-orange-500" />
       </div>
 
       {/* Main Table */}
       <div className="bg-white p-6 rounded-[20px] shadow-sm">
          <div className="flex justify-between mb-4">
             <div className="flex gap-3">
-               <Input prefix={<SearchOutlined className="text-gray-400" />} placeholder="Tìm theo tên SP, Khách hàng..." className="w-[300px] rounded-xl bg-[#F4F7FE] border-none" />
-               <Select defaultValue="all" className="w-[150px] custom-select-metrix bg-[#F4F7FE] rounded-xl"><Option value="all">Tất cả sao</Option><Option value="5">5 Sao</Option></Select>
+               <Input 
+                prefix={<SearchOutlined className="text-gray-400" />} 
+                placeholder="Tìm khách hàng..." 
+                className="w-[300px] rounded-xl bg-[#F4F7FE] border-none" 
+                onPressEnter={(e) => handleFilterChange('search', e.target.value)}
+               />
+               <Select defaultValue="all" className="w-[150px] custom-select-metrix bg-[#F4F7FE] rounded-xl" onChange={(v) => handleFilterChange('rating', v)}>
+                  <Option value="all">Tất cả sao</Option>
+                  <Option value="5">5 Sao</Option>
+                  <Option value="4">4 Sao</Option>
+                  <Option value="3">3 Sao</Option>
+                  <Option value="2">2 Sao</Option>
+                  <Option value="1">1 Sao</Option>
+               </Select>
+               <Select defaultValue="all" className="w-[150px] custom-select-metrix bg-[#F4F7FE] rounded-xl" onChange={(v) => handleFilterChange('isApproved', v)}>
+                  <Option value="all">Tất cả trạng thái</Option>
+                  <Option value="true">Đang hiện</Option>
+                  <Option value="false">Đang ẩn</Option>
+               </Select>
             </div>
          </div>
-         <Table columns={columns} dataSource={data} pagination={{ pageSize: 5 }} className="custom-table-metrix" />
+         <Table 
+          columns={columns} 
+          dataSource={data} 
+          pagination={pagination} 
+          onChange={handleTableChange}
+          loading={loading}
+          className="custom-table-metrix" 
+         />
       </div>
 
       {/* Modal Reply */}
@@ -158,7 +261,12 @@ const ReviewsPage = () => {
                <div className="text-gray-600 italic">"{currentReview.comment}"</div>
             </div>
             <p className="mb-2 font-medium">Nội dung trả lời:</p>
-            <TextArea rows={4} placeholder="Nhập câu trả lời của shop..." />
+            <TextArea 
+              rows={4} 
+              placeholder="Nhập câu trả lời của shop..." 
+              value={replyText}
+              onChange={(e) => setReplyText(e.target.value)}
+            />
           </div>
         )}
       </Modal>

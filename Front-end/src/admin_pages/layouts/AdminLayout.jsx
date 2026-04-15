@@ -79,7 +79,6 @@ const AdminLayout = () => {
             icon: <CustomerServiceOutlined />,
             label: 'CSKH & Marketing',
             children: [
-                { key: '/admin/chat', label: 'Tin nhắn (Chat)' },
                 { key: '/admin/reviews', label: 'Đánh giá' },
                 { key: '/admin/minigames', label: 'Minigame' },
                 { key: '/admin/cms/banners', label: 'Banner & Blog' },

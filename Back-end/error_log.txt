@@ -1,7 +1,0 @@
-2026-03-15T08:45:46.505Z - TypeError: next is not a function
-    at model.<anonymous> (D:\TTTN\Back-end\models\Product.js:84:5)
-    at Kareem.execPre (D:\TTTN\Back-end\node_modules\kareem\index.js:63:39)
-    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
-    at async model.$__save (D:\TTTN\Back-end\node_modules\mongoose\lib\model.js:369:5)
-    at async model.save (D:\TTTN\Back-end\node_modules\mongoose\lib\model.js:609:5)
-    at async createProduct (D:\TTTN\Back-end\controllers\productController.js:115:9)
