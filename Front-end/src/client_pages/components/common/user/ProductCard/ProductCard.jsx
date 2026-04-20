@@ -124,9 +124,9 @@ const ProductCard = ({ product }) => {
       <div className="product-content">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-1 bg-yellow-50 px-2 py-0.5 rounded-full border border-yellow-100">
-            <Star size={12} className="text-yellow-500 fill-yellow-500" />
+            <Star size={12} className={product.averageRating > 0 ? "text-yellow-500 fill-yellow-500" : "text-gray-300"} />
             <span className="text-[11px] font-bold text-yellow-700">
-              {product.averageRating || 5.0}
+              {product.averageRating > 0 ? (Math.round(product.averageRating * 10) / 10).toFixed(1) : "Mới"}
             </span>
           </div>
           <span className="text-[11px] text-gray-400 font-medium">

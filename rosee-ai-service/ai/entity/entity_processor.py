@@ -168,6 +168,26 @@ def analyze_entities(
     if intent in ("MODIFY", "modify", "chỉnh sửa"):
         modify_ops = detect_modify_ops(original_text)
 
+    # ── Missing fields & Clarification ────────────────────────────────────────
+    missing_fields = []
+    if not flower_types:
+        missing_fields.append("flower_type")
+    if not occasion:
+        missing_fields.append("occasion")
+    if not category:
+        missing_fields.append("category")
+
+    clarification_question = None
+    if intent in ("CREATE_BOUQUET", "RECOMMEND") and missing_fields:
+        if "flower_type" in missing_fields and "occasion" in missing_fields:
+            clarification_question = "Bạn muốn tặng hoa vào dịp gì và bạn có thích loại hoa nào đặc biệt không?"
+        elif "flower_type" in missing_fields:
+            clarification_question = "Bạn có yêu cầu cụ thể về loại hoa nào (như hoa hồng, hướng dương, tú cầu...) không?"
+        elif "occasion" in missing_fields:
+            clarification_question = "Bạn tặng hoa này vào dịp gì (sinh nhật, kỷ niệm, 8/3...) để mình tư vấn mẫu phù hợp nhất nhé?"
+        elif "category" in missing_fields:
+            clarification_question = "Bạn muốn làm dạng bó hoa, giỏ hoa hay hộp hoa nhỉ?"
+
     return AnalyzeResponse(
         intent=intent,
         entities=AnalyzeEntities(
@@ -184,6 +204,8 @@ def analyze_entities(
             role_hint=role_hint,
             modify_ops=modify_ops,
         ),
+        missing_fields=missing_fields,
+        clarification_question=clarification_question,
     )
 
 

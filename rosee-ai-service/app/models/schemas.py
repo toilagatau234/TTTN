@@ -96,6 +96,8 @@ class AnalyzeResponse(BaseModel):
     """Output chuẩn của endpoint /api/hydrangea/analyze."""
     intent: str
     entities: AnalyzeEntities
+    missing_fields: List[str] = []
+    clarification_question: Optional[str] = None
 
 
 # ── Image Generation ──────────────────────────────────────────────────────────

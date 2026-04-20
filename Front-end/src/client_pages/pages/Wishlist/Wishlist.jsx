@@ -1,15 +1,14 @@
 import { useEffect, useState } from "react";
-import { Trash2, ShoppingCart, Loader2 } from "lucide-react";
 import { Link } from "react-router-dom";
+import { Loader2, Heart, ShoppingBag } from "lucide-react";
 import wishlistService from "../../../services/wishlistService";
-import cartService from "../../../services/cartService";
 import authService from "../../../services/authService";
+import ProductCard from "../../components/common/user/ProductCard/ProductCard";
 import { message } from "antd";
 
 const Wishlist = () => {
   const [wishlist, setWishlist] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [addingToCart, setAddingToCart] = useState(null);
 
   const loadWishlist = async () => {
     if (!authService.isLoggedIn()) {
@@ -24,7 +23,6 @@ const Wishlist = () => {
       }
     } catch (error) {
       console.error("Lỗi khi lấy wishlist:", error);
-      message.error("Không thể tải danh sách yêu thích");
     } finally {
       setLoading(false);
     }
@@ -38,158 +36,89 @@ const Wishlist = () => {
     };
   }, []);
 
-  const removeItem = async (id) => {
-    try {
-      const res = await wishlistService.removeFromWishlist(id);
-      if (res.success) {
-        setWishlist(wishlist.filter((item) => item._id !== id));
-        window.dispatchEvent(new Event("wishlistUpdated"));
-        message.success("Đã xoá khỏi danh sách yêu thích");
-      }
-    } catch (error) {
-      message.error("Lỗi khi xoá sản phẩm khỏi wishlist");
-    }
-  };
-
-  const clearWishlist = async () => {
-    // Không có API clear all, remove the button implementation or loop
-    message.warning("Tính năng này đang được cập nhật");
-  };
-
-  const handleAddToCart = async (product) => {
-    if (!authService.isLoggedIn()) {
-      message.warning("Vui lòng đăng nhập để mua hàng");
-      return;
-    }
-
-    setAddingToCart(product._id);
-    try {
-      const res = await cartService.addToCart(product._id, 1);
-      if (res.success) {
-        message.success(`Đã thêm ${product.name} vào giỏ`);
-        window.dispatchEvent(new Event("cartUpdated"));
-      }
-    } catch (error) {
-      message.error(error?.response?.data?.message || "Lỗi khi thêm vào giỏ hàng");
-    } finally {
-      setAddingToCart(null);
-    }
-  };
-
   if (loading) {
     return (
-      <div className="bg-[#fffafc] min-h-screen flex items-center justify-center p-10 text-pink-400">
-        <Loader2 className="animate-spin w-12 h-12 mb-4" />
-        <p>Đang tải danh sách yêu thích...</p>
+      <div className="bg-white min-h-screen flex flex-col items-center justify-center p-10 text-pink-400">
+        <div className="relative mb-6">
+            <div className="w-16 h-16 rounded-full border-4 border-pink-50 border-t-pink-500 animate-spin"></div>
+            <div className="absolute inset-0 flex items-center justify-center">
+                <Heart size={20} className="fill-pink-500 text-pink-500 animate-pulse" />
+            </div>
+        </div>
+        <p className="font-black uppercase tracking-[0.2em] text-[10px] text-gray-400">Đang mở khóa những điều yêu thích...</p>
       </div>
     );
   }
 
   return (
-    <div className="bg-[#fffafc] min-h-screen shop-wrapper">
+    <div className="bg-white min-h-screen shop-wrapper pb-32 relative overflow-hidden">
+      {/* Decorative Background Elements */}
+      <div className="absolute top-0 right-0 w-1/3 h-[500px] bg-pink-50/30 rounded-full translate-x-1/2 -translate-y-1/2 blur-3xl pointer-events-none"></div>
+      <div className="absolute bottom-1/4 left-0 w-64 h-64 bg-nature-soft/20 rounded-full -translate-x-1/2 blur-3xl pointer-events-none"></div>
 
-      {/* Hoa rơi */}
-      <img src="https://res.cloudinary.com/drwles2k0/image/upload/v1772271283/flower_lmks7o.png" className="floweruy f1" alt="" />
-      <img src="https://res.cloudinary.com/drwles2k0/image/upload/v1772271283/flower_lmks7o.png" className="floweruy f2" alt="" />
-      <img src="https://res.cloudinary.com/drwles2k0/image/upload/v1772271283/flower_lmks7o.png" className="floweruy f3" alt="" />
-      <img src="https://res.cloudinary.com/drwles2k0/image/upload/v1772271283/flower_lmks7o.png" className="floweruy f4" alt="" />
-      <img src="https://res.cloudinary.com/drwles2k0/image/upload/v1772271283/flower_lmks7o.png" className="floweruy f5" alt="" />
-
-      <div className="relative z-10" />
-
-      {/* Banner */}
-      <div className="text-center mb-8 relative">
-        <h1 className="text-[#88a82a] font-medium tracking-widest uppercase px-6 pt-6">
-          Sản Phẩm Yêu Thích 💗
-        </h1>
-        <p className="shop-sub">
-          Khám phá thêm hoa 🌷
-        </p>
-      </div>
-
-      <div className="max-w-5xl mx-auto px-6 py-6">
+      {/* Header Section */}
+      <div className="max-w-7xl mx-auto pt-24 pb-12 px-6 relative z-10">
+        <div className="text-center mb-16">
+          <span className="text-nature-primary font-black tracking-[0.4em] uppercase text-[10px] mb-4 block">
+            Bộ sưu tập của riêng bạn
+          </span>
+          <h1 className="text-4xl md:text-6xl font-black text-gray-900 mb-6 tracking-tighter">
+            Sản Phẩm <span className="text-pink-500 italic">Yêu Thích</span> 💖
+          </h1>
+          <div className="w-24 h-1.5 bg-pink-500/20 mx-auto rounded-full relative overflow-hidden">
+             <div className="absolute top-0 left-0 h-full w-12 bg-pink-500 rounded-full animate-[shimmer_2s_infinite]"></div>
+          </div>
+        </div>
 
         {wishlist.length === 0 ? (
-          <div className="text-center">
-            <p className="text-gray-500 mb-6">
-              Bạn chưa có sản phẩm yêu thích 😢
-            </p>
-
-            <Link
-              to="/shop"
-              className="bg-pink-500 text-white px-6 py-2 rounded-full hover:bg-pink-600 transition"
-            >
-              Khám phá sản phẩm
-            </Link>
+          <div className="text-center py-32 bg-neutral-50 rounded-[3rem] border-2 border-dashed border-neutral-200 relative group overflow-hidden">
+             <div className="absolute inset-0 bg-white opacity-0 group-hover:opacity-40 transition-opacity duration-700"></div>
+             <div className="relative z-10">
+                <div className="w-24 h-24 bg-white rounded-3xl shadow-xl flex items-center justify-center mx-auto mb-8 rotate-3 transition-transform group-hover:rotate-12 duration-500">
+                   <Heart size={40} className="text-pink-200" />
+                </div>
+                <h2 className="text-2xl font-black text-gray-800 mb-3">Danh sách trống trơn!</h2>
+                <p className="text-gray-400 font-medium mb-10 max-w-sm mx-auto">Bạn chưa lưu sản phẩm nào vào danh sách yêu thích. Hãy quay lại cửa hàng để tìm kiếm những bông hoa yêu thích nhé.</p>
+                <Link
+                to="/shop"
+                className="inline-flex items-center gap-3 px-10 py-4 bg-neutral-900 text-white font-black rounded-full hover:bg-neutral-800 transition-all shadow-xl active:scale-95 uppercase tracking-widest text-xs"
+                >
+                <ShoppingBag size={18} />
+                <span>Khám phá ngay</span>
+                </Link>
+             </div>
           </div>
         ) : (
-          <>
-            {/* Nút xoá tất cả */}
-            <div className="flex justify-end mb-6">
-              <button
-                onClick={clearWishlist}
-                className="px-6 py-2 bg-rose-300 text-white rounded-full hover:bg-rose-400 transition duration-300 text-sm font-semibold shadow-sm"
-              >
-                Xoá tất cả
-              </button>
+          <div>
+            <div className="flex justify-between items-center mb-10">
+                <p className="text-gray-400 font-bold text-sm">
+                    Bạn đang có <span className="text-pink-500">{wishlist.length}</span> sản phẩm trong danh sách
+                </p>
+                <Link to="/shop" className="text-xs font-black uppercase tracking-widest text-gray-400 hover:text-pink-500 transition-colors flex items-center gap-2">
+                    Tiếp tục mua sắm
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                    </svg>
+                </Link>
             </div>
 
-            {/* LIST sản phẩm */}
-            <div className="space-y-6">
+            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
               {wishlist.map((product) => (
-                <div
-                  key={product._id}
-                  className="flex items-center justify-between bg-white p-5 rounded-2xl shadow-md hover:shadow-lg hover:scale-[1.01] transition"
-                >
-
-                  {/* Bên trái */}
-                  <div className="flex items-center gap-6">
-                    <Link to={`/product/${product._id}`} state={{ product }}>
-                      <img
-                        src={product.images?.[0]?.url || product.images?.[0]}
-                        alt={product.name}
-                        className="w-28 h-28 object-cover rounded-xl hover:scale-105 transition"
-                      />
-                    </Link>
-
-                    <div>
-                      <Link to={`/product/${product._id}`} state={{ product }}>
-                        <h3 className="text-lg font-semibold text-gray-800 hover:text-pink-500 transition">
-                          {product.name}
-                        </h3>
-                      </Link>
-
-                      <p className="text-pink-500 font-bold mt-2">
-                        {product.price.toLocaleString()} đ
-                      </p>
-                    </div>
-                  </div>
-                  {/* Bên phải */}
-                  <div className="flex items-center gap-4">
-
-                    <button
-                      onClick={() => handleAddToCart(product)}
-                      disabled={addingToCart === product._id}
-                      className="flex items-center justify-center gap-2 px-4 py-2 bg-emerald-200 text-emerald-700 rounded-full hover:bg-emerald-300 transition duration-300 text-sm font-medium"                    >
-                      {addingToCart === product._id ? <Loader2 size={18} className="animate-spin" /> : <ShoppingCart size={18} />}
-                      Thêm vào giỏ
-                    </button>
-
-                    <button
-                      onClick={() => removeItem(product._id)}
-                      className="px-4 py-2 bg-pink-200 text-pink-700 rounded-full hover:bg-pink-300 transition duration-300 text-sm font-medium"
-                    >
-                      <Trash2 size={18} />
-                    </button>
-
-                  </div>
+                <div key={product._id} className="animate-in fade-in slide-in-from-bottom-4 duration-700">
+                  <ProductCard product={product} />
                 </div>
               ))}
             </div>
-          </>
+          </div>
         )}
-
       </div>
+
+      <style dangerouslySetInnerHTML={{ __html: `
+        @keyframes shimmer {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(200%); }
+        }
+      `}} />
     </div>
   );
 };

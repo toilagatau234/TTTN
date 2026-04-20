@@ -65,25 +65,24 @@ const matchProducts = (filters = {}, products = [], strictMode = true) => {
                 const isSecondaryMatch = matchInArray(c, product.secondary_colors);
                 if (isDominantMatch || isSecondaryMatch) colorMatched = true;
             }
-            if (strictMode) {
-                if (colorMatched) score += 3;
-            } else {
-                // In relaxed mode, ignore color penalty if color doesn't match, but still reward if it does
-                if (colorMatched) score += 3;
+            if (colorMatched) score += 3;
+        }
+
+        // 2. Occasion (Weight: 5 - High Priority)
+        if (filters.occasion) {
+            if (matchInArray(filters.occasion, product.occasion)) {
+                score += 5;
+            } else if (filters.occasion === "women's day" && matchInArray("8/3", product.occasion)) {
+                score += 5; // Direct mapping for Women's Day
             }
         }
 
-        // 2. Occasion
-        if (filters.occasion) {
-            if (matchInArray(filters.occasion, product.occasion)) score += 3;
-        }
-
-        // 3. Style
+        // 3. Style (Weight: 2)
         if (filters.style) {
             if (matchInArray(filters.style, product.style)) score += 2;
         }
 
-        // 4. Flowers (Main and Secondary)
+        // 4. Flowers (Main and Secondary) (Weight: 4 for Main)
         if (filters.flowers) {
             if (Array.isArray(filters.flowers.main) && filters.flowers.main.length > 0) {
                 const productMainFlowers = (Array.isArray(product.main_flowers) ? product.main_flowers.map(f => normalize(typeof f === 'string' ? f : f.type)) : []);
@@ -91,7 +90,7 @@ const matchProducts = (filters = {}, products = [], strictMode = true) => {
                     const normFlower = normalize(f);
                     return productMainFlowers.some(pmf => pmf.includes(normFlower) || normFlower.includes(pmf));
                 });
-                if (matchedMain) score += 3;
+                if (matchedMain) score += 4;
             }
 
             if (Array.isArray(filters.flowers.secondary) && filters.flowers.secondary.length > 0) {
@@ -101,6 +100,13 @@ const matchProducts = (filters = {}, products = [], strictMode = true) => {
                     return productSubFlowers.some(pmf => pmf.includes(normFlower) || normFlower.includes(pmf));
                 });
                 if (matchedSub) score += 1;
+            }
+        }
+        
+        // 5. Category/Layout Match (Weight: 3)
+        if (filters.layout && product.category) {
+            if (normalize(product.category.name || "").includes(normalize(filters.layout))) {
+                score += 3;
             }
         }
         

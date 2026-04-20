@@ -185,7 +185,7 @@ const Home = () => {
             <button className="px-10 py-4 bg-white text-nature-primary font-black rounded-full hover:bg-nature-soft transition-all shadow-[0_10px_0_rgb(230,230,230)] hover:shadow-[0_5px_0_rgb(230,230,230)] hover:translate-y-[5px] active:translate-y-[10px] active:shadow-none uppercase tracking-wider">
               Liên Hệ Ngay
             </button>
-            <Link to="/custom-design" className="px-10 py-4 bg-transparent text-white border-2 border-white/30 font-bold rounded-full hover:bg-white/10 transition-all">
+            <Link to="/customDesign" className="px-10 py-4 bg-transparent text-white border-2 border-white/30 font-bold rounded-full hover:bg-white/10 transition-all">
               Tự thiết kế hoa
             </Link>
           </div>

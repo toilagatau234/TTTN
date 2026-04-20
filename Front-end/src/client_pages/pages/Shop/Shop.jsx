@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import ProductCard from "../../components/common/user/ProductCard/ProductCard";
 import productService from "../../../services/productService";
 import categoryService from "../../../services/categoryService";
@@ -8,17 +8,25 @@ import { useSearchParams } from "react-router-dom";
 const Shop = () => {
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // Khởi tạo state từ URL params (để hỗ trợ share link)
-  const [search, setSearch] = useState(searchParams.get("keyword") || "");
-  const [category, setCategory] = useState(searchParams.get("category") || "all");
-  const [sort, setSort] = useState(searchParams.get("sort") || "-createdAt");
-  const [priceRange, setPriceRange] = useState(searchParams.get("price") || "all");
-  const [currentPage, setCurrentPage] = useState(Number(searchParams.get("page")) || 1);
+  // Lấy giá trị từ URL params
+  const search = searchParams.get("keyword") || "";
+  const category = searchParams.get("category") || "all";
+  const sort = searchParams.get("sort") || "-createdAt";
+  const priceRange = searchParams.get("price") || "all";
+  const rating = searchParams.get("rating") || "all";
+  const currentPage = Number(searchParams.get("page")) || 1;
 
   // Dropdown UI state
   const [openCategory, setOpenCategory] = useState(false);
   const [openPrice, setOpenPrice] = useState(false);
   const [openSort, setOpenSort] = useState(false);
+  const [openRating, setOpenRating] = useState(false);
+
+  // Refs for click outside
+  const categoryRef = useRef(null);
+  const priceRef = useRef(null);
+  const sortRef = useRef(null);
+  const ratingRef = useRef(null);
 
   // Data state
   const [products, setProducts] = useState([]);
@@ -41,7 +49,7 @@ const Shop = () => {
     fetchCategories();
   }, []);
 
-  // Lấy Products mỗi khi filter thay đổi
+  // Lấy Products mỗi khi URL params thay đổi
   useEffect(() => {
     const fetchProducts = async () => {
       setLoading(true);
@@ -63,9 +71,7 @@ const Shop = () => {
 
         if (minPrice) params.minPrice = minPrice;
         if (maxPrice) params.maxPrice = maxPrice;
-
-        // Cập nhật URL
-        setSearchParams(params);
+        if (rating !== "all") params.rating = rating;
 
         const res = await productService.getAll(params);
         if (res.success) {
@@ -79,18 +85,32 @@ const Shop = () => {
       }
     };
 
-    // Debounce tìm kiếm
+    // Debounce tìm kiếm nếu keyword thay đổi
     const delay = setTimeout(() => {
       fetchProducts();
-    }, 500);
+    }, search ? 500 : 0); // No delay for categories/sort/page
 
     return () => clearTimeout(delay);
-  }, [search, category, sort, priceRange, currentPage, setSearchParams]);
+  }, [search, category, sort, priceRange, rating, currentPage]);
 
-  // Handle thay đổi bộ lọc -> reset về trang 1
-  const handleFilterChange = (setter, value) => {
-    setter(value);
-    setCurrentPage(1);
+  // Click outside handler
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (categoryRef.current && !categoryRef.current.contains(event.target)) setOpenCategory(false);
+      if (priceRef.current && !priceRef.current.contains(event.target)) setOpenPrice(false);
+      if (sortRef.current && !sortRef.current.contains(event.target)) setOpenSort(false);
+      if (ratingRef.current && !ratingRef.current.contains(event.target)) setOpenRating(false);
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Handle thay đổi bộ lọc -> cập nhật URL trực tiếp
+  const handleFilterChange = (key, value) => {
+    const newParams = new URLSearchParams(searchParams);
+    newParams.set(key, value);
+    if (key !== 'page') newParams.set('page', '1'); // Reset pagination on filter change
+    setSearchParams(newParams);
   };
 
   return (
@@ -118,9 +138,9 @@ const Shop = () => {
           
           <div className="flex flex-wrap items-center gap-2 p-1 flex-1">
             {/* DANH MỤC */}
-            <div className="relative">
+            <div className="relative" ref={categoryRef}>
                 <button
-                    onClick={() => { setOpenCategory(!openCategory); setOpenPrice(false); setOpenSort(false); }}
+                    onClick={() => { setOpenCategory(!openCategory); setOpenPrice(false); setOpenSort(false); setOpenRating(false); }}
                     className={`px-6 py-3 rounded-2xl text-sm font-bold transition-all flex items-center gap-2 ${category !== 'all' ? 'bg-pink-500 text-white shadow-lg shadow-pink-100' : 'bg-transparent text-gray-500 hover:bg-neutral-50'}`}
                 >
                     <span>{category === "all" ? "Tất cả danh mục" : categories.find(c => c._id === category)?.name}</span>
@@ -132,7 +152,7 @@ const Shop = () => {
                 {openCategory && (
                     <div className="absolute mt-3 w-64 bg-white border border-neutral-100 rounded-3xl shadow-premium z-50 p-2 animate-in fade-in slide-in-from-top-2 duration-200">
                         <div
-                            onClick={() => { handleFilterChange(setCategory, "all"); setOpenCategory(false); }}
+                            onClick={() => { handleFilterChange("category", "all"); setOpenCategory(false); }}
                             className={`px-5 py-3 rounded-xl hover:bg-neutral-50 cursor-pointer text-sm font-bold transition ${category === 'all' ? 'text-pink-500 bg-pink-50' : 'text-gray-600'}`}
                         >
                             Tất cả sản phẩm
@@ -140,7 +160,7 @@ const Shop = () => {
                         {categories.map((cat) => (
                             <div
                                 key={cat._id}
-                                onClick={() => { handleFilterChange(setCategory, cat._id); setOpenCategory(false); }}
+                                onClick={() => { handleFilterChange("category", cat._id); setOpenCategory(false); }}
                                 className={`px-5 py-3 rounded-xl hover:bg-neutral-50 cursor-pointer text-sm font-bold transition ${category === cat._id ? 'text-pink-500 bg-pink-50' : 'text-gray-600'}`}
                             >
                                 {cat.name}
@@ -151,9 +171,9 @@ const Shop = () => {
             </div>
 
             {/* KHOẢNG GIÁ */}
-            <div className="relative">
+            <div className="relative" ref={priceRef}>
                 <button
-                    onClick={() => { setOpenPrice(!openPrice); setOpenCategory(false); setOpenSort(false); }}
+                    onClick={() => { setOpenPrice(!openPrice); setOpenCategory(false); setOpenSort(false); setOpenRating(false); }}
                     className={`px-6 py-3 rounded-2xl text-sm font-bold transition-all flex items-center gap-2 ${priceRange !== 'all' ? 'bg-nature-primary text-white shadow-lg shadow-lime-100' : 'bg-transparent text-gray-500 hover:bg-neutral-50'}`}
                 >
                     <span>
@@ -171,7 +191,7 @@ const Shop = () => {
                         {['all', 'low', 'mid', 'high'].map((range) => (
                             <div 
                                 key={range}
-                                onClick={() => { handleFilterChange(setPriceRange, range); setOpenPrice(false); }} 
+                                onClick={() => { handleFilterChange("price", range); setOpenPrice(false); }} 
                                 className={`px-5 py-3 rounded-xl hover:bg-neutral-50 cursor-pointer text-sm font-bold transition ${priceRange === range ? 'text-nature-primary bg-nature-soft' : 'text-gray-600'}`}
                             >
                                 {range === "all" ? "Tất cả mức giá" : 
@@ -183,10 +203,51 @@ const Shop = () => {
                 )}
             </div>
 
-            {/* SẮP XẾP */}
-            <div className="relative">
+            {/* ĐÁNH GIÁ */}
+            <div className="relative" ref={ratingRef}>
                 <button
-                    onClick={() => { setOpenSort(!openSort); setOpenCategory(false); setOpenPrice(false); }}
+                    onClick={() => { setOpenRating(!openRating); setOpenCategory(false); setOpenPrice(false); setOpenSort(false); }}
+                    className={`px-6 py-3 rounded-2xl text-sm font-bold transition-all flex items-center gap-2 ${rating !== 'all' ? 'bg-amber-400 text-white shadow-lg shadow-amber-100' : 'bg-transparent text-gray-500 hover:bg-neutral-50'}`}
+                >
+                    <span className="flex items-center gap-1">
+                        {rating === "all" ? "Mọi đánh giá" : `Từ ${rating} sao`}
+                        {rating !== "all" && <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 fill-white" viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>}
+                    </span>
+                    <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 transition-transform ${openRating ? 'rotate-180' : ''}`} viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                    </svg>
+                </button>
+
+                {openRating && (
+                    <div className="absolute mt-3 w-48 bg-white border border-neutral-100 rounded-3xl shadow-premium z-50 p-2 animate-in fade-in slide-in-from-top-2 duration-200">
+                        <div
+                            onClick={() => { handleFilterChange("rating", "all"); setOpenRating(false); }}
+                            className={`px-5 py-3 rounded-xl hover:bg-neutral-50 cursor-pointer text-sm font-bold transition ${rating === 'all' ? 'text-amber-500 bg-amber-50' : 'text-gray-600'}`}
+                        >
+                            Tất cả đánh giá
+                        </div>
+                        {[5, 4, 3, 2, 1].map((star) => (
+                            <div
+                                key={star}
+                                onClick={() => { handleFilterChange("rating", star.toString()); setOpenRating(false); }}
+                                className={`px-5 py-3 rounded-xl hover:bg-neutral-50 cursor-pointer text-sm font-bold transition flex items-center justify-between ${rating === star.toString() ? 'text-amber-500 bg-amber-50' : 'text-gray-600'}`}
+                            >
+                                <span>Từ {star} sao</span>
+                                <div className="flex gap-0.5">
+                                    {[...Array(star)].map((_, i) => (
+                                        <svg key={i} xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 fill-amber-400" viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>
+                                    ))}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+
+            {/* SẮP XẾP */}
+            <div className="relative" ref={sortRef}>
+                <button
+                    onClick={() => { setOpenSort(!openSort); setOpenCategory(false); setOpenPrice(false); setOpenRating(false); }}
                     className="px-6 py-3 rounded-2xl bg-transparent text-gray-500 font-bold hover:bg-neutral-50 transition-all flex items-center gap-2"
                 >
                     <span className="text-gray-300 mr-1 font-normal uppercase text-[10px]">Xếp theo:</span>
@@ -208,7 +269,7 @@ const Shop = () => {
                         ].map((item) => (
                             <div 
                                 key={item.val}
-                                onClick={() => { handleFilterChange(setSort, item.val); setOpenSort(false); }} 
+                                onClick={() => { handleFilterChange("sort", item.val); setOpenSort(false); }} 
                                 className={`px-5 py-3 rounded-xl hover:bg-neutral-50 cursor-pointer text-sm font-bold transition ${sort === item.val ? 'text-gray-900 bg-neutral-50' : 'text-gray-500'}`}
                             >
                                 {item.label}
@@ -225,7 +286,7 @@ const Shop = () => {
                 <input
                     type="text"
                     value={search}
-                    onChange={(e) => handleFilterChange(setSearch, e.target.value)}
+                    onChange={(e) => handleFilterChange("keyword", e.target.value)}
                     placeholder="Tìm đóa hoa bạn thích..."
                     className="w-72 px-6 py-3.5 rounded-2xl bg-neutral-50 border border-transparent text-sm font-medium text-gray-700 focus:bg-white focus:border-pink-200 focus:ring-4 focus:ring-pink-50 outline-none transition-all placeholder:text-gray-300"
                 />
@@ -258,11 +319,7 @@ const Shop = () => {
               <p className="text-gray-400 font-medium mb-10 max-w-sm mx-auto">Chúng mình không có sản phẩm nào phù hợp với bộ lọc này. Hãy thử thay đổi tìm kiếm nhé!</p>
               <button
                 onClick={() => {
-                  setSearch("");
-                  setCategory("all");
-                  setPriceRange("all");
-                  setSort("-createdAt");
-                  setCurrentPage(1);
+                   setSearchParams({});
                 }}
                 className="relative bg-neutral-900 text-white px-10 py-4 rounded-full font-black text-sm uppercase tracking-widest hover:bg-neutral-800 transition active:scale-95 shadow-xl"
               >
@@ -287,7 +344,7 @@ const Shop = () => {
               <button
                 key={index}
                 onClick={() => {
-                  setCurrentPage(index + 1);
+                  handleFilterChange("page", index + 1);
                   window.scrollTo({ top: 0, behavior: "smooth" });
                 }}
                 className={`min-w-[50px] h-[50px] rounded-2xl font-black text-sm transition-all duration-300 relative group ${currentPage === index + 1

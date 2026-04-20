@@ -1,6 +1,7 @@
 import { Link, useNavigate } from "react-router-dom"
-import { useState, useEffect } from "react"
-import { Heart, ShoppingCart, User, Search, LogOut } from "lucide-react"
+import { useState, useEffect, useRef } from "react"
+import productService from "../../../../../services/productService"
+import { Heart, ShoppingCart, User, Search, LogOut, Loader2 } from "lucide-react"
 import { Bell, Gift, Tag, Sparkles, X } from "lucide-react"
 import { Home, Flower, LayoutGrid, Shapes } from "lucide-react"
 import { message } from "antd"
@@ -12,6 +13,13 @@ const Navbar = () => {
   const [openMenu, setOpenMenu] = useState(null)
   const [showAll, setShowAll] = useState(false)
   const [cartCount, setCartCount] = useState(0)
+  
+  // Search state
+  const [searchTerm, setSearchTerm] = useState("")
+  const [searchResults, setSearchResults] = useState([])
+  const [showResults, setShowResults] = useState(false)
+  const [loadingSearch, setLoadingSearch] = useState(false)
+  const searchRef = useRef(null)
 
   // Lấy thông tin tài khoản đang login
   const currentUser = authService.getCurrentUser()
@@ -41,6 +49,54 @@ const Navbar = () => {
     return () => window.removeEventListener("cartUpdated", fetchCartCount);
   }, [])
 
+  // Instant Search Logic
+  useEffect(() => {
+    if (searchTerm.trim().length < 2) {
+      setSearchResults([]);
+      setShowResults(false);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setLoadingSearch(true);
+      try {
+        const res = await productService.getAll({
+          keyword: searchTerm,
+          limit: 8,
+          status: 'active'
+        });
+        if (res.success) {
+          setSearchResults(res.data || []);
+          setShowResults(true);
+        }
+      } catch (error) {
+        console.error("Search error:", error);
+      } finally {
+        setLoadingSearch(false);
+      }
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Click outside search
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (searchRef.current && !searchRef.current.contains(e.target)) {
+        setShowResults(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleSearchSubmit = (e) => {
+    if (e.key === 'Enter' && searchTerm.trim()) {
+      navigate(`/shop?keyword=${encodeURIComponent(searchTerm.trim())}`);
+      setShowResults(false);
+    }
+  };
+
   // Xử lý Đăng xuất
   const handleLogout = () => {
     authService.logout()
@@ -63,13 +119,84 @@ const Navbar = () => {
           </Link>
 
           {/* SEARCH */}
-          <div className="hidden md:flex items-center bg-pink-50 border border-pink-200 px-4 py-2 rounded-full w-[400px] shadow-sm">
-            <Search size={18} className="text-pink-400 hover:text-pink-500 transition duration-300" />
-            <input
-              type="text"
-              placeholder="Tìm kiếm hoa..."
-              className="bg-transparent outline-none ml-3 w-full text-sm"
-            />
+          <div className="hidden md:flex relative" ref={searchRef}>
+            <div className="flex items-center bg-pink-50 border border-pink-200 px-4 py-2 rounded-full w-[400px] shadow-sm focus-within:border-pink-400 focus-within:ring-2 focus-within:ring-pink-100 transition-all">
+              {loadingSearch ? (
+                <Loader2 size={18} className="text-pink-400 animate-spin" />
+              ) : (
+                <Search size={18} className="text-pink-400" />
+              )}
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                onKeyDown={handleSearchSubmit}
+                onFocus={() => searchTerm.trim().length >= 2 && setShowResults(true)}
+                placeholder="Tìm kiếm hoa..."
+                className="bg-transparent outline-none ml-3 w-full text-sm placeholder:text-pink-200"
+              />
+              {searchTerm && (
+                <button onClick={() => setSearchTerm("")} className="text-pink-300 hover:text-pink-500">
+                   <X size={14} />
+                </button>
+              )}
+            </div>
+
+            {/* SEARCH RESULTS DROPDOWN */}
+            {showResults && (
+              <div className="absolute top-full mt-3 w-full bg-white shadow-2xl rounded-3xl border border-pink-50 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                <div className="p-2 max-h-[450px] overflow-y-auto">
+                  {searchResults.length > 0 ? (
+                    <>
+                      <p className="px-4 py-2 text-[10px] uppercase tracking-widest font-black text-pink-300">
+                        Sản phẩm gợi ý
+                      </p>
+                      {searchResults.map((item) => (
+                        <div
+                          key={item._id}
+                          onClick={() => {
+                            navigate(`/product/${item._id}`);
+                            setShowResults(false);
+                            setSearchTerm("");
+                          }}
+                          className="flex items-center gap-4 px-4 py-3 hover:bg-pink-50/50 cursor-pointer transition rounded-2xl group"
+                        >
+                          <img 
+                            src={item.images?.[0]?.url || "https://placehold.co/50x50"} 
+                            alt={item.name} 
+                            className="w-12 h-12 rounded-xl object-cover shadow-sm group-hover:scale-105 transition"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-bold text-gray-800 truncate group-hover:text-pink-500 transition">
+                              {item.name}
+                            </p>
+                            <p className="text-xs text-pink-400 font-medium">
+                              {item.price.toLocaleString()} đ
+                            </p>
+                          </div>
+                          <div className="opacity-0 group-hover:opacity-100 transition translate-x-2 group-hover:translate-x-0">
+                             <Search size={14} className="text-pink-300" />
+                          </div>
+                        </div>
+                      ))}
+                      <div 
+                        onClick={() => {
+                          navigate(`/shop?keyword=${encodeURIComponent(searchTerm)}`);
+                          setShowResults(false);
+                        }}
+                        className="mt-2 p-3 text-center border-t border-pink-50 text-xs font-bold text-pink-400 hover:text-pink-500 cursor-pointer bg-pink-50/20"
+                      >
+                        Xem tất cả kết quả
+                      </div>
+                    </>
+                  ) : (
+                    <div className="py-8 text-center">
+                       <p className="text-sm text-gray-400 italic">Không tìm thấy sản phẩm nào</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* ICONS */}

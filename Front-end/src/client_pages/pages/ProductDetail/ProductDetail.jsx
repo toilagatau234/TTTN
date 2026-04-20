@@ -9,6 +9,9 @@ import wishlistService from "../../../services/wishlistService";
 import ProductCard from "../../components/common/user/ProductCard/ProductCard";
 import { message, Rate, Progress, Upload, Modal } from "antd";
 import { CheckCircleOutlined, PlusOutlined, LikeOutlined, LikeFilled } from "@ant-design/icons";
+import Slider from "react-slick";
+import "slick-carousel/slick/slick.css";
+import "slick-carousel/slick/slick-theme.css";
 
 const ProductDetail = () => {
   const navigate = useNavigate();
@@ -63,7 +66,7 @@ const ProductDetail = () => {
           if (res.data.category?._id) {
             const relatedRes = await productService.getAll({
               category: res.data.category._id,
-              limit: 5 // Get 5, will filter out self later to keep 4
+              limit: 9 // Get 9, will filter out self later to keep 8
             });
             if (relatedRes.success) {
               setRelatedProducts(relatedRes.data);
@@ -287,8 +290,32 @@ const ProductDetail = () => {
     );
   }
 
-  // Filter out self, get exactly 4 related
-  const filteredRelated = relatedProducts.filter(p => p._id !== product._id).slice(0, 4);
+  // Filter out self, get exactly 8 related
+  const filteredRelated = relatedProducts.filter(p => p._id !== id).slice(0, 8);
+
+  const carouselSettings = {
+    dots: true,
+    infinite: filteredRelated.length > 4,
+    speed: 500,
+    slidesToShow: 4,
+    slidesToScroll: 1,
+    autoplay: true,
+    autoplaySpeed: 3000,
+    responsive: [
+      {
+        breakpoint: 1024,
+        settings: { slidesToShow: 3, slidesToScroll: 1 }
+      },
+      {
+        breakpoint: 768,
+        settings: { slidesToShow: 2, slidesToScroll: 1 }
+      },
+      {
+        breakpoint: 480,
+        settings: { slidesToShow: 1, slidesToScroll: 1 }
+      }
+    ]
+  };
 
   return (
     <div className="bg-[#fffafc] min-h-screen py-16 px-6">
@@ -354,7 +381,7 @@ const ProductDetail = () => {
             <div className="flex items-center gap-1 bg-yellow-50 px-3 py-1.5 rounded-full border border-yellow-100">
               <span className="text-yellow-400">★</span>
               <span className="text-gray-700 font-medium">
-                {product.averageRating || 5.0}
+                {product.averageRating > 0 ? (Math.round(product.averageRating * 10) / 10).toFixed(1) : "0.0"}
               </span>
             </div>
 
@@ -430,6 +457,39 @@ const ProductDetail = () => {
         </div>
       </div>
 
+      {/* RELATED PRODUCTS - Moved up for better discovery */}
+      {filteredRelated.length > 0 && (
+        <div className="max-w-7xl mx-auto mt-20 mb-20">
+          <div className="text-center mb-12">
+            <span className="text-nature-primary font-black tracking-[0.4em] uppercase text-[10px] mb-4 block">
+                Khám phá thêm
+            </span>
+            <h2 className="text-4xl font-black text-gray-900 tracking-tighter">
+                Có thể bạn <span className="text-pink-500 italic">cũng thích</span> 🌸
+            </h2>
+            <div className="w-24 h-1.5 bg-pink-500/20 mx-auto mt-6 rounded-full"></div>
+          </div>
+          
+          <div className="px-2">
+            {filteredRelated.length > 4 ? (
+              <Slider {...carouselSettings}>
+                {filteredRelated.map((item) => (
+                  <div key={item._id} className="px-4 pb-12">
+                    <ProductCard product={item} />
+                  </div>
+                ))}
+              </Slider>
+            ) : (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+                {filteredRelated.map((item) => (
+                  <ProductCard key={item._id} product={item} />
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* RATING SECTION */}
       <div className="max-w-7xl mx-auto mt-20">
         <h2 className="text-emerald-400 text-2xl font-bold mb-6">Đánh giá sản phẩm</h2>
@@ -446,17 +506,22 @@ const ProductDetail = () => {
               </div>
 
               {/* Rating breakdown */}
-              <div className="space-y-2 mb-8">
+              <div className="space-y-3 mb-8">
                 {[5, 4, 3, 2, 1].map((star) => (
-                  <div key={star} className="flex items-center gap-2 text-sm">
-                    <span className="w-8 text-gray-600">{star} sao</span>
-                    <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                  <div key={star} className="flex items-center gap-3 text-sm group">
+                    <div className="flex items-center gap-1 w-12">
+                       <span className="font-bold text-gray-700">{star}</span>
+                       <Star size={14} className="text-yellow-400 fill-yellow-400" />
+                    </div>
+                    <div className="flex-1 h-2.5 bg-gray-100 rounded-full overflow-hidden shadow-inner">
                       <div 
-                        className="h-full bg-yellow-400 transition-all duration-500" 
+                        className="h-full bg-gradient-to-r from-yellow-300 to-yellow-500 transition-all duration-1000 ease-out rounded-full" 
                         style={{ width: `${totalReviews > 0 ? (ratingBreakdown[star] / totalReviews) * 100 : 0}%` }}
                       ></div>
                     </div>
-                    <span className="w-8 text-gray-400 text-right">{ratingBreakdown[star] || 0}</span>
+                    <span className="w-10 text-gray-400 text-right font-medium group-hover:text-pink-500 transition-colors">
+                        {ratingBreakdown[star] || 0}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -684,19 +749,6 @@ const ProductDetail = () => {
         </div>
       </div>
 
-      {/* RELATED PRODUCTS */}
-      {filteredRelated.length > 0 && (
-        <div className="max-w-7xl mx-auto mt-20">
-          <h2 className="text-emerald-400 text-2xl font-bold mb-10 text-center">
-            Có thể bạn cũng thích 🌸
-          </h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-            {filteredRelated.map((item) => (
-              <ProductCard key={item._id} product={item} />
-            ))}
-          </div>
-        </div>
-      )}
       {/* Modal preview ảnh */}
       <Modal open={previewOpen} footer={null} onCancel={() => setPreviewOpen(false)} centered>
         <img alt="preview" style={{ width: '100%' }} src={previewImage} />
