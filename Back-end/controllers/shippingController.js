@@ -8,7 +8,7 @@ const getGHNConfig = async () => {
         throw new Error('Đơn vị vận chuyển GHN chưa được cấu hình token hoặc đang bị tắt');
     }
     const domain = carrier.isSandbox ? 'dev-online-gateway.ghn.vn' : 'online-gateway.ghn.vn';
-    return { token: carrier.apiToken, shopId: carrier.shopId, domain };
+    return { token: String(carrier.apiToken || '').trim(), shopId: String(carrier.shopId || '').trim(), domain };
 };
 
 // =============================================
@@ -168,8 +168,8 @@ const createShipment = async (req, res) => {
         const ghnDomain = carrier.isSandbox ? 'dev-online-gateway.ghn.vn' : 'online-gateway.ghn.vn';
         const ghnResponse = await axios.post(`https://${ghnDomain}/shiip/public-api/v2/shipping-order/create`, ghnPayload, {
             headers: {
-                'Token': carrier.apiToken,
-                'ShopId': carrier.shopId
+                'Token': String(carrier.apiToken || '').trim(),
+                'ShopId': String(carrier.shopId || '').trim()
             }
         });
 
@@ -188,10 +188,13 @@ const createShipment = async (req, res) => {
         });
 
         // Cập nhật trạng thái đơn hàng → processing
+        order.carrier = order.carrier || carrierId;
+        order.shipment = shipment._id;
+
         if (order.status === 'confirmed' || order.status === 'pending') {
             order.status = 'processing';
-            await order.save();
         }
+        await order.save();
 
         await shipment.populate('carrier', 'name code');
 

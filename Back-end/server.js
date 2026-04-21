@@ -24,6 +24,7 @@ const supplierRoutes = require('./routes/supplierRoutes');
 const inventoryRoutes = require('./routes/inventoryRoutes');
 const bannerRoutes = require('./routes/bannerRoutes');
 const blogRoutes = require('./routes/blogRoutes');
+const vnpayRoutes = require('./routes/vnpayRoutes');
 
 
 
@@ -66,6 +67,7 @@ app.use('/api/suppliers', supplierRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/banners', bannerRoutes);
 app.use('/api/blogs', blogRoutes);
+app.use('/api/payments/vnpay', vnpayRoutes);
 
 // New Simplified Recommendation API
 app.post('/api/recommend-products', recommendController.recommendProductsSimple);

@@ -2,6 +2,8 @@ const Order = require('../models/Order');
 const Cart = require('../models/Cart');
 const Product = require('../models/Product');
 const Voucher = require('../models/Voucher'); // Thêm model Voucher
+const { createPaymentUrl, getClientIp } = require('../utils/vnpay');
+const { createGhnShipmentForOrder } = require('../services/shippingShipmentService');
 
 // =============================================
 // USER ENDPOINTS
@@ -11,7 +13,7 @@ const Voucher = require('../models/Voucher'); // Thêm model Voucher
 // @route   POST /api/orders
 const createOrder = async (req, res) => {
     try {
-        const { shippingInfo, paymentMethod, voucherCode, shippingFee } = req.body; // Thêm shippingFee, voucherCode
+        const { shippingInfo, paymentMethod, voucherCode, shippingFee, carrierId } = req.body; // Thêm shippingFee, voucherCode
 
         // 1. Validate thông tin giao hàng
         if (!shippingInfo || !shippingInfo.fullName || !shippingInfo.phone || !shippingInfo.address) {
@@ -141,12 +143,55 @@ const createOrder = async (req, res) => {
             items: orderItems,
             shippingInfo: sanitizedShippingInfo,
             paymentMethod: normalizedPaymentMethod,
+            carrier: carrierId || undefined,
             itemsPrice: Number(itemsPrice) || 0,
             shippingPrice: Number(shippingPrice) || 0,
             discountPrice: Number(discountPrice) || 0,
             totalPrice: Number(totalPrice) || 0,
             voucher: voucherId,
         });
+
+        // VNPAY: tạo URL thanh toán, CHƯA trừ kho / CHƯA xóa giỏ / CHƯA tăng lượt dùng voucher
+        if (normalizedPaymentMethod === 'vnpay') {
+            const tmnCode = String(process.env.VNP_TMNCODE || '').trim();
+            const secret = String(process.env.VNP_HASHSECRET || '').trim();
+            const baseUrl = String(process.env.VNP_URL || '').trim();
+            const returnUrl = String(process.env.VNP_RETURNURL || '').trim();
+
+            if (!tmnCode || !secret || !baseUrl || !returnUrl) {
+                return res.status(500).json({
+                    success: false,
+                    message: 'Thiếu cấu hình VNPAY trong .env (VNP_TMNCODE/VNP_HASHSECRET/VNP_URL/VNP_RETURNURL)',
+                });
+            }
+
+            const ipAddr = getClientIp(req);
+            const txnRef = order.orderCode;
+            const orderInfo = `Thanh toan don hang ${order.orderCode}`;
+
+            const { url } = createPaymentUrl({
+                baseUrl,
+                tmnCode,
+                secret,
+                amountVnd: order.totalPrice,
+                txnRef,
+                orderInfo,
+                returnUrl,
+                ipAddr,
+            });
+
+            order.payment = order.payment || {};
+            order.payment.vnpay = order.payment.vnpay || {};
+            order.payment.vnpay.txnRef = txnRef;
+            order.payment.vnpay.amount = order.totalPrice;
+            await order.save();
+
+            return res.status(201).json({
+                success: true,
+                message: `Tạo đơn thành công, chuyển qua VNPAY để thanh toán. Mã đơn: ${order.orderCode}`,
+                data: { order, paymentUrl: url },
+            });
+        }
 
         // 8. Cập nhật lượt dùng Voucher nếu có
         if (voucherId) {
@@ -165,6 +210,19 @@ const createOrder = async (req, res) => {
         // 10. Xóa giỏ hàng sau khi đặt thành công
         cart.items = [];
         await cart.save();
+
+        // Auto create GHN shipment if user selected a carrier
+        if (carrierId) {
+            try {
+                const shipment = await createGhnShipmentForOrder({ orderId: order._id, carrierId });
+                if (shipment?._id) {
+                    order.shipment = shipment._id;
+                    await order.save();
+                }
+            } catch (e) {
+                console.error('[Order] Auto create GHN shipment failed:', e.response?.data || e.message);
+            }
+        }
 
         res.status(201).json({
             success: true,

@@ -437,8 +437,16 @@ const Checkout = () => {
       const res = await orderService.createOrder(orderData);
 
       if (res.success) {
+        const createdOrder = res.data?.order || res.data;
+        const paymentUrl = res.data?.paymentUrl;
+
+        if (String(paymentMethod).toUpperCase() === "VNPAY" && paymentUrl) {
+          window.location.href = paymentUrl;
+          return;
+        }
+
         setOrderSuccess(true);
-        setNewOrderCode(res.data.orderCode);
+        setNewOrderCode(createdOrder?.orderCode || "");
         message.success("Đặt hàng thành công!");
         window.dispatchEvent(new Event("cartUpdated")); // Update navbar cart count (0)
         window.scrollTo({ top: 0, behavior: "smooth" });
@@ -616,7 +624,7 @@ const Checkout = () => {
                 <span>Đơn vị vận chuyển</span>
                 <Truck size={20} className="text-emerald-500 ml-auto" />
               </h2>
-              <div className="grid sm:grid-cols-2 gap-4">
+              <div className="grid sm:grid-cols-3 gap-4">
                 {carriers.length === 0 ? (
                   <p className="text-gray-400 italic text-sm py-4">Chưa có đơn vị vận chuyển khả dụng.</p>
                 ) : (
@@ -701,6 +709,24 @@ const Checkout = () => {
                   </div>
                   <p className="font-bold text-gray-800">Ví MoMo</p>
                   <p className="text-xs text-gray-400 mt-1">Thanh toán nhanh qua QR</p>
+                </label>
+
+                <label className={`flex flex-col p-5 rounded-2xl border-2 cursor-pointer transition-all ${paymentMethod === 'VNPAY' ? 'border-pink-500 bg-pink-50/50 ring-4 ring-pink-50' : 'border-gray-50 hover:border-pink-200 hover:bg-gray-50/30'}`}>
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="w-10 h-10 rounded-xl bg-white shadow-sm flex items-center justify-center text-[#005a9c] font-black text-[10px]">
+                      VNPAY
+                    </div>
+                    <input
+                      type="radio"
+                      name="payment"
+                      value="VNPAY"
+                      checked={paymentMethod === 'VNPAY'}
+                      onChange={(e) => setPaymentMethod(e.target.value)}
+                      className="w-5 h-5 text-pink-500 focus:ring-pink-400 transition-all border-gray-300"
+                    />
+                  </div>
+                  <p className="font-bold text-gray-800">VNPAY</p>
+                  <p className="text-xs text-gray-400 mt-1">Chuyển sang cổng thanh toán</p>
                 </label>
               </div>
             </div>

@@ -55,7 +55,7 @@ const orderSchema = new mongoose.Schema({
     // Thanh toán
     paymentMethod: {
         type: String,
-        enum: ['cod', 'banking', 'momo', 'zalopay'],
+        enum: ['cod', 'banking', 'momo', 'zalopay', 'vnpay'],
         default: 'cod'
     },
     isPaid: {
@@ -63,6 +63,25 @@ const orderSchema = new mongoose.Schema({
         default: false
     },
     paidAt: { type: Date },
+
+    // Payment result snapshots (store gateway response for debugging/reconcile)
+    payment: {
+        vnpay: {
+            txnRef: { type: String },
+            amount: { type: Number },
+            responseCode: { type: String },
+            transactionStatus: { type: String },
+            transactionNo: { type: String },
+            bankCode: { type: String },
+            payDate: { type: String },
+            secureHash: { type: String },
+            raw: { type: mongoose.Schema.Types.Mixed, default: null },
+        }
+    },
+
+    // Shipping integrations
+    carrier: { type: mongoose.Schema.Types.ObjectId, ref: 'Carrier' },
+    shipment: { type: mongoose.Schema.Types.ObjectId, ref: 'Shipment' },
 
     // Giá
     itemsPrice: { type: Number, required: true },    // Tổng tiền hàng

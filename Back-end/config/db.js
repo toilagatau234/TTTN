@@ -8,8 +8,8 @@ const connectDB = async () => {
     
     // Tự động seed cấu hình GHN từ .env nếu chưa tồn tại hoặc bị thiếu Token
     try {
-      const ghnToken = process.env.GHN_API_TOKEN || '';
-      const ghnShopId = process.env.GHN_SHOP_ID || '';
+      const ghnToken = String(process.env.GHN_API_TOKEN || '').trim();
+      const ghnShopId = String(process.env.GHN_SHOP_ID || '').trim();
       
       if (ghnToken) {
         // Tìm và cập nhật nếu thiếu Token/ShopId, hoặc tạo mới nếu chưa có

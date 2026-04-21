@@ -10,6 +10,7 @@ import Banner from './client_pages/components/common/user/Banner/Banner';
 import Home from './client_pages/pages/Home/Home';
 import Cart from './client_pages/pages/Cart/Cart';
 import Checkout from './client_pages/pages/Checkout/Checkout';
+import VnpayReturn from './client_pages/pages/Checkout/VnpayReturn';
 import HydrangeaStudio from './client_pages/pages/HydrangeaStudio/HydrangeaStudio';
 import MiniGame from './client_pages/pages/MiniGame/MiniGame';
 import ProductDetail from './client_pages/pages/ProductDetail/ProductDetail';
@@ -38,6 +39,7 @@ function App() {
           <Route index element={<Home />} />
           <Route path="cart" element={<Cart />} />
           <Route path="checkout" element={<Checkout />} />
+          <Route path="checkout/vnpay-return" element={<VnpayReturn />} />
           <Route path="customDesign" element={<HydrangeaStudio />} />
           <Route path="miniGame" element={<MiniGame />} />
           <Route path="product/:id" element={<ProductDetail />} />
