@@ -1,23 +1,44 @@
 /**
- * Back-end/ai/hydrangea/hydrangea.service.js v3
- * 
- * Features:
- * - Multi-turn: create / modify intents
- * - MODIFY: "đổi hoa hồng thành hoa lan" → update session + re-suggest
- * - Session state: current_bouquet (flowers, colors, occasion, style, budget)
- * - Graceful AI fallback nếu Python service timeout
- * - Structured output theo BouquetOutput schema
+ * hydrangea.service.js v4
+ * - Multi-turn chat với session management
+ * - Structured item selection theo danh mục (basket/wrapper/ribbon/flowers/accessories)
+ * - Out-of-stock detection + alternatives
+ * - Gemini image generation
+ * - Custom bouquet order creation
  */
 const axios = require('axios');
 const Product = require('../../models/Product');
-const { classifyProducts, resolveLayoutName, buildExplanation } = require('../../utils/scoringService');
+const CustomBouquetOrder = require('../../models/CustomBouquetOrder');
 const { normalizeString } = require('../../utils/normalizer');
+const { generateBouquetImage } = require('./gemini.image.service');
 
 const AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://localhost:8000';
-
-// ── In-memory session store ─────────────────────────────────────────────────
+const SESSION_TTL_MS = 30 * 60 * 1000;
 const sessions = new Map();
-const SESSION_TTL_MS = 30 * 60 * 1000; // 30 min
+
+// ── Câu hỏi bổ sung thông minh ───────────────────────────────────────────────
+const MISSING_DATA_QUESTIONS = {
+    flower_types: {
+        question: 'Bạn thích loài hoa nào? 🌸',
+        chips: ['Hoa hồng', 'Hoa cúc', 'Hoa ly', 'Hướng dương', 'Hoa lavender', 'Hoa tulip']
+    },
+    colors: {
+        question: 'Bạn muốn tông màu gì?',
+        chips: ['Đỏ', 'Hồng', 'Trắng', 'Tím', 'Vàng', 'Cam', 'Xanh']
+    },
+    occasion: {
+        question: 'Giỏ hoa dành cho dịp nào? 🎉',
+        chips: ['Sinh nhật', 'Khai trương', 'Valentine', 'Tốt nghiệp', 'Tặng mẹ', 'Anniversary', 'Chia buồn']
+    },
+    style: {
+        question: 'Bạn muốn phong cách giỏ hoa như thế nào?',
+        chips: ['Sang trọng', 'Đơn giản', 'Vintage', 'Hiện đại', 'Dễ thương', 'Tối giản']
+    },
+    budget: {
+        question: 'Ngân sách của bạn khoảng bao nhiêu?',
+        chips: ['Dưới 300k', '300k - 500k', '500k - 1 triệu', 'Trên 1 triệu']
+    }
+};
 
 class HydrangeaService {
 
@@ -25,23 +46,18 @@ class HydrangeaService {
     _makeSession() {
         return {
             entities: {
-                flower_types: [],
-                colors: [],
-                color: null,         // compat
-                occasion: null,
-                style: null,
-                budget: 0,
-                target: null,
-                role_hint: {},
+                flower_types: [], colors: [], color: null,
+                occasion: null, style: null, budget: 0,
+                target: null, role_hint: {},
             },
-            current_bouquet: {
-                items: [],
-                image_url: null,
-                total_price: 0,
-                explanation: ''
+            selectedItems: {
+                basket: null, wrapper: null, ribbon: null,
+                main_flowers: [], sub_flowers: [], accessories: []
             },
+            current_bouquet: { items: [], image_url: null, total_price: 0, explanation: '' },
             intent: null,
             history: [],
+            missingDataAsked: new Set(),
             lastActivity: Date.now()
         };
     }
@@ -60,47 +76,32 @@ class HydrangeaService {
     // ── Entity merge ─────────────────────────────────────────────────────────
     mergeEntities(sessionEntities, newEntities) {
         if (!newEntities) return;
-
-        // Scalar overwrite
         ['occasion', 'style', 'target'].forEach(k => {
             if (newEntities[k]) sessionEntities[k] = newEntities[k];
         });
-
-        // Budget
         if (newEntities.budget > 0) sessionEntities.budget = newEntities.budget;
 
-        // Flowers: deduplicated union
         const newFlowers = [
             ...(newEntities.flower_types || []),
             ...(newEntities.flowers || []),
             ...(newEntities.flower_type ? [newEntities.flower_type] : [])
         ];
         if (newFlowers.length > 0) {
-            const merged = new Set([...sessionEntities.flower_types, ...newFlowers]);
-            sessionEntities.flower_types = Array.from(merged);
+            sessionEntities.flower_types = Array.from(new Set([...sessionEntities.flower_types, ...newFlowers]));
         }
 
-        // Colors: deduplicated union
-        const newColors = [
-            ...(newEntities.colors || []),
-            ...(newEntities.color ? [newEntities.color] : [])
-        ];
+        const newColors = [...(newEntities.colors || []), ...(newEntities.color ? [newEntities.color] : [])];
         if (newColors.length > 0) {
-            const merged = new Set([...sessionEntities.colors, ...newColors]);
-            sessionEntities.colors = Array.from(merged);
+            sessionEntities.colors = Array.from(new Set([...sessionEntities.colors, ...newColors]));
             sessionEntities.color = sessionEntities.colors[0] || null;
         }
 
-        // Role hint: merge (new overwrites per-flower)
         if (newEntities.role_hint && Object.keys(newEntities.role_hint).length > 0) {
-            sessionEntities.role_hint = {
-                ...sessionEntities.role_hint,
-                ...newEntities.role_hint
-            };
+            sessionEntities.role_hint = { ...sessionEntities.role_hint, ...newEntities.role_hint };
         }
     }
 
-    // ── Budget parser (fallback khi AI service down) ─────────────────────────
+    // ── Budget parser fallback ───────────────────────────────────────────────
     parseBudget(text) {
         const m = text.match(/(\d[\d.,]*)\s*(triệu|trieu|tr|nghìn|nghin|k)?\b/i);
         if (!m) return 0;
@@ -111,7 +112,7 @@ class HydrangeaService {
         return num;
     }
 
-    // ── Intent inference khi AI timeout ────────────────────────────────────
+    // ── Intent inference ─────────────────────────────────────────────────────
     inferIntent(text, session) {
         const t = text.toLowerCase();
         if (['đổi', 'thay', 'chỉnh', 'sửa', 'bỏ', 'thêm vào'].some(k => t.includes(k))) return 'MODIFY';
@@ -124,47 +125,41 @@ class HydrangeaService {
         return (e.flower_types?.length > 0) || (e.colors?.length > 0) || e.occasion || e.style;
     }
 
-    // ── MODIFY: extract flower changes từ text ────────────────────────────────
-    applyModifyOps(sessionEntities, modifyOps = []) {
-        if (!modifyOps || modifyOps.length === 0) return false;
+    // ── Tìm field thiếu quan trọng nhất để hỏi ──────────────────────────────
+    _getMissingField(session) {
+        const e = session.entities;
+        const asked = session.missingDataAsked;
+        // Ưu tiên: flowers → occasion → colors → style → budget
+        if (!e.flower_types?.length && !asked.has('flower_types')) return 'flower_types';
+        if (!e.occasion && !asked.has('occasion')) return 'occasion';
+        if (!e.colors?.length && !asked.has('colors')) return 'colors';
+        if (!e.style && !asked.has('style')) return 'style';
+        if (!e.budget && !asked.has('budget')) return 'budget';
+        return null;
+    }
 
+    // ── MODIFY ops ───────────────────────────────────────────────────────────
+    applyModifyOps(sessionEntities, modifyOps = []) {
+        if (!modifyOps?.length) return false;
         let changed = false;
         const norm = v => normalizeString(String(v || ''));
-
         modifyOps.forEach(op => {
             if (op.op === 'replace' && op.from && op.to) {
-                // Tìm và thay thế loài hoa trong flower_types
-                const fromNorm = norm(op.from);
-                const toNorm = norm(op.to);
                 const idx = sessionEntities.flower_types.findIndex(f =>
-                    norm(f).includes(fromNorm) || fromNorm.includes(norm(f))
-                );
-                if (idx >= 0) {
-                    sessionEntities.flower_types[idx] = toNorm;
-                    changed = true;
-                    // Cập nhật role_hint
-                    if (sessionEntities.role_hint[fromNorm]) {
-                        const role = sessionEntities.role_hint[fromNorm];
-                        delete sessionEntities.role_hint[fromNorm];
-                        sessionEntities.role_hint[toNorm] = role;
-                    }
-                }
+                    norm(f).includes(norm(op.from)) || norm(op.from).includes(norm(f)));
+                if (idx >= 0) { sessionEntities.flower_types[idx] = norm(op.to); changed = true; }
             } else if (op.op === 'remove' && op.from) {
-                const fromNorm = norm(op.from);
                 const before = sessionEntities.flower_types.length;
                 sessionEntities.flower_types = sessionEntities.flower_types.filter(f =>
-                    !norm(f).includes(fromNorm) && !fromNorm.includes(norm(f))
-                );
+                    !norm(f).includes(norm(op.from)) && !norm(op.from).includes(norm(f)));
                 if (sessionEntities.flower_types.length !== before) changed = true;
             } else if (op.op === 'add' && op.to) {
                 const toNorm = norm(op.to);
                 if (!sessionEntities.flower_types.includes(toNorm)) {
-                    sessionEntities.flower_types.push(toNorm);
-                    changed = true;
+                    sessionEntities.flower_types.push(toNorm); changed = true;
                 }
             }
         });
-
         return changed;
     }
 
@@ -172,155 +167,339 @@ class HydrangeaService {
     async processChat(sessionId, message, isConfirming = false, incomingEntities = null) {
         const session = this.getSession(sessionId);
 
-        // Client gửi entities trực tiếp
         if (incomingEntities && Object.keys(incomingEntities).length > 0) {
             this.mergeEntities(session.entities, incomingEntities);
         }
+        if (isConfirming) return this._handleConfirm(session, sessionId);
+        if (!message?.trim()) return this._handleSuggest(session);
 
-        if (isConfirming) {
-            return this._handleConfirm(session);
-        }
-
-        if (!message?.trim()) {
-            return this._handleSuggest(session);
-        }
-
-        // ── Gọi Python AI service ────────────────────────────────────────
+        // Gọi Python AI service
         let aiResult = null;
         try {
-            const resp = await axios.post(`${AI_SERVICE_URL}/api/hydrangea/analyze`, {
-                text: message
-            }, { timeout: 8000 });
+            const resp = await axios.post(`${AI_SERVICE_URL}/api/hydrangea/analyze`,
+                { text: message }, { timeout: 8000 });
             aiResult = resp.data;
-            console.log('[Hydrangea] AI result:', JSON.stringify(aiResult.entities || {}).substring(0, 200));
         } catch (err) {
-            console.warn('[Hydrangea] AI service unavailable:', err.message, '— using keyword fallback');
+            console.warn('[Hydrangea] AI service unavailable:', err.message);
         }
 
-        // ── Merge AI entities ────────────────────────────────────────────
         const aiEntities = aiResult?.entities || {};
         this.mergeEntities(session.entities, aiEntities);
 
-        // ── Budget fallback ──────────────────────────────────────────────
         if (!session.entities.budget) {
             const b = this.parseBudget(message);
             if (b > 0) session.entities.budget = b;
         }
 
-        // ── Intent routing ───────────────────────────────────────────────
         const intent = aiResult?.intent || this.inferIntent(message, session);
         session.intent = intent;
-        session.history.push({ role: 'user', text: message, ts: Date.now() });
-        console.log(`[Hydrangea] intent=${intent}, entities:`, session.entities);
+        session.history.push({ role: 'user', text: message, ts: new Date() });
 
-        // ── MODIFY: apply changes ─────────────────────────────────────────
+        // MODIFY intent
         if (intent === 'MODIFY' && aiEntities.modify_ops?.length > 0) {
             const changed = this.applyModifyOps(session.entities, aiEntities.modify_ops);
             if (changed) {
-                const opsDesc = aiEntities.modify_ops
-                    .map(op => op.op === 'replace'
-                        ? `đổi "${op.from}" → "${op.to}"`
-                        : op.op === 'remove' ? `bỏ "${op.from}"`
-                        : `thêm "${op.to}"`)
-                    .join(', ');
-                session.history.push({ role: 'bot', text: `Đã ${opsDesc}. Đang tìm lại cho bạn...` });
-                return this._handleSuggest(session, `Đã cập nhật! `);
+                const opsDesc = aiEntities.modify_ops.map(op =>
+                    op.op === 'replace' ? `đổi "${op.from}" → "${op.to}"` :
+                    op.op === 'remove' ? `bỏ "${op.from}"` : `thêm "${op.to}"`
+                ).join(', ');
+                return this._handleSuggest(session, `Đã ${opsDesc}. Đang tìm lại... `);
             }
         }
 
-        // ── ASK_PRICE ─────────────────────────────────────────────────────
+        // ASK_PRICE
         if (intent === 'ASK_PRICE') {
-            const totalPrice = session.current_bouquet.total_price;
-            const reply = totalPrice > 0
-                ? `Giỏ hoa hiện tại tổng khoảng **${new Intl.NumberFormat('vi-VN').format(totalPrice)}đ**. Bạn muốn điều chỉnh ngân sách không?`
-                : `Bạn muốn ngân sách khoảng bao nhiêu? (ví dụ: 500k, 1 triệu...)`;
-            return { success: true, reply, extractedEntities: session.entities, status: 'continue', suggestedProducts: [] };
+            const total = session.current_bouquet.total_price;
+            const reply = total > 0
+                ? `Giỏ hoa hiện tại tổng khoảng **${new Intl.NumberFormat('vi-VN').format(total)}đ**. Bạn muốn điều chỉnh không?`
+                : 'Bạn muốn ngân sách khoảng bao nhiêu? (ví dụ: 500k, 1 triệu...)';
+            return { success: true, reply, extractedEntities: session.entities, status: 'continue', suggestedItems: null };
         }
 
-        // ── Không đủ info → hỏi thêm ────────────────────────────────────
+        // Chưa đủ data — hỏi thêm thông minh
         if (!this.hasCoreEntities(session.entities)) {
-            return {
-                success: true,
-                reply: 'Mình cần biết thêm chút xíu! 🌸 Bạn muốn tặng ai, dịp gì, hay thích tông màu/loài hoa nào không?',
-                extractedEntities: session.entities,
-                status: 'continue',
-                suggestedProducts: []
-            };
+            const missingField = this._getMissingField(session);
+            if (missingField) {
+                session.missingDataAsked.add(missingField);
+                const q = MISSING_DATA_QUESTIONS[missingField];
+                session.history.push({ role: 'bot', text: q.question, ts: new Date() });
+                return {
+                    success: true,
+                    reply: q.question,
+                    quickChips: q.chips,
+                    extractedEntities: session.entities,
+                    status: 'asking',
+                    suggestedItems: null
+                };
+            }
         }
 
         return this._handleSuggest(session);
     }
 
-    // ── Suggest products ─────────────────────────────────────────────────────
+    // ── Tìm và phân loại sản phẩm theo danh mục ─────────────────────────────
     async _handleSuggest(session, prefixMsg = '') {
-        const products = await Product.find({ status: 'active', stock: { $gt: 0 } })
-            .select('name price images dominant_color secondary_colors main_flowers sub_flowers occasion style sold priority _id')
+        const e = session.entities;
+
+        // Query tất cả products active
+        const allProducts = await Product.find({ status: { $in: ['active', 'out_of_stock'] } })
+            .select('name price images dominant_color secondary_colors main_flowers sub_flowers occasion style sold product_type role_type layout elements stock _id')
             .lean();
 
-        const { main, secondary, all } = classifyProducts(products, session.entities);
+        const inStock = allProducts.filter(p => p.stock > 0);
+        const outOfStock = allProducts.filter(p => p.stock === 0);
 
-        const topProducts = [...main, ...secondary]
-            .sort((a, b) => b._score - a._score)
-            .slice(0, 6)
-            .map(p => ({
-                ...p,
-                aiScore: Math.round(p._score * 10),
-                role: main.includes(p) ? 'main' : 'secondary'
-            }));
+        // Score function — không lọc theo targetType (đã filter ở trước)
+        const score = (product) => {
+            let s = 0;
+            const norm = v => normalizeString(String(v || ''));
 
-        // Fallback: hàng phổ biến nhất
-        if (topProducts.length === 0) {
-            const fallback = await Product.find({ status: 'active' })
-                .sort({ sold: -1 }).limit(4).lean();
-            return {
-                success: true,
-                reply: 'Kho hàng chưa có mẫu khớp chính xác! Đây là những mẫu bán chạy nhất:',
-                extractedEntities: session.entities,
-                status: 'suggesting',
-                suggestedProducts: fallback,
-                classification: { main: [], secondary: [] }
-            };
-        }
+            // Flower match
+            e.flower_types?.forEach(ft => {
+                const ftN = norm(ft);
+                if (product.main_flowers?.some(f => norm(f).includes(ftN) || ftN.includes(norm(f)))) s += 30;
+                if (product.sub_flowers?.some(f => norm(f).includes(ftN) || ftN.includes(norm(f)))) s += 15;
+                if (norm(product.name).includes(ftN)) s += 20;
+            });
 
-        // Cập nhật current_bouquet state
-        const totalPrice = topProducts.slice(0, 3).reduce((s, p) => s + (p.price || 0), 0);
-        const explanation = buildExplanation(session.entities, main, secondary);
-        session.current_bouquet = {
-            items: topProducts.slice(0, 3),
-            total_price: totalPrice,
-            explanation
+            // Color match
+            e.colors?.forEach(c => {
+                const cN = norm(c);
+                if (norm(product.dominant_color || '').includes(cN) || cN.includes(norm(product.dominant_color || ''))) s += 20;
+                if (product.secondary_colors?.some(sc => norm(sc).includes(cN))) s += 10;
+            });
+
+            // Occasion match
+            if (e.occasion && product.occasion?.some(o => norm(o).includes(norm(e.occasion)) || norm(e.occasion).includes(norm(o)))) s += 25;
+
+            // Style match
+            if (e.style && product.style?.some(st => norm(st).includes(norm(e.style)))) s += 15;
+
+            // Popularity boost
+            s += Math.min((product.sold || 0) * 0.1, 10);
+
+            return s;
         };
 
-        const flowerStr = session.entities.flower_types?.join(', ') || 'đẹp';
-        const colorStr = session.entities.colors?.[0] || session.entities.color || '';
-        const reply = prefixMsg +
-            `Tìm thấy ${topProducts.length} mẫu ${flowerStr}${colorStr ? ' tông ' + colorStr : ''} phù hợp nhất! 🌸 Bạn thích mẫu nào?`;
+        // Chọn basket tốt nhất
+        const baskets = inStock
+            .filter(p => p.product_type === 'basket')
+            .map(p => ({ ...p, _score: score(p) }))
+            .sort((a, b) => b._score - a._score);
+
+        // Chọn wrapper
+        const wrappers = inStock
+            .filter(p => p.product_type === 'wrapper')
+            .map(p => ({ ...p, _score: score(p) }))
+            .sort((a, b) => b._score - a._score);
+
+        // Chọn ribbon
+        const ribbons = inStock
+            .filter(p => p.product_type === 'ribbon')
+            .map(p => ({ ...p, _score: score(p) }))
+            .sort((a, b) => b._score - a._score);
+
+        // Hoa chính
+        const mainFlowers = inStock
+            .filter(p => p.product_type === 'flower_component' && p.role_type === 'main_flower')
+            .map(p => ({ ...p, _score: score(p) }))
+            .sort((a, b) => b._score - a._score);
+
+        // Hoa phụ
+        const subFlowers = inStock
+            .filter(p => p.product_type === 'flower_component' && p.role_type === 'sub_flower')
+            .map(p => ({ ...p, _score: score(p) }))
+            .sort((a, b) => b._score - a._score);
+
+        // Phụ kiện
+        const accessories = inStock
+            .filter(p => p.product_type === 'accessory')
+
+            .map(p => ({ ...p, _score: score(p) }))
+            .sort((a, b) => b._score - a._score);
+
+        // Complete bouquet (legacy fallback)
+        const completeBouquets = inStock
+            .filter(p => p.product_type === 'complete_bouquet' || !p.product_type)
+            .map(p => ({ ...p, _score: score(p) }))
+            .sort((a, b) => b._score - a._score);
+
+        // Out-of-stock items người dùng muốn + alternatives
+        const outOfStockWarnings = [];
+        if (e.flower_types?.length > 0) {
+            outOfStock.forEach(oos => {
+                const oosFt = [...(oos.main_flowers || []), ...(oos.sub_flowers || [])];
+                const matches = e.flower_types.some(ft =>
+                    oosFt.some(f => normalizeString(f).includes(normalizeString(ft)) || normalizeString(ft).includes(normalizeString(f)))
+                );
+                if (matches) {
+                    // Tìm alternatives in-stock
+                    const alternatives = inStock
+                        .filter(p => {
+                            const pFt = [...(p.main_flowers || []), ...(p.sub_flowers || [])];
+                            return oosFt.some(f => pFt.some(pf =>
+                                normalizeString(f).includes(normalizeString(pf)) || normalizeString(pf).includes(normalizeString(f))
+                            ));
+                        })
+                        .slice(0, 3)
+                        .map(p => ({ _id: p._id, name: p.name, price: p.price, images: p.images }));
+
+                    outOfStockWarnings.push({
+                        item: { _id: oos._id, name: oos.name, product_type: oos.product_type },
+                        alternatives
+                    });
+                }
+            });
+        }
+
+        // Build structured items response
+        const suggestedItems = {
+            basket: baskets.slice(0, 3),
+            wrapper: wrappers.slice(0, 3),
+            ribbon: ribbons.slice(0, 3),
+            main_flowers: mainFlowers.slice(0, 4),
+            sub_flowers: subFlowers.slice(0, 3),
+            accessories: accessories.slice(0, 3),
+            complete_bouquets: completeBouquets.slice(0, 6), // fallback
+        };
+
+        // Auto-select items tốt nhất cho session
+        session.selectedItems = {
+            basket: baskets[0] || null,
+            wrapper: wrappers[0] || null,
+            ribbon: ribbons[0] || null,
+            main_flowers: mainFlowers.slice(0, 2),
+            sub_flowers: subFlowers.slice(0, 1),
+            accessories: accessories.slice(0, 1),
+        };
+
+        // Tính tổng giá
+        const allSelectedPrices = [
+            session.selectedItems.basket?.price || 0,
+            session.selectedItems.wrapper?.price || 0,
+            session.selectedItems.ribbon?.price || 0,
+            ...session.selectedItems.main_flowers.map(f => f.price || 0),
+            ...session.selectedItems.sub_flowers.map(f => f.price || 0),
+            ...session.selectedItems.accessories.map(f => f.price || 0),
+            // fallback complete bouquet
+            ...(baskets.length === 0 && completeBouquets.length > 0 ? [completeBouquets[0]?.price || 0] : [])
+        ];
+        session.current_bouquet.total_price = allSelectedPrices.reduce((a, b) => a + b, 0);
+
+        const hasItems = Object.values(suggestedItems).some(arr => arr.length > 0);
+        const flowerStr = e.flower_types?.join(', ') || 'hoa';
+        const reply = prefixMsg + (hasItems
+            ? `Mình đã tìm thấy các thành phần phù hợp cho giỏ hoa ${flowerStr} của bạn! 🌸 Xem danh sách bên cạnh và nhấn **"Tạo Giỏ Hoa"** khi bạn hài lòng nhé.`
+            : `Kho hàng chưa có đủ thành phần phù hợp. Mình sẽ gợi ý những mẫu bán chạy nhất!`
+        );
+
+        session.history.push({ role: 'bot', text: reply, ts: new Date() });
 
         return {
             success: true,
             reply,
             extractedEntities: session.entities,
             status: 'suggesting',
-            suggestedProducts: topProducts,
-            classification: {
-                main: main.map(p => p._id),
-                secondary: secondary.map(p => p._id)
-            },
-            current_bouquet: session.current_bouquet
+            suggestedItems,
+            selectedItems: session.selectedItems,
+            outOfStockWarnings,
+            totalPrice: session.current_bouquet.total_price,
         };
     }
 
-    // ── Confirm (trigger image gen) ──────────────────────────────────────────
-    async _handleConfirm(session) {
+    // ── Confirm: gọi Gemini tạo ảnh ─────────────────────────────────────────
+    async _handleConfirm(session, sessionId) {
+        const { entities, selectedItems } = session;
+
+        const imageResult = await generateBouquetImage(entities, selectedItems);
+
+        if (!imageResult.success) {
+            return {
+                success: false,
+                reply: `❌ Chưa thể tạo ảnh lúc này: ${imageResult.error}`,
+                extractedEntities: entities,
+                status: 'error',
+            };
+        }
+
+        // Lưu vào session
+        session.generatedImage = {
+            base64: imageResult.imageBase64,
+            mimeType: imageResult.mimeType,
+            modelUsed: imageResult.modelUsed,
+            prompt: imageResult.prompt,
+            generatedAt: new Date(),
+        };
+
         return {
             success: true,
-            reply: '✨ Đang cắm hoa cho bạn, chờ mình xíu nhé...',
-            extractedEntities: session.entities,
-            status: 'generating',
-            triggerImageGeneration: true,
-            imageEntities: session.entities,
-            current_bouquet: session.current_bouquet
+            reply: '✨ Giỏ hoa AI tạo đã sẵn sàng! Bạn thấy thế nào — đồng ý để lưu đơn hoặc tạo lại nhé!',
+            extractedEntities: entities,
+            status: 'image_ready',
+            imageBase64: imageResult.imageBase64,
+            mimeType: imageResult.mimeType,
+            selectedItems,
+            totalPrice: session.current_bouquet.total_price,
         };
+    }
+
+    // ── Tạo CustomBouquetOrder ───────────────────────────────────────────────
+    async createOrder(sessionId, userId, userDescription, note = '') {
+        const session = this.getSession(sessionId);
+
+        const mapItem = (p) => p ? {
+            product: p._id,
+            name: p.name,
+            price: p.price,
+            image: p.images?.[0]?.url || null
+        } : null;
+
+        const orderData = {
+            user: userId,
+            sessionId,
+            entities: session.entities,
+            userDescription,
+            selectedItems: {
+                basket: mapItem(session.selectedItems.basket),
+                wrapper: mapItem(session.selectedItems.wrapper),
+                ribbon: mapItem(session.selectedItems.ribbon),
+                main_flowers: (session.selectedItems.main_flowers || []).map(f => ({ ...mapItem(f), quantity: 1 })),
+                sub_flowers: (session.selectedItems.sub_flowers || []).map(f => ({ ...mapItem(f), quantity: 1 })),
+                accessories: (session.selectedItems.accessories || []).map(a => ({ ...mapItem(a), quantity: 1 })),
+            },
+            totalPrice: session.current_bouquet.total_price,
+            generatedImage: session.generatedImage ? {
+                base64: session.generatedImage.base64,
+                generatedAt: session.generatedImage.generatedAt,
+                prompt: session.generatedImage.prompt,
+                model: session.generatedImage.modelUsed,
+            } : undefined,
+            status: 'confirmed',
+            note,
+            chatHistory: session.history.slice(-20),
+            confirmedAt: new Date(),
+        };
+
+        const order = await CustomBouquetOrder.create(orderData);
+        return order;
+    }
+
+    // ── Update selected items từ frontend ────────────────────────────────────
+    updateSelectedItems(sessionId, newSelectedItems) {
+        const session = this.getSession(sessionId);
+        session.selectedItems = { ...session.selectedItems, ...newSelectedItems };
+
+        // Recalculate total
+        const all = [
+            session.selectedItems.basket,
+            session.selectedItems.wrapper,
+            session.selectedItems.ribbon,
+            ...(session.selectedItems.main_flowers || []),
+            ...(session.selectedItems.sub_flowers || []),
+            ...(session.selectedItems.accessories || []),
+        ].filter(Boolean);
+        session.current_bouquet.total_price = all.reduce((s, p) => s + (p.price || 0), 0);
+        return session.current_bouquet.total_price;
     }
 }
 

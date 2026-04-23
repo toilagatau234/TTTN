@@ -71,7 +71,10 @@ const CreateProductModal = ({ open, onCancel, onSuccess, initialData }) => {
           dominant_color: initialData.dominant_color,
           secondary_colors: initialData.secondary_colors,
           layout: initialData.layout,
-          elements: initialData.elements
+          elements: initialData.elements,
+          // Bouquet Builder
+          product_type: initialData.product_type || 'complete_bouquet',
+          role_type: initialData.role_type || null,
         });
 
         // Fill images
@@ -398,6 +401,34 @@ const CreateProductModal = ({ open, onCancel, onSuccess, initialData }) => {
 
               <Form.Item label="Yếu tố trang trí" name="elements" className="mb-1">
                 <Select mode="tags" placeholder="Ví dụ: Ribbon, Box, Pearl..." size="large" className="rounded-xl" />
+              </Form.Item>
+
+              {/* Bouquet Builder Type */}
+              <Form.Item label={<span className="font-semibold text-purple-700">🧺 Loại thành phần (Bouquet Builder)</span>} name="product_type" className="mb-1 col-span-2">
+                <Select size="large" className="rounded-xl" placeholder="Chọn loại sản phẩm">
+                  <Option value="complete_bouquet">💐 Giỏ hoa hoàn chỉnh</Option>
+                  <Option value="basket">🧺 Giỏ / Lẵng / Hộp</Option>
+                  <Option value="wrapper">🎁 Giấy gói</Option>
+                  <Option value="ribbon">🎀 Ruy băng / Nơ</Option>
+                  <Option value="flower_component">🌸 Hoa (thành phần)</Option>
+                  <Option value="accessory">✨ Phụ kiện trang trí</Option>
+                </Select>
+              </Form.Item>
+
+              <Form.Item
+                noStyle
+                shouldUpdate={(prev, cur) => prev.product_type !== cur.product_type}
+              >
+                {({ getFieldValue }) =>
+                  getFieldValue('product_type') === 'flower_component' ? (
+                    <Form.Item label={<span className="font-semibold text-pink-700">Vai trò hoa</span>} name="role_type" className="mb-1">
+                      <Select size="large" className="rounded-xl" placeholder="Chọn vai trò">
+                        <Option value="main_flower">🌹 Hoa chính</Option>
+                        <Option value="sub_flower">🌿 Hoa phụ / Lá</Option>
+                      </Select>
+                    </Form.Item>
+                  ) : null
+                }
               </Form.Item>
             </div>
           </div>

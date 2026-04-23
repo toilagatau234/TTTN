@@ -43,6 +43,24 @@ const productSchema = new mongoose.Schema({
     // ==========================================
     // AI MATCHING ATTRIBUTES (New fields for Step 4)
     // ==========================================
+    // Phân loại loại sản phẩm cho AI builder
+    product_type: {
+        type: String,
+        enum: ['complete_bouquet', 'basket', 'wrapper', 'ribbon', 'flower_component', 'accessory'],
+        default: 'complete_bouquet'
+        // basket: giỏ/lẵng/hộp đựng hoa
+        // wrapper: giấy gói
+        // ribbon: ruy băng, nơ
+        // flower_component: hoa (chính hoặc phụ) — dùng role_type để phân biệt
+        // accessory: phụ kiện trang trí (thiệp, thú bông, nến...)
+        // complete_bouquet: giỏ hoa hoàn chỉnh (legacy)
+    },
+    // Vai trò trong giỏ hoa (cho flower_component)
+    role_type: {
+        type: String,
+        enum: ['main_flower', 'sub_flower', null],
+        default: null
+    },
     occasion: [{
         type: String,
         trim: true

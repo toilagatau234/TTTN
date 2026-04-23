@@ -1,35 +1,135 @@
 const hydrangeaService = require('./hydrangea.service');
+const { checkGeminiApiKey } = require('./gemini.image.service');
+const CustomBouquetOrder = require('../../models/CustomBouquetOrder');
+const { protect } = require('../../middleware/auth');
 
+// POST /api/ai/hydrangea/chat
 exports.chatWithHydrangea = async (req, res) => {
     try {
-        // Lấy data từ Frontend gửi lên (theo đúng file HydrangeaStudio.jsx)
         const { sessionId, message, isConfirming, entities } = req.body;
+        if (!sessionId) return res.status(400).json({ success: false, reply: 'Thiếu sessionId' });
 
-        // Gọi đúng tên hàm trong service là processChat
         const result = await hydrangeaService.processChat(sessionId, message, isConfirming, entities);
-
-        // Trả kết quả về cho Frontend
         return res.status(200).json(result);
-        
     } catch (error) {
-        console.error("[Hydrangea Controller Error]:", error);
-        return res.status(500).json({ 
-            success: false, 
-            reply: 'Hệ thống AI đang quá tải, vui lòng thử lại sau!' 
+        console.error('[Hydrangea Controller Error]:', error);
+        return res.status(500).json({
+            success: false,
+            reply: 'Hệ thống AI đang quá tải, vui lòng thử lại sau!'
         });
     }
 };
 
-exports.generateImage = async (req, res) => {
+// POST /api/ai/hydrangea/update-items
+// Frontend gửi lên items user đã chọn (override auto-select)
+exports.updateSelectedItems = async (req, res) => {
     try {
-        const { layout, main_color, sub_color } = req.body;
-        const result = await hydrangeaService.generateImage(layout, main_color, sub_color);
+        const { sessionId, selectedItems } = req.body;
+        if (!sessionId) return res.status(400).json({ success: false });
+        const totalPrice = hydrangeaService.updateSelectedItems(sessionId, selectedItems);
+        return res.status(200).json({ success: true, totalPrice });
+    } catch (error) {
+        console.error('[UpdateItems Error]:', error);
+        return res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// POST /api/ai/hydrangea/generate
+// Trigger Gemini image generation
+exports.generateBouquetImage = async (req, res) => {
+    try {
+        const { sessionId } = req.body;
+        if (!sessionId) return res.status(400).json({ success: false, reply: 'Thiếu sessionId' });
+
+        const result = await hydrangeaService.processChat(sessionId, null, true);
         return res.status(200).json(result);
     } catch (error) {
-        console.error("[Hydrangea Image Error]:", error);
-        return res.status(500).json({ 
-            success: false, 
-            message: error.message || 'Không thể tạo ảnh lúc này.' 
+        console.error('[Generate Image Error]:', error);
+        return res.status(500).json({ success: false, reply: error.message });
+    }
+};
+
+// POST /api/ai/hydrangea/confirm-order
+// Tạo CustomBouquetOrder sau khi user đồng ý ảnh
+exports.confirmOrder = async (req, res) => {
+    try {
+        const { sessionId, userDescription, note } = req.body;
+        const userId = req.user?._id;
+
+        if (!userId) return res.status(401).json({ success: false, message: 'Vui lòng đăng nhập' });
+        if (!sessionId) return res.status(400).json({ success: false, message: 'Thiếu sessionId' });
+
+        const order = await hydrangeaService.createOrder(sessionId, userId, userDescription, note);
+        return res.status(201).json({
+            success: true,
+            message: 'Đơn hàng tùy chỉnh đã được lưu!',
+            order: {
+                _id: order._id,
+                orderCode: order.orderCode,
+                status: order.status,
+                totalPrice: order.totalPrice,
+                createdAt: order.createdAt,
+            }
         });
+    } catch (error) {
+        console.error('[ConfirmOrder Error]:', error);
+        return res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// GET /api/ai/hydrangea/my-orders
+// Lấy lịch sử đơn custom của user
+exports.getMyOrders = async (req, res) => {
+    try {
+        const userId = req.user?._id;
+        if (!userId) return res.status(401).json({ success: false });
+
+        const orders = await CustomBouquetOrder.find({ user: userId })
+            .select('orderCode status totalPrice entities generatedImage.url createdAt confirmedAt selectedItems')
+            .sort({ createdAt: -1 })
+            .limit(20)
+            .lean();
+
+        // Tạo orderCode virtual cho lean docs
+        const result = orders.map(o => ({
+            ...o,
+            orderCode: `CB-${String(o._id).slice(-8).toUpperCase()}`
+        }));
+
+        return res.status(200).json({ success: true, orders: result });
+    } catch (error) {
+        console.error('[GetMyOrders Error]:', error);
+        return res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// GET /api/ai/hydrangea/orders/:id
+// Chi tiết 1 đơn
+exports.getOrderDetail = async (req, res) => {
+    try {
+        const userId = req.user?._id;
+        const order = await CustomBouquetOrder.findOne({ _id: req.params.id, user: userId }).lean();
+        if (!order) return res.status(404).json({ success: false, message: 'Không tìm thấy đơn' });
+
+        return res.status(200).json({
+            success: true,
+            order: {
+                ...order,
+                orderCode: `CB-${String(order._id).slice(-8).toUpperCase()}`
+            }
+        });
+    } catch (error) {
+        return res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// GET /api/ai/hydrangea/check-api
+// Kiểm tra Gemini API key
+exports.checkApi = async (req, res) => {
+    try {
+        const status = await checkGeminiApiKey();
+        return res.status(200).json({ success: true, gemini: status });
+    } catch (error) {
+        return res.status(500).json({ success: false, error: error.message });
     }
 };
