@@ -8,13 +8,16 @@ const CreateBannerModal = ({ open, onCancel, onCreate }) => {
   const [imageUrl, setImageUrl] = useState(null);
 
   const handleUploadChange = (info) => {
-    if (info.file.status === 'uploading') {
-      setLoading(true); return;
-    }
+    const file = info.file.originFileObj || info.file;
+    if (!file) return;
+
+    setLoading(true);
     const reader = new FileReader();
-    reader.addEventListener('load', () => setImageUrl(reader.result));
-    reader.readAsDataURL(info.file.originFileObj);
-    setLoading(false);
+    reader.addEventListener('load', () => {
+      setImageUrl(reader.result);
+      setLoading(false);
+    });
+    reader.readAsDataURL(file);
   };
 
   const handleOk = async () => {
@@ -62,7 +65,7 @@ const CreateBannerModal = ({ open, onCancel, onCreate }) => {
             ) : (
               <div className="flex flex-col items-center justify-center text-gray-400 w-full h-[120px]">
                 {loading ? <LoadingOutlined /> : <PictureOutlined className="text-2xl" />}
-                <div className="mt-2 text-xs">Kích thước chuẩn: 1920x600</div>
+                <div className="mt-2 text-[10px] opacity-70 px-2 italic text-center">Gợi ý: 1920x600 (Hệ thống sẽ tự động điều chỉnh ảnh để không bị méo)</div>
               </div>
             )}
           </Upload>

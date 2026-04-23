@@ -2,6 +2,8 @@ const Order = require('../models/Order');
 const Product = require('../models/Product');
 const User = require('../models/User');
 const Review = require('../models/Review');
+const Cart = require('../models/Cart');
+const { Shipment } = require('../models/Shipping');
 
 // @desc    Tổng quan dashboard (cards)
 // @route   GET /api/stats/overview
@@ -103,12 +105,76 @@ const getTopProducts = async (req, res) => {
 // @route   GET /api/stats/order-status
 const getOrderStatusStats = async (req, res) => {
     try {
-        const stats = await Order.aggregate([
-            { $group: { _id: '$status', count: { $sum: 1 } } },
+        const { period = 'all' } = req.query;
+        let startDate = new Date(0); // Default to all time
+        let endDate = new Date();
+
+        // Tính toán khoảng thời gian dựa trên period
+        const now = new Date();
+        if (period === 'today') {
+            startDate = new Date(now.setHours(0, 0, 0, 0));
+            endDate = new Date(now.setHours(23, 59, 59, 999));
+        } else if (period === 'yesterday') {
+            const yesterday = new Date(now);
+            yesterday.setDate(now.getDate() - 1);
+            startDate = new Date(yesterday.setHours(0, 0, 0, 0));
+            endDate = new Date(yesterday.setHours(23, 59, 59, 999));
+        } else if (period === 'week') {
+            startDate = new Date(now);
+            startDate.setDate(now.getDate() - 7);
+        } else if (period === 'month') {
+            startDate = new Date(now);
+            startDate.setMonth(now.getMonth() - 1);
+        }
+
+        // Điều kiện lọc theo thời gian
+        const dateFilter = {
+            createdAt: { $gte: startDate, $lte: endDate }
+        };
+
+        // Riêng cho giỏ hàng, ta vẫn giữ logic > 24h nhưng nằm trong khoảng period (nếu có)
+        const abandonedThreshold = new Date();
+        abandonedThreshold.setHours(abandonedThreshold.getHours() - 24);
+
+        const [orderStats, returnedCount, abandonedCount, customerCount, totalCount] = await Promise.all([
+            Order.aggregate([
+                { $match: dateFilter },
+                { $group: { _id: '$status', count: { $sum: 1 } } },
+            ]),
+            Shipment.countDocuments({ 
+                status: 'returned',
+                createdAt: { $gte: startDate, $lte: endDate }
+            }),
+            Cart.countDocuments({ 
+                updatedAt: { $lt: abandonedThreshold, $gte: startDate, $lte: endDate },
+                'items.0': { $exists: true } 
+            }),
+            Order.aggregate([
+                { $match: dateFilter },
+                { $group: { _id: '$user' } },
+                { $count: 'total' }
+            ]),
+            Order.countDocuments(dateFilter)
         ]);
 
-        const result = {};
-        stats.forEach((s) => { result[s._id] = s.count; });
+        const result = {
+            total: totalCount,
+            pending: 0,
+            confirmed: 0,
+            processing: 0,
+            shipping: 0,
+            delivered: 0,
+            cancelled: 0,
+            returned: returnedCount,
+            abandoned: abandonedCount,
+            customers: customerCount[0]?.total || 0
+        };
+
+        orderStats.forEach((s) => { 
+            if (Object.prototype.hasOwnProperty.call(result, s._id)) {
+                result[s._id] = s.count; 
+            }
+        });
 
         res.json({ success: true, data: result });
     } catch (error) {

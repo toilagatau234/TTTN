@@ -15,8 +15,8 @@ const statsService = {
     return axiosClient.get(`${STATS_ENDPOINT}/top-products`, { params });
   },
 
-  getOrderStatusStats: () => {
-    return axiosClient.get(`${STATS_ENDPOINT}/order-status`);
+  getOrderStatusStats: (params) => {
+    return axiosClient.get(`${STATS_ENDPOINT}/order-status`, { params });
   },
 
   getRecentOrders: (params) => {

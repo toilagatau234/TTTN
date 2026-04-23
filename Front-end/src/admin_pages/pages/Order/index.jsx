@@ -23,19 +23,18 @@ import CreateOrderModal from './components/CreateOrderModal';
 import ViewOrderDetailDrawer from './components/ViewOrderDetailDrawer';
 import orderService from '../../../services/orderService';
 import shippingService from '../../../services/shippingService';
+import statsService from '../../../services/statsService';
 
 const { RangePicker } = DatePicker;
 const { Option } = Select;
 
 // --- COMPONENT CON: OrderStatCard ---
 const OrderStatCard = ({ title, options, icon }) => {
-  const [filter, setFilter] = useState('week');
-
   return (
     <div className="bg-white p-6 rounded-[24px] shadow-premium flex flex-col justify-between h-full border border-white/50 relative overflow-hidden group animate-in slide-in-from-bottom-4 duration-500">
       <div className="absolute top-0 right-0 w-32 h-32 bg-blue-50/20 rounded-full translate-x-1/2 -translate-y-1/2 blur-3xl pointer-events-none"></div>
       
-      {/* Header Card: Tiêu đề + Bộ lọc thời gian */}
+      {/* Header Card: Tiêu đề */}
       <div className="flex justify-between items-start mb-6 z-10">
         <div className="flex items-center gap-4">
            <div className="bg-[#F4F7FE] text-blue-600 w-12 h-12 rounded-2xl flex items-center justify-center text-2xl shadow-sm group-hover:scale-110 transition-transform duration-500">
@@ -43,20 +42,6 @@ const OrderStatCard = ({ title, options, icon }) => {
            </div>
            <h4 className="text-lg font-black text-[#2B3674] tracking-tight m-0">{title}</h4>
         </div>
-        
-        {/* Dropdown Filter */}
-        <Select 
-          defaultValue="week" 
-          value={filter}
-          onChange={setFilter}
-          variant="borderless"
-          className="bg-[#F4F7FE] rounded-xl text-[10px] font-black uppercase tracking-widest text-gray-500 min-w-[110px]"
-        >
-          <Option value="today">Hôm nay</Option>
-          <Option value="yesterday">Hôm qua</Option>
-          <Option value="week">Tuần này</Option>
-          <Option value="month">Tháng này</Option>
-        </Select>
       </div>
 
       {/* Nội dung thống kê */}
@@ -64,7 +49,7 @@ const OrderStatCard = ({ title, options, icon }) => {
         {options.map((item, index) => (
           <React.Fragment key={index}>
             <div className="flex flex-col items-center gap-1 group/item cursor-pointer">
-               <span className="text-3xl font-black text-[#2B3674] tracking-tighter group-hover/item:text-blue-600 transition-colors">{item.value}</span>
+               <span className="text-3xl font-black text-[#2B3674] tracking-tighter group-hover/item:text-blue-600 transition-colors">{item.value ?? 0}</span>
                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{item.label}</span>
             </div>
             {/* Đường kẻ dọc phân cách */}
@@ -87,10 +72,36 @@ const OrderPage = () => {
   const [dataSource, setDataSource] = useState([]);
   const [pagination, setPagination] = useState({ current: 1, pageSize: 10, total: 0 });
 
+  const [stats, setStats] = useState({
+    total: 0,
+    pending: 0,
+    delivered: 0,
+    cancelled: 0,
+    returned: 0,
+    abandoned: 0,
+    customers: 0
+  });
+  const [statsLoading, setStatsLoading] = useState(false);
+  const [statsPeriod, setStatsPeriod] = useState('week');
+
   // Filters
   const [searchText, setSearchText] = useState('');
   const [debouncedSearchText, setDebouncedSearchText] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+
+  const fetchStats = async () => {
+    setStatsLoading(true);
+    try {
+      const response = await statsService.getOrderStatusStats({ period: statsPeriod });
+      if (response && response.success) {
+        setStats(response.data);
+      }
+    } catch (error) {
+      console.error('Lỗi khi tải thống kê:', error);
+    } finally {
+      setStatsLoading(false);
+    }
+  };
 
   const fetchOrders = async (page = 1, pageSize = 10) => {
     setLoading(true);
@@ -128,6 +139,10 @@ const OrderPage = () => {
   useEffect(() => {
     fetchOrders(1, pagination.pageSize);
   }, [statusFilter, debouncedSearchText]);
+
+  useEffect(() => {
+    fetchStats();
+  }, [statsPeriod]);
 
   const handleUpdateStatus = async (id, status) => {
     try {
@@ -289,30 +304,50 @@ const OrderPage = () => {
       </div>
 
       {/* --- BẢNG THỐNG KÊ --- */}
+      <div className="flex justify-between items-center mb-6 px-2">
+        <h4 className="text-sm font-black text-gray-400 uppercase tracking-widest m-0">Tổng quan vận hành</h4>
+        <div className="flex items-center gap-3 bg-white px-4 py-2 rounded-2xl shadow-sm border border-gray-100">
+           <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Thời gian:</span>
+           <Select 
+             value={statsPeriod} 
+             onChange={setStatsPeriod}
+             variant="borderless"
+             className="bg-[#F4F7FE] rounded-xl text-[11px] font-black uppercase tracking-widest text-blue-600 min-w-[140px]"
+             dropdownClassName="premium-select-dropdown"
+           >
+             <Option value="all">Tất cả thời gian</Option>
+             <Option value="today">Hôm nay</Option>
+             <Option value="yesterday">Hôm qua</Option>
+             <Option value="week">7 ngày qua</Option>
+             <Option value="month">30 ngày qua</Option>
+           </Select>
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
         <OrderStatCard 
           title="Thông tin vận hành"
           icon={<InboxOutlined />}
           options={[
-            { label: 'Tất cả', value: pagination.total },
-            { label: 'Chờ xử lý', value: 12 },
-            { label: 'Hoàn thành', value: 98 },
+            { label: 'Tất cả', value: stats.total },
+            { label: 'Chờ xử lý', value: stats.pending },
+            { label: 'Hoàn thành', value: stats.delivered },
           ]}
         />
         <OrderStatCard 
           title="Rủi ro vận chuyển"
           icon={<StopOutlined />}
           options={[
-            { label: 'Đã hủy', value: 5 },
-            { label: 'Hoàn trả', value: 2 },
+            { label: 'Đã hủy', value: stats.cancelled },
+            { label: 'Hoàn trả', value: stats.returned },
           ]}
         />
         <OrderStatCard 
           title="Luồng mua hàng"
           icon={<ShoppingCartOutlined />}
           options={[
-            { label: 'Bỏ quên giỏ', value: 24 },
-            { label: 'Khách mua', value: 85 },
+            { label: 'Bỏ quên giỏ', value: stats.abandoned },
+            { label: 'Khách mua', value: stats.customers },
           ]}
         />
       </div>

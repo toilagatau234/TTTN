@@ -1,5 +1,5 @@
 const Blog = require('../models/Blog');
-const cloudinary = require('../config/cloudinary');
+const { cloudinary } = require('../config/cloudinary');
 
 exports.getAllBlogs = async (query) => {
   const { page = 1, limit = 10, status, category, search } = query;

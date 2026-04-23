@@ -7,7 +7,7 @@ const {
     updateProduct,
     deleteProduct
 } = require('../controllers/productController');
-const upload = require('../config/cloudinary');
+const { upload } = require('../config/cloudinary');
 const { protect, authorize } = require('../middleware/auth');
 const validateObjectId = require('../middleware/validateObjectId');
 

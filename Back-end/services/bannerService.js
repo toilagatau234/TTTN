@@ -1,5 +1,5 @@
 const Banner = require('../models/Banner');
-const cloudinary = require('../config/cloudinary');
+const { cloudinary } = require('../config/cloudinary');
 
 exports.getAllBanners = async (query = {}) => {
   const { status } = query;
@@ -23,6 +23,10 @@ exports.createBanner = async (data) => {
   if (data.imageBase64) {
     const uploadRes = await cloudinary.uploader.upload(data.imageBase64, {
       folder: 'rosee/banners',
+      width: 1920,
+      height: 600,
+      crop: 'fill',
+      gravity: 'auto'
     });
     data.image = { url: uploadRes.secure_url, publicId: uploadRes.public_id };
   }
@@ -41,6 +45,10 @@ exports.updateBanner = async (id, data) => {
     }
     const uploadRes = await cloudinary.uploader.upload(data.imageBase64, {
       folder: 'rosee/banners',
+      width: 1920,
+      height: 600,
+      crop: 'fill',
+      gravity: 'auto'
     });
     data.image = { url: uploadRes.secure_url, publicId: uploadRes.public_id };
   }
