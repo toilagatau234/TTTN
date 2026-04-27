@@ -3,9 +3,6 @@ const router = express.Router();
 const imageController = require('../controllers/imageController');
 const { protect } = require('../middleware/auth');
 
-// POST /api/generate-image — Tạo ảnh từ product_id hoặc entities AI
-router.post('/', imageController.generateProductImage);
-
 // POST /api/products/:id/process-image — Remove bg + resize 1 sản phẩm
 router.post('/product/:id/process', protect, imageController.processProductImage);
 
@@ -13,4 +10,3 @@ router.post('/product/:id/process', protect, imageController.processProductImage
 router.post('/batch-process', protect, imageController.batchProcessImages);
 
 module.exports = router;
-

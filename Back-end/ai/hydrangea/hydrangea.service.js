@@ -49,6 +49,8 @@ class HydrangeaService {
                 flower_types: [], colors: [], color: null,
                 occasion: null, style: null, budget: 0,
                 target: null, role_hint: {},
+                category: null, wrapper: null, ribbon: null, accessories: [],
+                removed_items: []
             },
             selectedItems: {
                 basket: null, wrapper: null, ribbon: null,
@@ -76,9 +78,12 @@ class HydrangeaService {
     // ── Entity merge ─────────────────────────────────────────────────────────
     mergeEntities(sessionEntities, newEntities) {
         if (!newEntities) return;
-        ['occasion', 'style', 'target'].forEach(k => {
+        ['occasion', 'style', 'target', 'category', 'wrapper', 'ribbon'].forEach(k => {
             if (newEntities[k]) sessionEntities[k] = newEntities[k];
         });
+        if (newEntities.accessories?.length > 0) {
+            sessionEntities.accessories = Array.from(new Set([...(sessionEntities.accessories || []), ...newEntities.accessories]));
+        }
         if (newEntities.budget > 0) sessionEntities.budget = newEntities.budget;
 
         const newFlowers = [
@@ -168,6 +173,9 @@ class HydrangeaService {
                     sessionEntities.flower_types = [toNorm];
                     changed = true;
                 } else if (op.op === 'remove' && op.from) {
+            if (!sessionEntities.removed_items) sessionEntities.removed_items = [];
+            sessionEntities.removed_items.push(op.from);
+
                     const before = sessionEntities.flower_types.length;
                     sessionEntities.flower_types = sessionEntities.flower_types.filter(f =>
                         !norm(f).includes(norm(op.from)) && !norm(op.from).includes(norm(f)));
@@ -183,6 +191,8 @@ class HydrangeaService {
                     sessionEntities.wrapper = op.to;
                     changed = true;
                 } else if (op.op === 'remove') {
+                    if (!sessionEntities.removed_items) sessionEntities.removed_items = [];
+                    if (sessionEntities.wrapper) sessionEntities.removed_items.push(sessionEntities.wrapper);
                     sessionEntities.wrapper = null;
                     changed = true;
                 }
@@ -192,6 +202,9 @@ class HydrangeaService {
                     sessionEntities.accessories.push(op.to);
                     changed = true;
                 } else if (op.op === 'remove' && op.from) {
+                    if (!sessionEntities.removed_items) sessionEntities.removed_items = [];
+                    sessionEntities.removed_items.push(op.from);
+
                     if (session.selectedItems.accessories) {
                         const before = session.selectedItems.accessories.length;
                         session.selectedItems.accessories = session.selectedItems.accessories.filter(a => 
@@ -311,13 +324,48 @@ class HydrangeaService {
             .select('name price images dominant_color secondary_colors main_flowers sub_flowers occasion style sold product_type role_type layout elements stock _id')
             .lean();
 
-        const inStock = allProducts.filter(p => p.stock > 0);
-        const outOfStock = allProducts.filter(p => p.stock === 0);
+        // Lọc bỏ những sản phẩm nằm trong removed_items
+        const norm = v => normalizeString(String(v || ''));
+        const filteredProducts = allProducts.filter(p => {
+            if (!e.removed_items || e.removed_items.length === 0) return true;
+            const pName = norm(p.name);
+            return !e.removed_items.some(rm => pName.includes(norm(rm)));
+        });
+
+        const inStock = filteredProducts.filter(p => p.stock > 0);
+        const outOfStock = filteredProducts.filter(p => p.stock === 0);
 
         // Score function — không lọc theo targetType (đã filter ở trước)
         const score = (product) => {
             let s = 0;
-            const norm = v => normalizeString(String(v || ''));
+
+            // Tùy chỉnh điểm cho Giấy gói (wrapper)
+            if (product.product_type === 'wrapper' && e.wrapper) {
+                const wN = norm(e.wrapper);
+                if (norm(product.name).includes(wN) || wN.includes(norm(product.name))) s += 50;
+                if (norm(product.dominant_color).includes(wN)) s += 30;
+            }
+
+            // Tùy chỉnh điểm cho Ruy băng (ribbon)
+            if (product.product_type === 'ribbon' && e.ribbon) {
+                const rN = norm(e.ribbon);
+                if (norm(product.name).includes(rN) || rN.includes(norm(product.name))) s += 50;
+                if (norm(product.dominant_color).includes(rN)) s += 30;
+            }
+
+            // Tùy chỉnh điểm cho Giỏ/Lẵng (category/basket)
+            if (product.product_type === 'basket' && e.category) {
+                const cN = norm(e.category);
+                if (norm(product.name).includes(cN) || cN.includes(norm(product.name))) s += 50;
+            }
+
+            // Phụ kiện (accessories)
+            if (product.product_type === 'accessory' && e.accessories?.length > 0) {
+                e.accessories.forEach(acc => {
+                    const aN = norm(acc);
+                    if (norm(product.name).includes(aN) || aN.includes(norm(product.name))) s += 50;
+                });
+            }
 
             // Flower match
             e.flower_types?.forEach(ft => {
@@ -442,15 +490,26 @@ class HydrangeaService {
             complete_bouquets: completeBouquets.slice(0, 6), // fallback
         };
 
+        // Tôn trọng yêu cầu của người dùng: Không tự động fallback nếu sản phẩm bị thiếu
+        const mainAutoFilled = e.flower_types?.length > 0
+            ? mainFlowers.filter(f => f._score >= 20).slice(0, 2)
+            : mainFlowers.slice(0, 2);
+
         // Auto-select items tốt nhất cho session
         session.selectedItems = {
             basket: baskets[0] || null,
             wrapper: wrappers[0] || null,
             ribbon: ribbons[0] || null,
-            main_flowers: mainFlowers.slice(0, 2),
-            sub_flowers: subFlowers.slice(0, 1),
-            accessories: accessories.slice(0, 1),
+            main_flowers: session.selectedItems.main_flowers?.length ? session.selectedItems.main_flowers : mainAutoFilled,
+            sub_flowers: session.selectedItems.sub_flowers?.length ? session.selectedItems.sub_flowers : subFlowers.slice(0, 1),
+            // Không bao giờ tự động chèn phụ kiện (Gấu bông) nếu khách không yêu cầu!
+            accessories: session.selectedItems.accessories?.length ? session.selectedItems.accessories : (e.accessories?.length ? accessories.slice(0, 1) : []),
         };
+
+        // Nếu HOA CHÍNH hoàn toàn không có trong kho, đảm bảo không nhét bừa hoa khác vào
+        if (missingFlowersFromDB.length > 0) {
+            session.selectedItems.main_flowers = [];
+        }
 
         // Tính tổng giá
         const allSelectedPrices = [

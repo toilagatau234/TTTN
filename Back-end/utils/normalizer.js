@@ -3,19 +3,16 @@
  * Helps map AI-extracted entities to database-specific phrasing.
  */
 
-// Dictionary mapping edge cases and aliases to uniform DB keys
 const DICTIONARY = {
-    // Flowers
-    "baby breath": "baby_breath",
-    "baby's breath": "baby_breath",
-    "hoa cẩm chướng": "carnation",
-    "cúc họa mi": "daisy",
+    // Only map true synonyms, do not translate to English
+    "hoa cẩm chướng": "cẩm chướng",
+    "cúc họa mi": "hoa cúc",
+    "cẩm tú cầu": "cẩm tú cầu",
+    "hoa hồng": "hoa hồng",
     
     // Colors
-    "dark red": "red",
-    "light pink": "pink",
-    "navy blue": "blue",
-    "sky blue": "blue"
+    "đỏ tươi": "đỏ",
+    "hồng nhạt": "hồng"
 };
 
 /**

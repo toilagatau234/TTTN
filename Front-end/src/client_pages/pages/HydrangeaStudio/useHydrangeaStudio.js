@@ -88,6 +88,7 @@ export function useHydrangeaStudio() {
     const handleGenerate = useCallback(async () => {
         setIsGenerating(true);
         setGeneratedImage(null);
+        setStatus('generating');
         addBotMsg('✨ Đang tạo ảnh giỏ hoa, chờ mình xíu...');
         try {
             const res = await axios.post(`${API}/ai/hydrangea/generate`, { sessionId }, { timeout: 60000 });
