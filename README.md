@@ -1,7 +1,7 @@
 # 🌸 Rosee Floral - AI-Powered Bouquet Customization & E-commerce System
 
 ## 📌 Tổng Quan Dự Án
-**Rosee Floral** là một hệ thống thương mại điện tử chuyên về hoa tươi, tích hợp trí tuệ nhân tạo (AI) để hỗ trợ khách hàng thiết kế và cá nhân hóa bó hoa theo ý muốn. Dự án được phát triển như một phần của Đồ án Tốt nghiệp (TTTN), kết hợp các công nghệ hiện đại từ Web, Mobile đến NLP (Natural Language Processing).
+**Rosee Floral** là một hệ thống thương mại điện tử chuyên về hoa tươi, tích hợp trí tuệ nhân tạo (AI) để hỗ trợ khách hàng thiết kế và cá nhân hóa bó hoa theo ý muốn thông qua giao diện chat trực quan. Dự án tập trung vào việc mang lại trải nghiệm cá nhân hóa cao nhất cho người dùng bằng cách kết hợp sức mạnh của NLP và Generative AI.
 
 ---
 
@@ -15,34 +15,36 @@ Dự án được thực hiện bởi các thành viên:
 ---
 
 ## 🏗️ Cấu Trúc Hệ Thống
-Hệ thống bao gồm 4 thành phần chính:
+Hệ thống hiện tại tập trung vào nền tảng Web với 3 thành phần cốt lõi:
 
 ### 1. 🖥️ Front-end (Web)
-- **Công nghệ:** React.js, Vite, Tailwind CSS.
-- **Tính năng:** Giao diện khách hàng (mua sắm, giỏ hàng, thanh toán) và Dashboard cho Admin quản lý sản phẩm, đơn hàng.
+- **Công nghệ:** React.js, Vite, Tailwind CSS, Lucide Icons.
+- **Tính năng:** 
+  - **Hydrangea Studio**: Giao diện thiết kế hoa tương tác với AI.
+  - E-commerce flow: Xem sản phẩm, giỏ hàng, đặt hàng.
+  - Dashboard quản trị toàn diện.
 
-### 2. 📱 Mobile App
-- **Công nghệ:** Flutter.
-- **Tính năng:** Trải nghiệm mua sắm mượt mà trên thiết bị di động, tích hợp chat với AI Assistant.
-
-### 3. ⚙️ Back-end (API Server)
+### 2. ⚙️ Back-end (API Server)
 - **Công nghệ:** Node.js, Express, MongoDB (Mongoose).
-- **Tính năng:** Quản lý dữ liệu, xác thực người dùng, xử lý đơn hàng và tích hợp dịch vụ AI.
+- **Tính năng:** 
+  - Quản lý kho sản phẩm đa dạng (Hoa chính, hoa phụ, giấy gói, ruy băng, phụ kiện).
+  - Xử lý logic phiên chat (Session management) và đồng bộ dữ liệu AI.
+  - Tích hợp Gemini 2.5 Flash để tối ưu hóa gợi ý và tạo prompt hình ảnh.
 
-### 4. 🧠 Rosee AI Service
+### 3. 🧠 Rosee AI Service (Python Microservice)
 - **Công nghệ:** Python, FastAPI, PhoBERT, Transformers.
 - **Tính năng:** 
-  - Phân loại ý định (Intent Classification) và trích xuất thực thể (NER) tiếng Việt.
-  - Tư vấn sản phẩm hoa dựa trên sở thích và dịp (Valentine, Sinh nhật, v.v.).
-  - Demo tạo ảnh hoa bằng AI (Hybrid Pollinations AI).
+  - Trích xuất thực thể (NER) và nhận diện ý định (Intent) thuần tiếng Việt.
+  - Xử lý ngôn ngữ tự nhiên để hiểu sâu yêu cầu về màu sắc, loại hoa, dịp lễ.
+  - Tích hợp Pollinations AI để sinh ảnh giỏ hoa thực tế từ các thành phần đã chọn.
 
 ---
 
 ## ✨ Tính Năng Nổi Bật
-- **AI Bouquet Builder:** Chatbot thông minh hiểu ngôn ngữ tự nhiên của khách hàng để gợi ý các thành phần (loại hoa, giấy gói, phụ kiện) phù hợp.
-- **Smart Product Search:** Tìm kiếm và lọc sản phẩm theo các thuộc tính AI (Occasion, Style, Color, Layout).
-- **Admin Management:** Hệ thống quản lý toàn diện cho chủ cửa hàng.
-- **Responsive Design:** Hoạt động tốt trên mọi thiết bị.
+- **AI Hydrangea Studio:** Chatbot thông minh giúp bạn "lắp ghép" giỏ hoa trong mơ. AI hiểu được cả những yêu cầu chi tiết như "thêm nơ đỏ", "bỏ gấu bông" hay "giấy gói đen".
+- **Visual Preview:** Hình ảnh giỏ hoa được sinh ra ngay lập tức sau khi bạn chọn đủ thành phần, giúp bạn hình dung sản phẩm thực tế.
+- **Smart Inventory Matching:** Tự động đối soát kho hàng thực tế để chỉ gợi ý những loại hoa đang còn sẵn tại tiệm.
+- **Strict Entity Matching:** Hệ thống chấm điểm (Scoring logic) ưu tiên độ chính xác về màu sắc và loài hoa theo đúng yêu cầu người dùng.
 
 ---
 
@@ -50,49 +52,37 @@ Hệ thống bao gồm 4 thành phần chính:
 
 ### Yêu Cầu Hệ Thống
 - Node.js (v18+)
-- Python (3.9+)
-- Flutter SDK
+- Python (3.10+)
 - MongoDB (Local hoặc Atlas)
 
-### 1. Cài đặt Back-end
+### 1. Cấu hình & Chạy Back-end
 ```bash
 cd Back-end
 npm install
-# Cấu hình .env (MONGO_URI, JWT_SECRET, v.v.)
-npm start
+# Tạo file .env dựa trên các biến: MONGO_URI, JWT_SECRET, GEMINI_API_KEY
+npm run dev
 ```
 
-### 2. Cài đặt Front-end
+### 2. Cấu hình & Chạy Front-end
 ```bash
 cd Front-end
 npm install
 npm run dev
 ```
 
-### 3. Cài đặt AI Service
+### 3. Cấu hình & Chạy AI Service (FastAPI)
 ```bash
 cd rosee-ai-service
-python -m venv venv
-.\venv\Scripts\activate
+# Cài đặt các thư viện cần thiết (Numpy, Transformers, Scikit-learn, v.v.)
 pip install -r requirements.txt
 python -m app.main
-```
-
-### 4. Cài đặt Mobile App
-```bash
-cd mobile_app
-flutter pub get
-flutter run
 ```
 
 ---
 
 ## 🛠️ Công Nghệ Sử Dụng
-- **Database:** MongoDB
-- **Backend:** Node.js, Express, FastAPI
-- **Frontend:** React, Tailwind CSS, Flutter
-- **AI/ML:** PhoBERT, PyTorch, HuggingFace
-- **Deployment:** Docker (Optional), Vercel/Netlify (Frontend)
-
----
-
+- **Database:** MongoDB (Atlas)
+- **Backend:** Node.js, FastAPI
+- **Frontend:** React (Vite)
+- **AI Models:** PhoBERT (NER/Intent), Gemini 2.5 Flash (Reasoning), Pollinations AI (Image Gen)
+- **Styling:** CSS Modern & Tailwind CSS
