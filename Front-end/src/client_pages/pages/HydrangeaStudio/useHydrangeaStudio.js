@@ -5,12 +5,14 @@ import authService from '../../../services/authService';
 const API = 'http://localhost:8080/api';
 
 export function useHydrangeaStudio() {
-    const [sessionId] = useState(() => `sess_${Math.random().toString(36).slice(2, 9)}`);
-    const [messages, setMessages] = useState([{
+    const defaultMessages = [{
         role: 'bot',
         text: 'Chào mừng đến Hydrangea Studio! 🌸 Bạn muốn giỏ hoa như thế nào? Mô tả cho mình nghe nào!',
         quickChips: ['Giỏ hoa hồng đỏ sinh nhật', 'Hoa tím lavender 500k', 'Lẵng hướng dương khai trương']
-    }]);
+    }];
+    
+    const [sessionId, setSessionId] = useState(() => `sess_${Math.random().toString(36).slice(2, 9)}`);
+    const [messages, setMessages] = useState(defaultMessages);
     const [inputText, setInputText] = useState('');
     const [isLoading, setIsLoading] = useState(false);
 
@@ -118,8 +120,17 @@ export function useHydrangeaStudio() {
             );
             if (res.data.success) {
                 setSavedOrder(res.data.order);
-                setShowConfirmModal(false);
-                addBotMsg(`🎉 Đơn **${res.data.order.orderCode}** đã lưu! Cửa hàng sẽ liên hệ bạn sớm.`);
+                
+                try {
+                    await axios.post(`${API}/cart/custom`, 
+                        { orderId: res.data.order._id }, 
+                        { headers: { Authorization: `Bearer ${token}` } }
+                    );
+                    addBotMsg(`🎉 Đơn **${res.data.order.orderCode}** đã được thêm vào Giỏ hàng! Bạn có thể tiến hành thanh toán ngay.`);
+                } catch (cartErr) {
+                    console.error("Cart add error", cartErr);
+                    addBotMsg(`🎉 Đơn **${res.data.order.orderCode}** đã lưu, nhưng có lỗi nhỏ khi đẩy vào giỏ hàng.`);
+                }
             }
         } catch (err) {
             addBotMsg(err.response?.data?.message || 'Lỗi khi lưu đơn.');
@@ -137,11 +148,52 @@ export function useHydrangeaStudio() {
         } catch { /* silent */ }
     }, []);
 
+    const startNewChat = useCallback(() => {
+        setSessionId(`sess_${Math.random().toString(36).slice(2, 9)}`);
+        setMessages(defaultMessages);
+        setEntities({});
+        setSuggestedItems(null);
+        setSelectedItems({ basket: null, wrapper: null, ribbon: null, main_flowers: [], sub_flowers: [], accessories: [] });
+        setOutOfStockWarnings([]);
+        setTotalPrice(0);
+        setStatus('idle');
+        setGeneratedImage(null);
+        setSavedOrder(null);
+        setShowConfirmModal(false);
+    }, []);
+
+    const resumeChat = useCallback(async (orderId) => {
+        const token = authService.getToken();
+        if (!token) return;
+        setIsLoading(true);
+        try {
+            const res = await axios.post(`${API}/ai/hydrangea/restore-session`, 
+                { orderId }, 
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+            if (res.data.success && res.data.sessionState) {
+                const s = res.data.sessionState;
+                setSessionId(s.sessionId);
+                setMessages(s.messages || defaultMessages);
+                setEntities(s.entities || {});
+                setSelectedItems(s.selectedItems || { basket: null, wrapper: null, ribbon: null, main_flowers: [], sub_flowers: [], accessories: [] });
+                setTotalPrice(s.totalPrice || 0);
+                setGeneratedImage(s.generatedImage || null);
+                setStatus(s.status || 'idle');
+            }
+        } catch (err) {
+            addBotMsg('❌ Không thể tải lại đơn hàng cũ.');
+        } finally {
+            setIsLoading(false);
+        }
+    }, []);
+
     return {
         sessionId, messages, inputText, setInputText, isLoading,
         entities, suggestedItems, selectedItems, outOfStockWarnings, totalPrice, status,
         generatedImage, isGenerating, showConfirmModal, setShowConfirmModal,
         myOrders, showOrders, setShowOrders, isSavingOrder, savedOrder,
         chatEndRef, sendMessage, handleSelectItem, handleGenerate, handleConfirmOrder, loadMyOrders,
+        startNewChat, resumeChat
     };
 }

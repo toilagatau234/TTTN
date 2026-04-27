@@ -17,13 +17,19 @@ def _normalize_key(text: str) -> str:
     return text.lower().strip()
 
 
-def _fuzzy_lookup(value: str, mapping: dict, cutoff: float = 0.6) -> Optional[str]:
+def _fuzzy_lookup(value: str, mapping: dict, cutoff: float = 0.85) -> Optional[str]:
     key = _normalize_key(value)
     if key in mapping:
         return mapping[key]
-    for map_key, map_val in mapping.items():
-        if map_key in key or key in map_key:
-            return map_val
+        
+    # Check substring match but only if the key is reasonably long 
+    # and strictly bounded to avoid matching "hoa" to "hoa hồng"
+    if len(key) >= 4:
+        for map_key, map_val in mapping.items():
+            if (map_key in key and len(map_key) >= 4) or (key in map_key and len(key) >= 4):
+                # Ensure it's a significant match, not just 'hoa' in 'hoa hồng'
+                return map_val
+                
     candidates = get_close_matches(key, mapping.keys(), n=1, cutoff=cutoff)
     if candidates:
         return mapping[candidates[0]]
@@ -32,101 +38,100 @@ def _fuzzy_lookup(value: str, mapping: dict, cutoff: float = 0.6) -> Optional[st
 
 # ── Flower Map ───────────────────────────────────────────────────────────────
 FLOWER_MAP: dict = {
-    "hoa hồng": "rose", "hồng": "rose", "hoa hong": "rose", "hong": "rose",
+    "hoa hồng": "hoa hồng", "hồng": "hoa hồng", "hoa hong": "hoa hồng", "hong": "hoa hồng",
     "hoa tulip": "tulip", "tulip": "tulip", "tu líp": "tulip",
-    "lan hồ điệp": "orchid", "hồ điệp": "orchid", "lan ho diep": "orchid", "lẵng lan": "orchid", "hoa lan": "orchid", "lan": "orchid",
-    "hoa cúc": "chrysanthemum", "cúc": "chrysanthemum", "cúc vạn thọ": "marigold",
-    "tú cầu": "hydrangea", "hortensie": "hydrangea",
-    "cát tường": "eustoma", "lisianthus": "eustoma",
-    "baby": "baby's breath", "hoa baby": "baby's breath", "hoa phấn": "baby's breath",
-    "hướng dương": "sunflower", "hoa hướng dương": "sunflower",
-    "cẩm chướng": "carnation", "hoa cẩm chướng": "carnation",
-    "hoa ly": "lily", "ly": "lily", "lily": "lily",
-    "đồng tiền": "gerbera", "hoa đồng tiền": "gerbera",
-    "hoa mix": "mixed flowers", "mix": "mixed flowers",
-    "sen": "lotus", "hoa sen": "lotus",
-    "huệ": "tuberose", "hoa huệ": "tuberose",
-    "thủy tiên": "narcissus", "hoa thủy tiên": "narcissus",
-    "hướng": "sunflower",  # viết tắt
+    "lan hồ điệp": "lan hồ điệp", "hồ điệp": "lan hồ điệp", "lan ho diep": "lan hồ điệp", "lẵng lan": "lan hồ điệp", "hoa lan": "lan hồ điệp", "lan": "lan hồ điệp",
+    "hoa cúc": "hoa cúc", "cúc": "hoa cúc", "cúc vạn thọ": "cúc vạn thọ",
+    "tú cầu": "cẩm tú cầu", "cẩm tú cầu": "cẩm tú cầu", "hoa cẩm tú cầu": "cẩm tú cầu", "hortensie": "cẩm tú cầu",
+    "cát tường": "cát tường", "lisianthus": "cát tường",
+    "baby": "hoa baby", "hoa baby": "hoa baby", "hoa phấn": "hoa baby", "baby breath": "hoa baby", "baby's breath": "hoa baby",
+    "hướng dương": "hướng dương", "hoa hướng dương": "hướng dương", "hướng": "hướng dương",
+    "cẩm chướng": "cẩm chướng", "hoa cẩm chướng": "cẩm chướng",
+    "hoa ly": "hoa ly", "ly": "hoa ly", "lily": "hoa ly",
+    "đồng tiền": "đồng tiền", "hoa đồng tiền": "đồng tiền",
+    "hoa mix": "hoa mix", "mix": "hoa mix",
+    "sen": "hoa sen", "hoa sen": "hoa sen",
+    "huệ": "hoa huệ", "hoa huệ": "hoa huệ",
+    "thủy tiên": "thủy tiên", "hoa thủy tiên": "thủy tiên",
 }
 
 # ── Color Map ────────────────────────────────────────────────────────────────
 COLOR_MAP: dict = {
-    "đỏ": "red", "do": "red", "đỏ tươi": "bright red", "đỏ trầm": "deep red",
-    "hồng": "pink", "hồng phấn": "light pink", "hồng đậm": "hot pink", "hồng pastel": "pink",
-    "trắng": "white", "trang": "white",
-    "vàng": "yellow", "vàng kem": "cream", "vàng chanh": "lemon yellow",
-    "cam": "orange",
-    "tím": "purple", "tím lavender": "lavender", "tím hoa cà": "violet",
-    "xanh": "blue", "xanh dương": "blue", "xanh lá": "green",
-    "xanh mint": "mint", "xanh bơ": "avocado green",
-    "be": "beige", "be/kem": "beige", "kem": "cream",
-    "nâu": "brown", "đen": "black",
-    "trầm": "deep tone", "pastel": "pastel", "nhạt": "light", "đậm": "dark",
+    "đỏ": "đỏ", "do": "đỏ", "đỏ tươi": "đỏ tươi", "đỏ trầm": "đỏ trầm",
+    "hồng": "hồng", "hồng phấn": "hồng phấn", "hồng đậm": "hồng đậm", "hồng pastel": "hồng",
+    "trắng": "trắng", "trang": "trắng",
+    "vàng": "vàng", "vàng kem": "vàng kem", "vàng chanh": "vàng chanh",
+    "cam": "cam",
+    "tím": "tím", "tím lavender": "tím lavender", "tím hoa cà": "tím hoa cà",
+    "xanh": "xanh", "xanh dương": "xanh dương", "xanh lá": "xanh lá",
+    "xanh mint": "xanh mint", "xanh bơ": "xanh bơ",
+    "be": "be", "be/kem": "be", "kem": "kem",
+    "nâu": "nâu", "đen": "đen",
+    "trầm": "tone trầm", "pastel": "pastel", "nhạt": "nhạt", "đậm": "đậm",
     "nude": "nude",
 }
 
 # ── Category Map ─────────────────────────────────────────────────────────────
 CATEGORY_MAP: dict = {
-    "giỏ": "basket", "lẵng": "basket", "giỏ hoa": "basket", "lẵng hoa": "basket",
-    "bó": "bouquet", "bó hoa": "bouquet",
-    "hộp": "box", "hộp hoa": "box",
-    "kệ": "stand", "kệ hoa": "stand",
+    "giỏ": "giỏ", "lẵng": "giỏ", "giỏ hoa": "giỏ", "lẵng hoa": "giỏ",
+    "bó": "bó", "bó hoa": "bó",
+    "hộp": "hộp", "hộp hoa": "hộp",
+    "kệ": "kệ", "kệ hoa": "kệ",
 }
 
 # ── Wrapper Map ──────────────────────────────────────────────────────────────
 WRAPPER_MAP: dict = {
-    "giấy kraft": "kraft paper", "kraft": "kraft paper", "giấy": "paper",
-    "túi": "bag", "túi vải": "fabric bag", "nơ": "ribbon", "có nơ": "ribbon",
-    "vải": "fabric", "vải tuyn": "tulle", "đơn giản": "simple wrap", "sang trọng": "luxury wrap",
+    "giấy kraft": "giấy kraft", "kraft": "giấy kraft", "giấy": "giấy",
+    "túi": "túi", "túi vải": "túi vải", "nơ": "nơ", "có nơ": "nơ", "ruy băng": "ruy băng",
+    "vải": "vải", "vải tuyn": "vải tuyn", "đơn giản": "gói đơn giản", "sang trọng": "gói sang trọng",
 }
 
 # ── Occasion Map ─────────────────────────────────────────────────────────────
 OCCASION_MAP: dict = {
-    "sinh nhật": "birthday", "sn": "birthday", "sinh nhat": "birthday", "tặng sinh nhật": "birthday",
-    "kỷ niệm": "anniversary", "ky niem": "anniversary", "ngày kỷ niệm": "anniversary",
-    "khai trương": "opening", "khai truong": "opening",
-    "tốt nghiệp": "graduation", "tot nghiep": "graduation",
+    "sinh nhật": "sinh nhật", "sn": "sinh nhật", "sinh nhat": "sinh nhật", "tặng sinh nhật": "sinh nhật",
+    "kỷ niệm": "kỷ niệm", "ky niem": "kỷ niệm", "ngày kỷ niệm": "kỷ niệm",
+    "khai trương": "khai trương", "khai truong": "khai trương",
+    "tốt nghiệp": "tốt nghiệp", "tot nghiep": "tốt nghiệp",
     "valentine": "valentine",
-    "8/3": "women's day", "8 3": "women's day", "mùng 8": "women's day",
-    "20/10": "vietnamese women's day", "20/11": "teachers' day",
-    "ngày của mẹ": "mother's day", "tặng mẹ": "birthday", "cho mẹ": "birthday",
-    "tang le": "condolence", "tang lễ": "condolence", "chia buồn": "condolence",
-    "chúc mừng": "congratulations", "chuc mung": "congratulations",
-    "ốm": "get well", "thăm bệnh": "get well", "ra viện": "get well",
-    "cưới": "wedding", "dam cuoi": "wedding", "hôn lễ": "wedding",
+    "8/3": "quốc tế phụ nữ", "8 3": "quốc tế phụ nữ", "mùng 8": "quốc tế phụ nữ",
+    "20/10": "phụ nữ việt nam", "20/11": "ngày nhà giáo",
+    "ngày của mẹ": "ngày của mẹ", "tặng mẹ": "sinh nhật", "cho mẹ": "sinh nhật",
+    "tang le": "chia buồn", "tang lễ": "chia buồn", "chia buồn": "chia buồn",
+    "chúc mừng": "chúc mừng", "chuc mung": "chúc mừng",
+    "ốm": "thăm bệnh", "thăm bệnh": "thăm bệnh", "ra viện": "thăm bệnh",
+    "cưới": "đám cưới", "dam cuoi": "đám cưới", "hôn lễ": "đám cưới",
 }
 
 # ── Target Map (người nhận) ──────────────────────────────────────────────────
 TARGET_MAP: dict = {
-    "mẹ": "mother", "má": "mother", "ba": "father", "bố": "father",
-    "bạn gái": "girlfriend", "bạn trai": "boyfriend",
-    "vợ": "wife", "chồng": "husband",
-    "người yêu": "partner", "bạn bè": "friend", "ban be": "friend",
-    "sếp": "boss", "đồng nghiệp": "colleague",
-    "thầy": "teacher", "cô giáo": "teacher", "thầy giáo": "teacher",
-    "bé": "child", "con": "child", "anh": "sibling", "chị": "sibling",
-    "ông": "grandparent", "bà": "grandparent",
+    "mẹ": "mẹ", "má": "mẹ", "ba": "ba", "bố": "ba",
+    "bạn gái": "bạn gái", "bạn trai": "bạn trai",
+    "vợ": "vợ", "chồng": "chồng",
+    "người yêu": "người yêu", "bạn bè": "bạn bè", "ban be": "bạn bè",
+    "sếp": "sếp", "đồng nghiệp": "đồng nghiệp",
+    "thầy": "thầy giáo", "cô giáo": "cô giáo", "thầy giáo": "thầy giáo",
+    "bé": "bé", "con": "con", "anh": "anh", "chị": "chị",
+    "ông": "ông", "bà": "bà",
 }
 
 # ── Style Map ────────────────────────────────────────────────────────────────
 STYLE_MAP: dict = {
-    "hoàng gia": "luxury", "sang trọng": "luxury", "tối giản": "luxury",
-    "đơn giản": "simple", "vintage": "vintage", "cổ điển": "classic",
-    "hiện đại": "modern", "bohemian": "bohemian", "rustic": "rustic",
-    "tinh tế": "elegant", "thanh lịch": "elegant", "elegant": "elegant",
-    "kawaii": "cute", "dễ thương": "cute", "mộng mơ": "dreamy", "cá tính": "bold",
-    "vui tươi": "cute", "nhiều màu": "cute", "colorful": "cute",
+    "hoàng gia": "sang trọng", "sang trọng": "sang trọng", "tối giản": "tối giản",
+    "đơn giản": "đơn giản", "vintage": "vintage", "cổ điển": "cổ điển",
+    "hiện đại": "hiện đại", "bohemian": "bohemian", "rustic": "rustic",
+    "tinh tế": "tinh tế", "thanh lịch": "thanh lịch", "elegant": "thanh lịch",
+    "kawaii": "dễ thương", "dễ thương": "dễ thương", "mộng mơ": "mộng mơ", "cá tính": "cá tính",
+    "vui tươi": "dễ thương", "nhiều màu": "nhiều màu", "colorful": "nhiều màu",
 }
 
 # ── Layout Map ───────────────────────────────────────────────────────────────
 LAYOUT_MAP: dict = {
-    "tròn": "round", "hình tròn": "round", "oval": "oval",
-    "vuông": "square", "chữ nhật": "rectangular",
-    "trái tim": "heart", "hình trái tim": "heart", "tim": "heart",
-    "ngôi sao": "star", "tháp": "tower", "thác": "cascade",
-    "thẳng đứng": "vertical", "nằm ngang": "horizontal",
-    "dày": "dense", "thưa": "sparse",
+    "tròn": "tròn", "hình tròn": "tròn", "oval": "oval",
+    "vuông": "vuông", "chữ nhật": "chữ nhật",
+    "trái tim": "trái tim", "hình trái tim": "trái tim", "tim": "trái tim",
+    "ngôi sao": "ngôi sao", "tháp": "tháp", "thác": "thác",
+    "thẳng đứng": "thẳng đứng", "nằm ngang": "nằm ngang",
+    "dày": "dày", "thưa": "thưa",
 }
 
 # ── Role hint keywords (ROLE_MAIN / ROLE_SECONDARY) ──────────────────────────
@@ -179,6 +184,7 @@ def scan_all_flowers(text: str) -> List[str]:
         if viet_key in text_lower and eng_val not in seen:
             found.append(eng_val)
             seen.add(eng_val)
+            text_lower = text_lower.replace(viet_key, " ")
     return found
 
 
@@ -191,6 +197,7 @@ def scan_all_colors(text: str) -> List[str]:
         if viet_key in text_lower and eng_val not in seen:
             found.append(eng_val)
             seen.add(eng_val)
+            text_lower = text_lower.replace(viet_key, " ")
     return found
 
 

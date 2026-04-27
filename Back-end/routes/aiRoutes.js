@@ -13,5 +13,6 @@ router.get('/hydrangea/check-api', hydrangeaController.checkApi);
 router.post('/hydrangea/confirm-order', protect, hydrangeaController.confirmOrder);
 router.get('/hydrangea/my-orders', protect, hydrangeaController.getMyOrders);
 router.get('/hydrangea/orders/:id', protect, hydrangeaController.getOrderDetail);
+router.post('/hydrangea/restore-session', protect, hydrangeaController.restoreSession);
 
 module.exports = router;

@@ -73,6 +73,52 @@ async function seedProducts() {
             // HỎA TƯƠI - MAIN FLOWERS
             // ==========================================
             {
+                name: 'Hoa Cẩm Chướng Hồng',
+                description: 'Hoa cẩm chướng hồng ngọt ngào, độ bền cao, ý nghĩa trân trọng tình cảm',
+                price: 25000,
+                originalPrice: 30000,
+                stock: 200,
+                sold: 50,
+                category: categories.flowers._id,
+                product_type: 'flower_component',
+                role_type: 'main_flower',
+                occasion: ['ngày của mẹ', 'sinh nhật', 'kỷ niệm'],
+                style: ['romantic', 'vintage'],
+                main_flowers: ['cẩm chướng'],
+                dominant_color: 'hồng',
+                secondary_colors: ['trắng', 'xanh lá'],
+                elements: ['lá xanh'],
+                status: 'active',
+                isHot: false,
+                isNewProduct: true,
+                images: [
+                    { url: 'https://images.unsplash.com/photo-1562690868-60bbe7293e94?w=500&h=500&fit=crop', publicId: 'carnation-pink-1' }
+                ]
+            },
+            {
+                name: 'Hoa Cẩm Chướng Đỏ',
+                description: 'Hoa cẩm chướng đỏ thắm, sang trọng và nổi bật',
+                price: 28000,
+                originalPrice: 35000,
+                stock: 180,
+                sold: 60,
+                category: categories.flowers._id,
+                product_type: 'flower_component',
+                role_type: 'main_flower',
+                occasion: ['kỷ niệm', 'tình yêu', 'ngày của mẹ'],
+                style: ['elegant', 'classic'],
+                main_flowers: ['cẩm chướng'],
+                dominant_color: 'đỏ',
+                secondary_colors: ['xanh lá'],
+                elements: ['lá xanh'],
+                status: 'active',
+                isHot: true,
+                isNewProduct: false,
+                images: [
+                    { url: 'https://images.unsplash.com/photo-1614531341131-7e8e50b868cd?w=500&h=500&fit=crop', publicId: 'carnation-red-1' }
+                ]
+            },
+            {
                 name: 'Hoa Hồng Đỏ Nhung Ecuador',
                 description: 'Hoa hồng đỏ nhung nhập khẩu từ Ecuador, hương thơm ngọt ngào, độ tươi cao',
                 price: 45000,

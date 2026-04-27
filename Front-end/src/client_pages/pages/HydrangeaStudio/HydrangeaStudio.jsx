@@ -14,13 +14,12 @@ const CATEGORY_LABELS = {
     complete_bouquets: { label: 'Giỏ hoa hoàn chỉnh', icon: '💐', single: true },
 };
 
-function ProductCard({ product, category, isSelected, onSelect, outOfStock }) {
+function ProductCard({ product, category, isSelected, outOfStock }) {
     return (
         <div
-            onClick={() => !outOfStock && onSelect(category, product)}
-            className={`relative flex gap-2 p-2 rounded-xl border cursor-pointer transition-all text-left w-full
-                ${outOfStock ? 'opacity-50 cursor-not-allowed border-gray-100 bg-gray-50' :
-                isSelected ? 'border-pink-400 bg-pink-50 shadow-md' : 'border-gray-100 bg-white hover:border-pink-200 hover:shadow-sm'}`}
+            className={`relative flex gap-2 p-2 rounded-xl border text-left w-full transition-all
+                ${outOfStock ? 'opacity-50 border-gray-100 bg-gray-50' :
+                isSelected ? 'border-pink-400 bg-pink-50 shadow-md' : 'border-gray-100 bg-white'}`}
         >
             <img
                 src={product.images?.[0]?.url || 'https://placehold.co/64x64?text=🌸'}
@@ -41,24 +40,19 @@ function ProductCard({ product, category, isSelected, onSelect, outOfStock }) {
     );
 }
 
-function ItemsPanel({ suggestedItems, selectedItems, outOfStockWarnings, onSelect, totalPrice }) {
-    if (!suggestedItems) {
+function ItemsPanel({ selectedItems, outOfStockWarnings, totalPrice }) {
+    const hasItems = Object.values(selectedItems).some(val => Array.isArray(val) ? val.length > 0 : val !== null);
+    if (!hasItems) {
         return (
             <div className="flex flex-col items-center justify-center h-full text-center py-12 px-4">
                 <div className="w-16 h-16 bg-pink-50 rounded-full flex items-center justify-center mb-3">
                     <Flower2 size={28} className="text-pink-300" />
                 </div>
-                <p className="text-sm text-gray-400">Chat với AI để xem gợi ý</p>
-                <p className="text-xs text-gray-300 mt-1">Mô tả giỏ hoa bạn muốn 🌸</p>
+                <p className="text-sm text-gray-400">Chat với AI để bắt đầu</p>
+                <p className="text-xs text-gray-300 mt-1">Các thành phần giỏ hoa sẽ hiển thị ở đây 🌸</p>
             </div>
         );
     }
-
-    const isItemSelected = (cat, product) => {
-        if (['main_flowers', 'sub_flowers', 'accessories'].includes(cat))
-            return (selectedItems[cat] || []).some(p => String(p._id) === String(product._id));
-        return selectedItems[cat] && String(selectedItems[cat]._id) === String(product._id);
-    };
 
     return (
         <div className="flex-1 overflow-y-auto p-3 space-y-4">
@@ -85,12 +79,12 @@ function ItemsPanel({ suggestedItems, selectedItems, outOfStockWarnings, onSelec
             )}
 
             {Object.entries(CATEGORY_LABELS).map(([cat, meta]) => {
-                const items = suggestedItems[cat];
+                const items = Array.isArray(selectedItems[cat]) ? selectedItems[cat] : (selectedItems[cat] ? [selectedItems[cat]] : []);
                 if (!items?.length) return null;
                 return (
                     <div key={cat}>
                         <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">
-                            {meta.icon} {meta.label} {!meta.single && <span className="text-pink-400">(chọn nhiều)</span>}
+                            {meta.icon} {meta.label}
                         </p>
                         <div className="space-y-1.5">
                             {items.map(p => (
@@ -98,8 +92,7 @@ function ItemsPanel({ suggestedItems, selectedItems, outOfStockWarnings, onSelec
                                     key={p._id}
                                     product={p}
                                     category={cat}
-                                    isSelected={isItemSelected(cat, p)}
-                                    onSelect={onSelect}
+                                    isSelected={true}
                                     outOfStock={p.stock === 0}
                                 />
                             ))}
@@ -120,46 +113,26 @@ function ItemsPanel({ suggestedItems, selectedItems, outOfStockWarnings, onSelec
     );
 }
 
-function ConfirmModal({ image, totalPrice, onConfirm, onRegenerate, onClose, isSaving }) {
-    if (!image) return null;
-    const src = `data:${image.mimeType};base64,${image.base64}`;
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-            <div className="bg-white rounded-3xl overflow-hidden shadow-2xl max-w-md w-full">
-                <div className="relative">
-                    <img src={src} alt="AI generated bouquet" className="w-full object-contain max-h-80" />
-                    <button onClick={onClose} className="absolute top-3 right-3 w-8 h-8 bg-black/30 hover:bg-black/50 text-white rounded-full flex items-center justify-center cursor-pointer text-sm">✕</button>
-                </div>
-                <div className="p-5">
-                    <h3 className="font-bold text-gray-800 mb-1">Giỏ hoa AI tạo cho bạn 🌸</h3>
-                    {totalPrice > 0 && <p className="text-pink-600 font-extrabold text-lg mb-3">{fmt(totalPrice)}</p>}
-                    <div className="flex gap-2">
-                        <button onClick={onRegenerate} className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm py-2.5 rounded-xl font-medium flex items-center justify-center gap-1.5 cursor-pointer">
-                            <RefreshCw size={14} /> Tạo lại
-                        </button>
-                        <button onClick={onConfirm} disabled={isSaving} className="flex-1 bg-gradient-to-r from-pink-500 to-fuchsia-500 text-white text-sm py-2.5 rounded-xl font-bold flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-60">
-                            {isSaving ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <CheckCircle size={14} />}
-                            Đồng ý & Lưu đơn
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-}
+// Popup removed as requested
 
 export default function HydrangeaStudio() {
     const {
         messages, inputText, setInputText, isLoading, chatEndRef,
         entities, suggestedItems, selectedItems, outOfStockWarnings, totalPrice, status,
-        generatedImage, isGenerating, showConfirmModal, setShowConfirmModal,
+        generatedImage, isGenerating,
         myOrders, showOrders, setShowOrders, isSavingOrder, savedOrder,
-        sendMessage, handleSelectItem, handleGenerate, handleConfirmOrder, loadMyOrders,
+        sendMessage, handleGenerate, handleConfirmOrder, loadMyOrders,
+        startNewChat, resumeChat
     } = useHydrangeaStudio();
 
     useEffect(() => {
         chatEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }, [messages]);
+
+    useEffect(() => {
+        // Tải lịch sử chat khi vừa vào trang
+        loadMyOrders();
+    }, [loadMyOrders]);
 
     const hasEntities = Object.keys(entities).some(k => {
         const v = entities[k];
@@ -185,27 +158,46 @@ export default function HydrangeaStudio() {
 
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
                     {/* Col 1: Chat */}
-                    <div className="lg:col-span-4 bg-white rounded-3xl shadow-xl border border-pink-100 flex flex-col overflow-hidden" style={{ minHeight: 620 }}>
-                        <div className="p-4 border-b border-pink-50 bg-gradient-to-r from-pink-50 to-fuchsia-50 flex items-center gap-3">
-                            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-pink-500 to-fuchsia-500 flex items-center justify-center shadow">
-                                <Flower2 size={18} className="text-white" />
+                    <div className="lg:col-span-4 bg-white rounded-3xl shadow-xl border border-pink-100 flex flex-col overflow-hidden h-[650px]">
+                        <div className="p-4 border-b border-pink-50 bg-gradient-to-r from-pink-50 to-fuchsia-50 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-pink-500 to-fuchsia-500 flex items-center justify-center shadow">
+                                    <Flower2 size={18} className="text-white" />
+                                </div>
+                                <div>
+                                    <p className="font-bold text-gray-800 text-sm">Hydrangea AI</p>
+                                    <p className="text-[10px] text-green-500 flex items-center gap-1">
+                                        <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse inline-block" />
+                                        Đang hoạt động
+                                    </p>
+                                </div>
                             </div>
-                            <div>
-                                <p className="font-bold text-gray-800 text-sm">Hydrangea AI</p>
-                                <p className="text-[10px] text-green-500 flex items-center gap-1">
-                                    <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse inline-block" />
-                                    Đang hoạt động
-                                </p>
-                            </div>
+                            <button onClick={startNewChat} className="text-xs bg-white text-pink-600 hover:bg-pink-50 border border-pink-200 px-3 py-1.5 rounded-full font-bold flex items-center gap-1 shadow-sm transition-colors cursor-pointer">
+                                <span>+</span> Mới
+                            </button>
                         </div>
 
                         {/* Entity chips */}
                         {hasEntities && (
-                            <div className="px-3 py-2 bg-gray-50 border-b border-gray-100 flex flex-wrap gap-1">
-                                {entities.flower_types?.map((f, i) => <span key={i} className="text-[10px] bg-green-50 text-green-700 border border-green-200 px-2 py-0.5 rounded-full">{f}</span>)}
-                                {entities.colors?.map((c, i) => <span key={i} className="text-[10px] bg-pink-50 text-pink-700 border border-pink-200 px-2 py-0.5 rounded-full">{c}</span>)}
-                                {entities.occasion && <span className="text-[10px] bg-orange-50 text-orange-700 border border-orange-200 px-2 py-0.5 rounded-full">{entities.occasion}</span>}
-                                {entities.budget > 0 && <span className="text-[10px] bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-full">{fmt(entities.budget)}</span>}
+                            <div className="px-3 py-2.5 bg-gray-50 border-b border-gray-100">
+                                <div className="grid grid-cols-2 gap-x-2 gap-y-1.5 text-[11px]">
+                                    <div className="flex gap-1 items-start truncate">
+                                        <span className="font-bold text-gray-500">Hoa:</span>
+                                        <span className="text-gray-800 truncate">{entities.flower_types?.length > 0 ? entities.flower_types.join(', ') : 'Không'}</span>
+                                    </div>
+                                    <div className="flex gap-1 items-start truncate">
+                                        <span className="font-bold text-gray-500">Màu sắc:</span>
+                                        <span className="text-gray-800 truncate">{entities.colors?.length > 0 ? entities.colors.join(', ') : 'Không'}</span>
+                                    </div>
+                                    <div className="flex gap-1 items-start truncate">
+                                        <span className="font-bold text-gray-500">Phụ kiện/Gói:</span>
+                                        <span className="text-gray-800 truncate">{[entities.wrapper, ...(entities.accessories || [])].filter(Boolean).join(', ') || 'Không'}</span>
+                                    </div>
+                                    <div className="flex gap-1 items-start truncate">
+                                        <span className="font-bold text-gray-500">Giá:</span>
+                                        <span className="text-pink-600 font-bold truncate">{entities.budget > 0 ? fmt(entities.budget) : 'Không'}</span>
+                                    </div>
+                                </div>
                             </div>
                         )}
 
@@ -243,9 +235,8 @@ export default function HydrangeaStudio() {
                         <div className="p-3 border-t border-pink-50">
                             <form onSubmit={e => { e.preventDefault(); sendMessage(inputText); }} className="flex gap-2">
                                 <input type="text" value={inputText} onChange={e => setInputText(e.target.value)}
-                                    disabled={isLoading}
                                     placeholder="Mô tả giỏ hoa bạn muốn..."
-                                    className="flex-1 bg-gray-50 border border-gray-200 text-sm px-4 py-2.5 rounded-full focus:outline-none focus:ring-2 focus:ring-pink-300 disabled:bg-gray-100"
+                                    className="flex-1 bg-gray-50 border border-gray-200 text-sm px-4 py-2.5 rounded-full focus:outline-none focus:ring-2 focus:ring-pink-300"
                                 />
                                 <button type="submit" disabled={!inputText.trim() || isLoading}
                                     className="w-10 h-10 bg-gradient-to-br from-pink-500 to-fuchsia-500 text-white rounded-full flex items-center justify-center shadow disabled:opacity-50 cursor-pointer flex-shrink-0">
@@ -256,7 +247,7 @@ export default function HydrangeaStudio() {
                     </div>
 
                     {/* Col 2: Preview & Generate */}
-                    <div className="lg:col-span-4 flex flex-col gap-4">
+                    <div className="lg:col-span-4 flex flex-col gap-4 h-[650px]">
                         {/* Generated image or placeholder */}
                         <div className="bg-white rounded-3xl shadow-xl border border-pink-100 overflow-hidden flex-1">
                             <div className="p-4 border-b border-pink-50 flex items-center gap-2">
@@ -287,79 +278,77 @@ export default function HydrangeaStudio() {
                             </div>
                             {/* Generate button */}
                             <div className="p-4 border-t border-pink-50">
-                                <button onClick={handleGenerate} disabled={!canGenerate}
-                                    className="w-full bg-gradient-to-r from-pink-500 to-fuchsia-500 hover:from-pink-600 hover:to-fuchsia-600 disabled:opacity-40 text-white font-bold py-3 rounded-2xl shadow flex items-center justify-center gap-2 transition-all cursor-pointer">
-                                    {isGenerating
-                                        ? <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Đang tạo...</>
-                                        : <><Sparkles size={16} />✨ Tạo Giỏ Hoa</>}
-                                </button>
-                                {!hasEntities && <p className="text-center text-[10px] text-gray-400 mt-1.5">Chat với AI trước để kích hoạt nút này</p>}
+                                {status === 'image_ready' && generatedImage ? (
+                                    <div className="flex gap-2">
+                                        <button onClick={handleGenerate} className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm py-3 rounded-2xl font-bold flex items-center justify-center gap-1.5 cursor-pointer">
+                                            <RefreshCw size={16} /> Tạo lại
+                                        </button>
+                                        <button onClick={handleConfirmOrder} disabled={isSavingOrder} className="flex-[2] bg-gradient-to-r from-pink-500 to-fuchsia-500 hover:from-pink-600 hover:to-fuchsia-600 text-white text-sm py-3 rounded-2xl font-bold flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-60 shadow-md">
+                                            {isSavingOrder ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <ShoppingCart size={16} />}
+                                            Đồng ý & Chọn Mua
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <button onClick={handleGenerate} disabled={!canGenerate}
+                                            className="w-full bg-gradient-to-r from-pink-500 to-fuchsia-500 hover:from-pink-600 hover:to-fuchsia-600 disabled:opacity-40 text-white font-bold py-3 rounded-2xl shadow flex items-center justify-center gap-2 transition-all cursor-pointer">
+                                            {isGenerating
+                                                ? <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Đang tạo...</>
+                                                : <><Sparkles size={16} />✨ Tạo Giỏ Hoa</>}
+                                        </button>
+                                        {!hasEntities && <p className="text-center text-[10px] text-gray-400 mt-1.5">Chat với AI trước để kích hoạt nút này</p>}
+                                    </>
+                                )}
                             </div>
                         </div>
 
-                        {/* My orders */}
-                        <div className="bg-white rounded-2xl shadow border border-pink-100 overflow-hidden">
-                            <button onClick={() => { setShowOrders(!showOrders); if (!showOrders) loadMyOrders(); }}
-                                className="w-full p-3 flex items-center gap-2 hover:bg-pink-50 transition-colors cursor-pointer">
+                        {/* Lịch sử trò chuyện */}
+                        <div className="bg-white rounded-2xl shadow border border-pink-100 overflow-hidden flex flex-col max-h-[180px]">
+                            <div className="p-3 bg-gray-50 border-b border-pink-50 flex items-center gap-2">
                                 <Clock size={14} className="text-pink-500" />
-                                <span className="text-sm font-semibold text-gray-700 flex-1">Đơn tùy chỉnh của tôi</span>
-                                <ChevronDown size={14} className={`text-gray-400 transition-transform ${showOrders ? 'rotate-180' : ''}`} />
-                            </button>
-                            {showOrders && (
-                                <div className="border-t border-pink-50 max-h-48 overflow-y-auto">
-                                    {myOrders.length === 0
-                                        ? <p className="text-xs text-gray-400 text-center py-4">Chưa có đơn nào</p>
-                                        : myOrders.map(o => (
-                                            <div key={o._id} className="p-3 border-b border-gray-50 flex items-center gap-2">
-                                                {o.generatedImage?.url
-                                                    ? <img src={o.generatedImage.url} className="w-10 h-10 rounded-lg object-cover" alt="" />
-                                                    : <div className="w-10 h-10 bg-pink-50 rounded-lg flex items-center justify-center"><Flower2 size={16} className="text-pink-300" /></div>}
-                                                <div className="flex-1 min-w-0">
-                                                    <p className="text-xs font-bold text-gray-700">{o.orderCode}</p>
-                                                    <p className="text-[10px] text-gray-400">{o.entities?.flower_types?.join(', ') || 'Giỏ hoa'}</p>
-                                                </div>
-                                                <div className="text-right">
-                                                    <p className="text-xs font-bold text-pink-600">{fmt(o.totalPrice)}</p>
-                                                    <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold ${o.status === 'confirmed' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
-                                                        {o.status}
-                                                    </span>
-                                                </div>
+                                <span className="text-sm font-semibold text-gray-700 flex-1">Lịch sử thiết kế gần đây</span>
+                            </div>
+                            <div className="overflow-y-auto">
+                                {myOrders.length === 0
+                                    ? <p className="text-xs text-gray-400 text-center py-4">Chưa có lịch sử</p>
+                                    : myOrders.map(o => (
+                                        <div key={o._id} onClick={() => resumeChat(o._id)} className="p-3 border-b border-gray-50 flex items-center gap-3 hover:bg-pink-50 cursor-pointer transition-colors group">
+                                            {o.generatedImage?.url
+                                                ? <img src={o.generatedImage.url} className="w-10 h-10 rounded-lg object-cover group-hover:shadow" alt="" />
+                                                : <div className="w-10 h-10 bg-pink-100 rounded-lg flex items-center justify-center group-hover:shadow"><Flower2 size={16} className="text-pink-400" /></div>}
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-xs font-bold text-gray-700 group-hover:text-pink-600 transition-colors truncate">{o.orderCode}</p>
+                                                <p className="text-[10px] text-gray-400 truncate">{o.entities?.flower_types?.join(', ') || 'Giỏ hoa'}</p>
                                             </div>
-                                        ))}
-                                </div>
-                            )}
+                                            <div className="text-right flex flex-col items-end gap-1">
+                                                <p className="text-xs font-bold text-pink-600">{fmt(o.totalPrice)}</p>
+                                                <span className="text-[9px] px-2 py-0.5 rounded-full font-bold bg-pink-100 text-pink-600 hover:bg-pink-200">
+                                                    Tiếp tục
+                                                </span>
+                                            </div>
+                                        </div>
+                                    ))}
+                            </div>
                         </div>
                     </div>
 
                     {/* Col 3: Items panel */}
-                    <div className="lg:col-span-4 bg-white rounded-3xl shadow-xl border border-pink-100 flex flex-col overflow-hidden" style={{ minHeight: 620 }}>
+                    <div className="lg:col-span-4 bg-white rounded-3xl shadow-xl border border-pink-100 flex flex-col overflow-hidden h-[650px]">
                         <div className="p-4 border-b border-pink-50 flex items-center gap-2">
                             <Package size={15} className="text-pink-500" />
                             <h3 className="font-bold text-gray-800 text-sm flex-1">Thành phần giỏ hoa</h3>
                             {totalPrice > 0 && <span className="text-xs font-extrabold text-pink-600">{fmt(totalPrice)}</span>}
                         </div>
                         <ItemsPanel
-                            suggestedItems={suggestedItems}
                             selectedItems={selectedItems}
                             outOfStockWarnings={outOfStockWarnings}
-                            onSelect={handleSelectItem}
                             totalPrice={totalPrice}
                         />
                     </div>
                 </div>
             </div>
 
-            {/* Confirm Modal */}
-            {showConfirmModal && generatedImage && (
-                <ConfirmModal
-                    image={generatedImage}
-                    totalPrice={totalPrice}
-                    onConfirm={handleConfirmOrder}
-                    onRegenerate={() => { setShowConfirmModal(false); handleGenerate(); }}
-                    onClose={() => setShowConfirmModal(false)}
-                    isSaving={isSavingOrder}
-                />
-            )}
+
         </div>
     );
 }

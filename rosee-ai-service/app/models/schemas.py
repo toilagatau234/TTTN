@@ -85,6 +85,8 @@ class AnalyzeEntities(BaseModel):
     occasion: Optional[str] = None
     style: Optional[str] = None
     layout: Optional[str] = None
+    category: Optional[str] = None
+    wrapper: Optional[str] = None
     price_hint: Optional[str] = None
     budget: Optional[int] = None
     target: Optional[str] = None

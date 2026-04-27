@@ -25,15 +25,18 @@ async function buildDetailedPromptWithGemini(entities, selectedItems) {
         const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
         const inputSummary = [
+            `-- YÊU CẦU CHÍNH TỪ KHÁCH HÀNG (Ưu tiên cao nhất) --`,
+            entities.flower_types?.length && `Loại hoa: ${entities.flower_types.join(', ')}`,
+            entities.colors?.length && `Tông màu: ${entities.colors.join(', ')}`,
+            entities.occasion && `Dịp: ${entities.occasion}`,
+            entities.style && `Phong cách: ${entities.style}`,
+            `\n-- THÀNH PHẦN THAM KHẢO --`,
             selectedItems.basket?.name && `Giỏ/lẵng: ${selectedItems.basket.name}`,
             selectedItems.wrapper?.name && `Giấy gói: ${selectedItems.wrapper.name}`,
             selectedItems.ribbon?.name && `Ruy băng: ${selectedItems.ribbon.name}`,
             selectedItems.main_flowers?.length && `Hoa chính: ${selectedItems.main_flowers.map(f => f.name).join(', ')}`,
             selectedItems.sub_flowers?.length && `Hoa phụ: ${selectedItems.sub_flowers.map(f => f.name).join(', ')}`,
             selectedItems.accessories?.length && `Phụ kiện: ${selectedItems.accessories.map(a => a.name).join(', ')}`,
-            entities.colors?.length && `Tông màu: ${entities.colors.join(', ')}`,
-            entities.occasion && `Dịp: ${entities.occasion}`,
-            entities.style && `Phong cách: ${entities.style}`,
         ].filter(Boolean).join('\n');
 
         const metaPrompt = `You are an expert florist and photographer. 
@@ -59,17 +62,21 @@ Write ONLY the image prompt, no explanations.`;
 function buildFallbackPrompt(entities, selectedItems) {
     const parts = ['beautiful professional flower basket arrangement'];
 
-    const mainFlowers = selectedItems.main_flowers?.map(f => f.name).filter(Boolean);
-    if (mainFlowers?.length) parts.push(`with ${mainFlowers.join(' and ')}`);
-    else if (entities.flower_types?.length) parts.push(`with ${entities.flower_types.join(' and ')}`);
+    if (entities.flower_types?.length) {
+        parts.push(`with ${entities.flower_types.join(' and ')}`);
+    } else {
+        const mainFlowers = selectedItems.main_flowers?.map(f => f.name).filter(Boolean);
+        if (mainFlowers?.length) parts.push(`with ${mainFlowers.join(' and ')}`);
+    }
+
+    if (entities.colors?.length) parts.push(`in ${entities.colors.join(' and ')} color tones`);
+    if (entities.occasion) parts.push(`for ${entities.occasion}`);
 
     const subFlowers = selectedItems.sub_flowers?.map(f => f.name).filter(Boolean);
     if (subFlowers?.length) parts.push(`accented with ${subFlowers.join(', ')}`);
 
-    if (entities.colors?.length) parts.push(`in ${entities.colors.join(' and ')} color tones`);
     if (selectedItems.wrapper?.name) parts.push(`wrapped in ${selectedItems.wrapper.name}`);
     if (selectedItems.ribbon?.name) parts.push(`with ${selectedItems.ribbon.name} ribbon`);
-    if (entities.occasion) parts.push(`for ${entities.occasion}`);
 
     parts.push('professional florist photography, white background, high quality, sharp focus, product photo');
     return parts.join(', ');

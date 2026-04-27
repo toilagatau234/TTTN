@@ -82,16 +82,25 @@ def detect_modify_ops(text: str) -> List[Dict]:
     """
     ops = []
     text_lower = text.lower()
-    # Replace: "đổi hoa hồng thành hoa lan"
+    # Replace explicit: "đổi hoa hồng thành hoa lan"
     for pat in [r"(?:đổi|thay)\s+(.+?)\s+(?:thành|sang|bằng)\s+(.+?)(?:[,.]|$)"]:
         for m in re.finditer(pat, text_lower):
-            ops.append({ "op": "replace", "from": m.group(1).strip(), "to": m.group(2).strip() })
-    # Remove: "bỏ hoa hồng"
-    for m in re.finditer(r"bỏ\s+(.+?)(?:[,.]|$)", text_lower):
-        ops.append({ "op": "remove", "from": m.group(1).strip(), "to": None })
+            fr = normalize_flower(m.group(1).strip()) or m.group(1).strip()
+            to = normalize_flower(m.group(2).strip()) or m.group(2).strip()
+            ops.append({ "op": "replace", "from": fr, "to": to })
+    # Replace implicit: "đổi thành hoa lan"
+    for pat in [r"(?:đổi|thay)\s+(?:thành|sang|bằng)\s+(.+?)(?:[,.]|$)"]:
+        for m in re.finditer(pat, text_lower):
+            to = normalize_flower(m.group(1).strip()) or m.group(1).strip()
+            ops.append({ "op": "replace_all", "from": None, "to": to })
+    # Remove: "bỏ hoa hồng", "xoá gấu bông"
+    for m in re.finditer(r"(?:bỏ|xoá|xóa)\s+(.+?)(?:[,.]|$)", text_lower):
+        fr = normalize_flower(m.group(1).strip()) or m.group(1).strip()
+        ops.append({ "op": "remove", "from": fr, "to": None })
     # Add: "thêm hoa cúc"
     for m in re.finditer(r"thêm\s+(.+?)(?:[,.]|$)", text_lower):
-        ops.append({ "op": "add", "from": None, "to": m.group(1).strip() })
+        to = normalize_flower(m.group(1).strip()) or m.group(1).strip()
+        ops.append({ "op": "add", "from": None, "to": to })
     return ops
 
 
@@ -152,6 +161,7 @@ def analyze_entities(
 
     # ── Others ───────────────────────────────────────────────────────────────
     category = normalize_category(raw_ner.get("CATEGORY", "")) or scanned.get("category")
+    wrapper = normalize_wrapper(raw_ner.get("WRAPPER", "")) or scanned.get("wrapper")
     occasion = normalize_occasion(raw_ner.get("OCCASION", "")) or scanned.get("occasion")
     style    = normalize_style(raw_ner.get("STYLE", "")) or scanned.get("style")
     target   = extract_target(original_text, raw_ner)
@@ -163,10 +173,10 @@ def analyze_entities(
     # ── Role hints ────────────────────────────────────────────────────────────
     role_hint = extract_role_hints(original_text, flower_types)
 
-    # ── Modify ops (chỉ khi intent == MODIFY) ────────────────────────────────
-    modify_ops = []
-    if intent in ("MODIFY", "modify", "chỉnh sửa"):
-        modify_ops = detect_modify_ops(original_text)
+    # ── Modify ops ────────────────────────────────────────────────────────────
+    modify_ops = detect_modify_ops(original_text)
+    if modify_ops:
+        intent = "MODIFY"
 
     # ── Missing fields & Clarification ────────────────────────────────────────
     missing_fields = []
@@ -198,6 +208,8 @@ def analyze_entities(
             flowers=flower_types,                          # compat field
             flower_types=flower_types,
             layout=category.lower() if category else None,
+            category=category.lower() if category else None,
+            wrapper=wrapper.lower() if wrapper else None,
             price_hint=price_hint,
             budget=budget,
             target=target,

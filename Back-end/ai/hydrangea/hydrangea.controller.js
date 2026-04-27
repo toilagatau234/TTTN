@@ -85,9 +85,9 @@ exports.getMyOrders = async (req, res) => {
         if (!userId) return res.status(401).json({ success: false });
 
         const orders = await CustomBouquetOrder.find({ user: userId })
-            .select('orderCode status totalPrice entities generatedImage.url createdAt confirmedAt selectedItems')
+            .select('orderCode status totalPrice entities generatedImage.url createdAt confirmedAt selectedItems sessionId')
             .sort({ createdAt: -1 })
-            .limit(20)
+            .limit(4)
             .lean();
 
         // Tạo orderCode virtual cho lean docs
@@ -119,6 +119,30 @@ exports.getOrderDetail = async (req, res) => {
             }
         });
     } catch (error) {
+        return res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// POST /api/ai/hydrangea/restore-session
+// Khôi phục phiên làm việc từ order cũ
+exports.restoreSession = async (req, res) => {
+    try {
+        const userId = req.user?._id;
+        const { orderId } = req.body;
+        if (!userId) return res.status(401).json({ success: false, message: 'Vui lòng đăng nhập' });
+        if (!orderId) return res.status(400).json({ success: false, message: 'Thiếu orderId' });
+
+        const sessionState = await hydrangeaService.restoreSession(orderId, userId);
+        if (!sessionState) {
+            return res.status(404).json({ success: false, message: 'Không tìm thấy đơn hàng' });
+        }
+
+        return res.status(200).json({
+            success: true,
+            sessionState
+        });
+    } catch (error) {
+        console.error('[RestoreSession Error]:', error);
         return res.status(500).json({ success: false, message: error.message });
     }
 };

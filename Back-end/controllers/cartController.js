@@ -240,52 +240,52 @@ const clearCart = async (req, res) => {
 const addCustomBouquetToCart = async (req, res) => {
     try {
         const userId = req.user._id;
-        const { entities, imageUrl } = req.body;
+        const { orderId } = req.body;
 
-        // 1. RAG MAPPING: Tìm kiếm nguyên liệu thật trong kho (MongoDB)
-        const flowerRegex = new RegExp(entities.flower || 'hoa', 'i');
-        const colorRegex = new RegExp(entities.color || '', 'i');
+        const CustomBouquetOrder = require('../models/CustomBouquetOrder');
+        const order = await CustomBouquetOrder.findById(orderId);
 
-        const matchingFlowers = await Product.find({
-            category: 'nguyen-lieu',
-            name: { $regex: flowerRegex },
-            tags: { $regex: colorRegex },
-        }).limit(3);
+        if (!order) {
+            return res.status(404).json({ success: false, message: 'Không tìm thấy đơn AI' });
+        }
 
-        // 2. Tính toán giá (Business Logic)
-        let basePrice = 150000;
-        let materials = [];
-
-        if (matchingFlowers.length > 0) {
-            const mainFlower = matchingFlowers[0];
-            basePrice += mainFlower.price * 10;
-            materials.push({
-                productId: mainFlower._id,
-                name: mainFlower.name,
-                quantity: 10,
-                price: mainFlower.price,
+        let components = [];
+        const cats = ['basket', 'wrapper', 'ribbon', 'main_flowers', 'sub_flowers', 'accessories'];
+        cats.forEach(cat => {
+            if (!order.selectedItems) return;
+            const items = Array.isArray(order.selectedItems[cat]) ? order.selectedItems[cat] : (order.selectedItems[cat] ? [order.selectedItems[cat]] : []);
+            items.forEach(item => {
+                if(item && item._id) {
+                    components.push({
+                        item: item.name,
+                        qty: 1,
+                        unitPrice: item.price,
+                        totalPrice: item.price
+                    });
+                }
             });
-        } else {
-            basePrice += 300000;
-            materials.push({
-                name: `Hoa mix tông ${entities.color || 'tự do'} (Giao ngẫu nhiên theo kho)`,
-                quantity: 1,
-                price: 300000,
+        });
+
+        // Nếu không có material nào, thêm 1 material chung
+        if (components.length === 0) {
+            components.push({
+                item: `Hoa mix tông ${order.entities?.colors?.join(', ') || 'tự do'}`,
+                qty: 1,
+                unitPrice: order.totalPrice > 0 ? order.totalPrice : 300000,
+                totalPrice: order.totalPrice > 0 ? order.totalPrice : 300000,
             });
         }
 
-        // 3. Tạo Custom Cart Item
         const customItem = {
             isCustom: true,
-            name: `Giỏ hoa thiết kế AI - ${entities.flower || 'Độc bản'}`,
-            image: imageUrl,
-            price: basePrice,
+            name: `Giỏ hoa AI - ${order.orderCode || 'Độc bản'}`,
+            image: order.generatedImage?.url || '',
+            price: order.totalPrice,
             quantity: 1,
-            materials: materials,
-            note: `Tông màu: ${entities.color}`,
+            components: components,
+            note: order.entities?.flower_types?.join(', ') || '',
         };
 
-        // 4. Lưu vào Giỏ hàng
         let cart = await Cart.findOne({ user: userId });
         if (!cart) {
             cart = new Cart({ user: userId, items: [] });
