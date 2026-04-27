@@ -11,7 +11,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # ── Model Paths ─────────────────────────────────────────────────────────────
 INTENT_MODEL_PATH: str = os.getenv(
     "INTENT_MODEL_PATH",
-    str(BASE_DIR / "model_intent_output")
+    str(BASE_DIR / "model_weights" / "phobert-intent-classifier")
 )
 NER_MODEL_PATH: str = os.getenv(
     "NER_MODEL_PATH",
