@@ -8,32 +8,36 @@ export function useHydrangeaStudio() {
     const defaultMessages = [{
         role: 'bot',
         text: 'Chào mừng đến Hydrangea Studio! 🌸 Bạn muốn giỏ hoa như thế nào? Mô tả cho mình nghe nào!',
-        quickChips: ['Giỏ hoa hồng đỏ sinh nhật', 'Hoa tím lavender 500k', 'Lẵng hướng dương khai trương']
+        quickChips: ['Bó hoa hồng đỏ sinh nhật', 'Giỏ hoa tím lavender 500k', 'Lẵng hướng dương khai trương']
     }];
-    
-    const [sessionId, setSessionId] = useState(() => `sess_${Math.random().toString(36).slice(2, 9)}`);
-    const [messages, setMessages] = useState(defaultMessages);
-    const [inputText, setInputText] = useState('');
-    const [isLoading, setIsLoading] = useState(false);
+
+    const [sessionId, setSessionId]   = useState(() => `sess_${Math.random().toString(36).slice(2, 9)}`);
+    const [messages, setMessages]     = useState(defaultMessages);
+    const [inputText, setInputText]   = useState('');
+    const [isLoading, setIsLoading]   = useState(false);
 
     // AI state
-    const [entities, setEntities] = useState({});
-    const [suggestedItems, setSuggestedItems] = useState(null);
-    const [selectedItems, setSelectedItems] = useState({ basket: null, wrapper: null, ribbon: null, main_flowers: [], sub_flowers: [], accessories: [] });
+    const [entities, setEntities]                   = useState({});
+    const [suggestedItems, setSuggestedItems]       = useState(null);
+    const [selectedItems, setSelectedItems]         = useState({ basket: null, wrapper: null, ribbon: null, main_flowers: [], sub_flowers: [], accessories: [] });
     const [outOfStockWarnings, setOutOfStockWarnings] = useState([]);
-    const [totalPrice, setTotalPrice] = useState(0);
-    const [status, setStatus] = useState('idle'); // idle | asking | suggesting | generating | image_ready
+    const [totalPrice, setTotalPrice]               = useState(0);
+    const [status, setStatus]                       = useState('idle');
 
-    // Image state
-    const [generatedImage, setGeneratedImage] = useState(null); // { base64, mimeType }
-    const [isGenerating, setIsGenerating] = useState(false);
-    const [showConfirmModal, setShowConfirmModal] = useState(false);
+    // Image state — v2: Cloudinary URLs
+    const [generatedImages, setGeneratedImages]         = useState([]);    // [{ url, public_id }]
+    const [selectedImageIndex, setSelectedImageIndex]   = useState(0);
+    const [isGenerating, setIsGenerating]               = useState(false);
+    const [generateError, setGenerateError]             = useState(null);  // string | null
+    const [promptUsed, setPromptUsed]                   = useState('');
+    const [detectedType, setDetectedType]               = useState(null);  // 'bouquet' | 'basket' | ...
+    const [customPrompt, setCustomPrompt]               = useState('');    // cho refine flow
 
     // Order state
-    const [myOrders, setMyOrders] = useState([]);
-    const [showOrders, setShowOrders] = useState(false);
+    const [myOrders, setMyOrders]         = useState([]);
+    const [showOrders, setShowOrders]     = useState(false);
     const [isSavingOrder, setIsSavingOrder] = useState(false);
-    const [savedOrder, setSavedOrder] = useState(null);
+    const [savedOrder, setSavedOrder]     = useState(null);
 
     const chatEndRef = useRef(null);
 
@@ -42,6 +46,7 @@ export function useHydrangeaStudio() {
         setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 100);
     };
 
+    // ── Gửi tin nhắn chat ────────────────────────────────────────────────────
     const sendMessage = useCallback(async (text) => {
         if (!text?.trim() || isLoading) return;
         setMessages(prev => [...prev, { role: 'user', text }]);
@@ -50,14 +55,14 @@ export function useHydrangeaStudio() {
 
         try {
             const res = await axios.post(`${API}/ai/hydrangea/chat`, { sessionId, message: text });
-            const d = res.data;
+            const d   = res.data;
             if (d.success) {
                 addBotMsg(d.reply, d.quickChips || null);
                 if (d.extractedEntities) setEntities(prev => ({ ...prev, ...d.extractedEntities }));
-                if (d.suggestedItems) setSuggestedItems(d.suggestedItems);
-                if (d.selectedItems) setSelectedItems(d.selectedItems);
+                if (d.suggestedItems)    setSuggestedItems(d.suggestedItems);
+                if (d.selectedItems)     setSelectedItems(d.selectedItems);
                 if (d.outOfStockWarnings) setOutOfStockWarnings(d.outOfStockWarnings);
-                if (d.totalPrice) setTotalPrice(d.totalPrice);
+                if (d.totalPrice)        setTotalPrice(d.totalPrice);
                 setStatus(d.status || 'idle');
             } else {
                 addBotMsg(d.reply || 'Có lỗi xảy ra.');
@@ -69,12 +74,15 @@ export function useHydrangeaStudio() {
         }
     }, [sessionId, isLoading]);
 
+    // ── Chọn item trong panel ────────────────────────────────────────────────
     const handleSelectItem = useCallback(async (category, product) => {
         const newSelected = { ...selectedItems };
         if (['main_flowers', 'sub_flowers', 'accessories'].includes(category)) {
-            const arr = newSelected[category] || [];
+            const arr    = newSelected[category] || [];
             const exists = arr.some(p => String(p._id) === String(product._id));
-            newSelected[category] = exists ? arr.filter(p => String(p._id) !== String(product._id)) : [...arr, product];
+            newSelected[category] = exists
+                ? arr.filter(p => String(p._id) !== String(product._id))
+                : [...arr, product];
         } else {
             newSelected[category] = newSelected[category]?._id === product._id ? null : product;
         }
@@ -85,61 +93,95 @@ export function useHydrangeaStudio() {
         } catch { /* silent */ }
     }, [sessionId, selectedItems]);
 
-    const handleGenerate = useCallback(async () => {
+    // ── Tạo ảnh (generate / regenerate) ─────────────────────────────────────
+    const handleGenerate = useCallback(async (overridePrompt = null) => {
         setIsGenerating(true);
-        setGeneratedImage(null);
+        setGeneratedImages([]);
+        setGenerateError(null);
+        setSelectedImageIndex(0);
         setStatus('generating');
-        addBotMsg('✨ Đang tạo ảnh giỏ hoa, chờ mình xíu...');
+        addBotMsg('✨ Đang tạo ảnh giỏ hoa, chờ mình xíu nhé...');
+
         try {
-            const res = await axios.post(`${API}/ai/hydrangea/generate`, { sessionId }, { timeout: 60000 });
-            const d = res.data;
-            if (d.success && d.imageBase64) {
-                setGeneratedImage({ base64: d.imageBase64, mimeType: d.mimeType || 'image/png' });
+            const endpoint = overridePrompt ? `${API}/ai/hydrangea/refine-generate` : `${API}/ai/hydrangea/generate`;
+            const payload  = overridePrompt
+                ? { sessionId, customPrompt: overridePrompt }
+                : { sessionId };
+
+            const res = await axios.post(endpoint, payload, { timeout: 60000 });
+            const d   = res.data;
+
+            if (d.success && d.images?.length > 0) {
+                setGeneratedImages(d.images);             // [{ url, public_id }]
+                setPromptUsed(d.prompt_used || '');
+                setDetectedType(d.metadata?.type || null);
                 setStatus('image_ready');
-                setShowConfirmModal(true);
-                addBotMsg('🌸 Ảnh đã xong! Xem và xác nhận đơn nhé.');
+                setCustomPrompt(d.prompt_used || '');
+                addBotMsg('🌸 Xong rồi! Chọn ảnh bạn thích và nhấn "Đồng ý & Chọn Mua" nhé.');
             } else {
-                addBotMsg(`❌ ${d.reply || 'Không thể tạo ảnh lúc này.'}`);
+                const errMsg = d.reply || 'Không thể tạo ảnh lúc này.';
+                setGenerateError(errMsg);
+                setStatus('error');
+                addBotMsg(`❌ ${errMsg}`);
             }
         } catch (err) {
-            const msg = err.response?.data?.reply || 'Lỗi kết nối khi tạo ảnh.';
-            addBotMsg(`❌ ${msg}`);
+            const errMsg = err.response?.data?.reply
+                || (err.code === 'ECONNABORTED' ? 'Tạo ảnh quá lâu, vui lòng thử lại.' : 'Lỗi kết nối khi tạo ảnh.');
+            setGenerateError(errMsg);
+            setStatus('error');
+            addBotMsg(`❌ ${errMsg}`);
         } finally {
             setIsGenerating(false);
         }
     }, [sessionId]);
 
+    // ── Tinh chỉnh prompt (refine) ───────────────────────────────────────────
+    const handleRefine = useCallback((prompt) => {
+        if (!prompt?.trim()) return;
+        handleGenerate(prompt.trim());
+    }, [handleGenerate]);
+
+    // ── Chọn ảnh ────────────────────────────────────────────────────────────
+    const handleSelectImage = useCallback((idx) => {
+        setSelectedImageIndex(idx);
+    }, []);
+
+    // ── Xác nhận đơn hàng ───────────────────────────────────────────────────
     const handleConfirmOrder = useCallback(async () => {
         const token = authService.getToken();
         if (!token) { addBotMsg('Vui lòng đăng nhập để lưu đơn!'); return; }
+        if (generatedImages.length === 0) { addBotMsg('Vui lòng tạo ảnh trước!'); return; }
+
         setIsSavingOrder(true);
         try {
             const desc = entities.flower_types?.join(', ') || 'giỏ hoa tùy chỉnh';
-            const res = await axios.post(`${API}/ai/hydrangea/confirm-order`,
-                { sessionId, userDescription: desc },
+            const res  = await axios.post(
+                `${API}/ai/hydrangea/confirm-order`,
+                { sessionId, userDescription: desc, selectedImageIndex },
                 { headers: { Authorization: `Bearer ${token}` } }
             );
             if (res.data.success) {
                 setSavedOrder(res.data.order);
-                
                 try {
-                    await axios.post(`${API}/cart/custom`, 
-                        { orderId: res.data.order._id }, 
+                    await axios.post(
+                        `${API}/cart/custom`,
+                        { orderId: res.data.order._id },
                         { headers: { Authorization: `Bearer ${token}` } }
                     );
-                    addBotMsg(`🎉 Đơn **${res.data.order.orderCode}** đã được thêm vào Giỏ hàng! Bạn có thể tiến hành thanh toán ngay.`);
-                } catch (cartErr) {
-                    console.error("Cart add error", cartErr);
-                    addBotMsg(`🎉 Đơn **${res.data.order.orderCode}** đã lưu, nhưng có lỗi nhỏ khi đẩy vào giỏ hàng.`);
+                    addBotMsg(`🎉 Đơn **${res.data.order.orderCode}** đã được thêm vào Giỏ hàng!`);
+                } catch {
+                    addBotMsg(`🎉 Đơn **${res.data.order.orderCode}** đã lưu.`);
                 }
+                loadMyOrders();
             }
         } catch (err) {
             addBotMsg(err.response?.data?.message || 'Lỗi khi lưu đơn.');
         } finally {
             setIsSavingOrder(false);
         }
-    }, [sessionId, entities]);
+    }, [sessionId, entities, generatedImages, selectedImageIndex]);
 
+    // ── Tải lịch sử đơn ─────────────────────────────────────────────────────
     const loadMyOrders = useCallback(async () => {
         const token = authService.getToken();
         if (!token) return;
@@ -149,6 +191,7 @@ export function useHydrangeaStudio() {
         } catch { /* silent */ }
     }, []);
 
+    // ── Chat mới ─────────────────────────────────────────────────────────────
     const startNewChat = useCallback(() => {
         setSessionId(`sess_${Math.random().toString(36).slice(2, 9)}`);
         setMessages(defaultMessages);
@@ -158,18 +201,24 @@ export function useHydrangeaStudio() {
         setOutOfStockWarnings([]);
         setTotalPrice(0);
         setStatus('idle');
-        setGeneratedImage(null);
+        setGeneratedImages([]);
+        setSelectedImageIndex(0);
+        setGenerateError(null);
+        setPromptUsed('');
+        setDetectedType(null);
+        setCustomPrompt('');
         setSavedOrder(null);
-        setShowConfirmModal(false);
     }, []);
 
+    // ── Khôi phục session cũ ─────────────────────────────────────────────────
     const resumeChat = useCallback(async (orderId) => {
         const token = authService.getToken();
         if (!token) return;
         setIsLoading(true);
         try {
-            const res = await axios.post(`${API}/ai/hydrangea/restore-session`, 
-                { orderId }, 
+            const res = await axios.post(
+                `${API}/ai/hydrangea/restore-session`,
+                { orderId },
                 { headers: { Authorization: `Bearer ${token}` } }
             );
             if (res.data.success && res.data.sessionState) {
@@ -179,16 +228,21 @@ export function useHydrangeaStudio() {
                 setEntities(s.entities || {});
                 setSelectedItems(s.selectedItems || { basket: null, wrapper: null, ribbon: null, main_flowers: [], sub_flowers: [], accessories: [] });
                 setTotalPrice(s.totalPrice || 0);
-                setGeneratedImage(s.generatedImage || null);
                 setStatus(s.status || 'idle');
+                // Khôi phục ảnh Cloudinary (URL)
+                if (s.generatedImages?.length > 0) {
+                    setGeneratedImages(s.generatedImages);
+                    setStatus('image_ready');
+                }
             }
-        } catch (err) {
+        } catch {
             addBotMsg('❌ Không thể tải lại đơn hàng cũ.');
         } finally {
             setIsLoading(false);
         }
     }, []);
 
+    // ── Xóa lịch sử ─────────────────────────────────────────────────────────
     const deleteHistory = useCallback(async (orderId) => {
         const token = authService.getToken();
         if (!token) return;
@@ -200,16 +254,23 @@ export function useHydrangeaStudio() {
                 setMyOrders(prev => prev.filter(o => o._id !== orderId));
             }
         } catch (err) {
-            console.error("Delete history error", err);
+            console.error('Delete history error', err);
         }
     }, []);
 
     return {
         sessionId, messages, inputText, setInputText, isLoading,
         entities, suggestedItems, selectedItems, outOfStockWarnings, totalPrice, status,
-        generatedImage, isGenerating, showConfirmModal, setShowConfirmModal,
+        // Image state
+        generatedImages, selectedImageIndex, isGenerating, generateError,
+        promptUsed, detectedType, customPrompt, setCustomPrompt,
+        // Order state
         myOrders, showOrders, setShowOrders, isSavingOrder, savedOrder,
-        chatEndRef, sendMessage, handleSelectItem, handleGenerate, handleConfirmOrder, loadMyOrders,
-        startNewChat, resumeChat, deleteHistory
+        // Refs
+        chatEndRef,
+        // Actions
+        sendMessage, handleSelectItem, handleGenerate, handleRefine,
+        handleSelectImage, handleConfirmOrder, loadMyOrders,
+        startNewChat, resumeChat, deleteHistory,
     };
 }

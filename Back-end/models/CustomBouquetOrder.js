@@ -1,45 +1,46 @@
 const mongoose = require('mongoose');
 
 /**
- * CustomBouquetOrder — Đơn hàng giỏ hoa tùy chỉnh bằng AI
- * 
+ * CustomBouquetOrder — Đơn hàng giỏ hoa tùy chỉnh bằng AI (v2)
+ *
  * Lưu lại toàn bộ quá trình AI tạo giỏ hoa:
  * - Entities người dùng mô tả
  * - Danh sách items được AI chọn
- * - Ảnh AI tạo (base64 hoặc Cloudinary URL)
- * - Trạng thái: pending → confirmed → processing → completed
+ * - Ảnh AI tạo (Cloudinary URL — KHÔNG lưu base64 lâu dài)
+ * - Prompt đã dùng + metadata loại bó hoa
+ * - Trạng thái: draft → image_generated → confirmed → processing → completed
  */
 const customBouquetOrderSchema = new mongoose.Schema({
-    // ── Người dùng ──────────────────────────────────────────────────
+    // Người dùng
     user: {
         type: mongoose.Schema.ObjectId,
         ref: 'User',
         required: true
     },
 
-    // ── Session AI ───────────────────────────────────────────────────
+    // Session AI
     sessionId: {
         type: String,
         required: true
     },
 
-    // ── Entities AI bóc tách từ mô tả người dùng ────────────────────
+    // Entities AI bóc tách từ mô tả người dùng
     entities: {
         flower_types: [String],
         colors: [String],
         occasion: String,
         style: String,
         budget: Number,
-        target: String,      // "bạn gái", "mẹ", "đối tác"...
+        target: String,
     },
 
-    // ── Mô tả gốc của người dùng ─────────────────────────────────────
+    // Mô tả gốc của người dùng
     userDescription: {
         type: String,
         trim: true
     },
 
-    // ── Items AI đã chọn và xếp vào giỏ ─────────────────────────────
+    // Items AI đã chọn và xếp vào giỏ
     selectedItems: {
         basket: {
             product: { type: mongoose.Schema.ObjectId, ref: 'Product' },
@@ -82,59 +83,71 @@ const customBouquetOrderSchema = new mongoose.Schema({
         }]
     },
 
-    // ── Giá tổng ─────────────────────────────────────────────────────
+    // Giá tổng
     totalPrice: {
         type: Number,
         default: 0
     },
 
-    // ── Ảnh AI tạo ───────────────────────────────────────────────────
-    generatedImage: {
-        url: String,          // Cloudinary URL (nếu đã upload)
-        base64: String,       // Base64 tạm thời trước khi upload
-        generatedAt: Date,
-        prompt: String,       // Prompt đã dùng để tạo ảnh
-        model: String,        // gemini-2.0-flash-exp v.v.
+    // Ảnh AI tạo — v2: Cloudinary URL (KHÔNG lưu base64)
+    // Chỉ lưu ảnh được người dùng chọn (selected: true)
+    generatedImages: [{
+        url:       String,        // Cloudinary secure_url
+        public_id: String,        // để xóa Cloudinary nếu cần
+        selected:  { type: Boolean, default: false }
+    }],
+
+    // Prompt đã dùng để tạo ảnh
+    promptUsed: { type: String, trim: true },
+
+    // Metadata loại bó hoa do pipeline detect
+    imageMetadata: {
+        type:    String,       // 'bouquet' | 'basket' | 'box' | 'vase' | 'stand'
+        flowers: [String],
+        colors:  [String]
     },
 
-    // ── Trạng thái đơn ───────────────────────────────────────────────
+    // (backward compat) Ảnh cũ có base64 — trước phiên bản v2
+    generatedImage: {
+        url:         String,
+        base64:      String,
+        generatedAt: Date,
+        prompt:      String,
+        model:       String,
+    },
+
+    // Trạng thái đơn
     status: {
         type: String,
         enum: ['draft', 'image_generated', 'confirmed', 'processing', 'completed', 'cancelled'],
         default: 'draft'
         // draft: đang chat, chưa tạo ảnh
-        // image_generated: AI đã tạo ảnh, chờ user đồng ý
+        // image_generated: AI đã tạo ảnh, chờ user chọn
         // confirmed: user đồng ý ảnh, đã tạo đơn
         // processing: shop đang làm
         // completed: hoàn thành
         // cancelled: huỷ
     },
 
-    // ── Ghi chú thêm ─────────────────────────────────────────────────
+    // Ghi chú thêm
     note: {
         type: String,
         trim: true
     },
 
-    // ── Lịch sử chat (snapshot) ───────────────────────────────────────
+    // Lịch sử chat (snapshot)
     chatHistory: [{
         role: { type: String, enum: ['user', 'bot'] },
         text: String,
         ts: Date
     }],
 
-    // ── Timestamps ───────────────────────────────────────────────────
-    createdAt: {
-        type: Date,
-        default: Date.now
-    },
-    updatedAt: {
-        type: Date,
-        default: Date.now
-    },
+    // Timestamps
+    createdAt:   { type: Date, default: Date.now },
+    updatedAt:   { type: Date, default: Date.now },
     confirmedAt: Date,
 }, {
-    toJSON: { virtuals: true },
+    toJSON:   { virtuals: true },
     toObject: { virtuals: true }
 });
 

@@ -1,6 +1,8 @@
-const hydrangeaService = require('./hydrangea.service');
+const hydrangeaService  = require('./hydrangea.service');
+const aiImagePipeline   = require('./aiImagePipeline.service');
 const { checkGeminiApiKey } = require('./gemini.image.service');
-const CustomBouquetOrder = require('../../models/CustomBouquetOrder');
+const CustomBouquetOrder    = require('../../models/CustomBouquetOrder');
+const { deleteImages }       = require('../../services/cloudinary.service');
 const { protect } = require('../../middleware/auth');
 
 // POST /api/ai/hydrangea/chat
@@ -35,38 +37,147 @@ exports.updateSelectedItems = async (req, res) => {
 };
 
 // POST /api/ai/hydrangea/generate
-// Trigger Gemini image generation
+// Tạo ảnh mới — xóa ảnh Cloudinary cũ (nếu có) rồi gọi pipeline
 exports.generateBouquetImage = async (req, res) => {
     try {
         const { sessionId } = req.body;
         if (!sessionId) return res.status(400).json({ success: false, reply: 'Thiếu sessionId' });
 
-        const result = await hydrangeaService.processChat(sessionId, null, true);
-        return res.status(200).json(result);
+        const session = hydrangeaService.getSession(sessionId);
+
+        // Xóa ảnh Cloudinary cũ nếu là lần regenerate
+        if (session.generatedImages?.length > 0) {
+            const oldIds = session.generatedImages
+                .map(img => img.public_id)
+                .filter(Boolean);
+            if (oldIds.length > 0) {
+                // Không await — xóa bất đồng bộ, không chặn generate
+                aiImagePipeline.deletePreviousImages(oldIds).catch(err =>
+                    console.warn('[Controller] Xóa ảnh cũ thất bại (không chặn):', err.message)
+                );
+            }
+            session.generatedImages = [];
+        }
+
+        // Gọi pipeline tạo ảnh mới
+        const result = await aiImagePipeline.generateBouquetImages(
+            session.entities,
+            session.selectedItems
+        );
+
+        if (!result.success) {
+            return res.status(500).json({
+                success: false,
+                reply: result.error || 'Không thể tạo ảnh lúc này, vui lòng thử lại!'
+            });
+        }
+
+        // Lưu vào session
+        session.generatedImages = result.images;
+        session.promptUsed      = result.prompt_used;
+        session.imageMetadata   = result.metadata;
+
+        return res.status(200).json({
+            success:     true,
+            images:      result.images,      // [{ url, public_id }]
+            prompt_used: result.prompt_used,
+            metadata:    result.metadata,
+            reply:       '✨ Đã tạo xong! Chọn ảnh bạn thích và xác nhận đơn nhé.',
+            status:      'image_ready',
+        });
     } catch (error) {
         console.error('[Generate Image Error]:', error);
         return res.status(500).json({ success: false, reply: error.message });
     }
 };
 
+// POST /api/ai/hydrangea/refine-generate
+// Tạo lại ảnh với prompt tùy chỉnh từ người dùng
+exports.refineGenerate = async (req, res) => {
+    try {
+        const { sessionId, customPrompt } = req.body;
+        if (!sessionId) return res.status(400).json({ success: false, reply: 'Thiếu sessionId' });
+        if (!customPrompt?.trim()) return res.status(400).json({ success: false, reply: 'Prompt không được trống' });
+
+        const session = hydrangeaService.getSession(sessionId);
+
+        // Xóa ảnh cũ
+        if (session.generatedImages?.length > 0) {
+            const oldIds = session.generatedImages.map(img => img.public_id).filter(Boolean);
+            if (oldIds.length > 0) {
+                aiImagePipeline.deletePreviousImages(oldIds).catch(err =>
+                    console.warn('[Controller] Xóa ảnh cũ (refine) thất bại:', err.message)
+                );
+            }
+            session.generatedImages = [];
+        }
+
+        const result = await aiImagePipeline.generateBouquetImages(
+            session.entities,
+            session.selectedItems,
+            customPrompt.trim()
+        );
+
+        if (!result.success) {
+            return res.status(500).json({ success: false, reply: result.error });
+        }
+
+        session.generatedImages = result.images;
+        session.promptUsed      = result.prompt_used;
+        session.imageMetadata   = result.metadata;
+
+        return res.status(200).json({
+            success:     true,
+            images:      result.images,
+            prompt_used: result.prompt_used,
+            metadata:    result.metadata,
+            reply:       '✨ Đã tạo lại với prompt mới!',
+            status:      'image_ready',
+        });
+    } catch (error) {
+        console.error('[RefineGenerate Error]:', error);
+        return res.status(500).json({ success: false, reply: error.message });
+    }
+};
+
 // POST /api/ai/hydrangea/confirm-order
-// Tạo CustomBouquetOrder sau khi user đồng ý ảnh
+// Tạo CustomBouquetOrder sau khi user chọn ảnh và đồng ý
 exports.confirmOrder = async (req, res) => {
     try {
-        const { sessionId, userDescription, note } = req.body;
+        const { sessionId, userDescription, note, selectedImageIndex } = req.body;
         const userId = req.user?._id;
 
         if (!userId) return res.status(401).json({ success: false, message: 'Vui lòng đăng nhập' });
         if (!sessionId) return res.status(400).json({ success: false, message: 'Thiếu sessionId' });
 
-        const order = await hydrangeaService.createOrder(sessionId, userId, userDescription, note);
+        const session      = hydrangeaService.getSession(sessionId);
+        const selIdx       = Number.isInteger(selectedImageIndex) ? selectedImageIndex : 0;
+        const allImages    = session.generatedImages || [];
+        const selectedImg  = allImages[selIdx] || allImages[0] || null;
+        const unselected   = allImages.filter((_, i) => i !== selIdx);
+
+        // Xóa các ảnh KHÔNG được chọn khỏi Cloudinary (dọn dẹp storage)
+        if (unselected.length > 0) {
+            const unusedIds = unselected.map(img => img.public_id).filter(Boolean);
+            if (unusedIds.length > 0) {
+                deleteImages(unusedIds).catch(err =>
+                    console.warn('[ConfirmOrder] Xóa ảnh không dùng thất bại:', err.message)
+                );
+            }
+        }
+
+        const order = await hydrangeaService.createOrder(
+            sessionId, userId, userDescription, note,
+            selectedImg, session.promptUsed, session.imageMetadata
+        );
+
         return res.status(201).json({
             success: true,
             message: 'Đơn hàng tùy chỉnh đã được lưu!',
             order: {
-                _id: order._id,
+                _id:       order._id,
                 orderCode: order.orderCode,
-                status: order.status,
+                status:    order.status,
                 totalPrice: order.totalPrice,
                 createdAt: order.createdAt,
             }

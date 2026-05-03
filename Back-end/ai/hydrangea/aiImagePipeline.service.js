@@ -1,0 +1,384 @@
+/**
+ * Back-end/ai/hydrangea/aiImagePipeline.service.js
+ *
+ * Pipeline tạo ảnh AI cho Hydrangea Studio — 8 bước:
+ *
+ * 1. validateInput       — kiểm tra đầu vào
+ * 2. detectBouquetType   — nhận dạng loại bó hoa (logic nội bộ, KHÔNG AI)
+ * 3. buildStructuredPrompt — xây dựng prompt có cấu trúc
+ * 4. callGeminiForEnhancement — cải thiện câu từ (DUY NHẤT dùng Gemini)
+ * 5. deletePreviousImages — xóa ảnh cũ Cloudinary (khi regenerate)
+ * 6. generateVariations  — tạo 2 ảnh từ Pollinations AI
+ * 7. uploadToCloudinary  — lưu ảnh lên Cloudinary, lấy URL
+ * 8. filterResults       — lọc kết quả, đảm bảo ít nhất 1 ảnh hợp lệ
+ *
+ * Ràng buộc:
+ * - Gemini chỉ dùng để enhance wording (không quyết định logic)
+ * - Tất cả logic kinh doanh là deterministic (nội bộ)
+ * - Timeout toàn cục: 25 giây
+ */
+
+const https = require('https');
+const http  = require('http');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { uploadBase64Image, deleteImages } = require('../../services/cloudinary.service');
+
+const GEMINI_API_KEY    = process.env.GEMINI_API_KEY;
+const GLOBAL_TIMEOUT_MS = 90_000; // 90s toàn cục (2 ảnh mỗi ảnh tối đa 45s)
+const GEMINI_TIMEOUT_MS = 10_000; // 10s cho Gemini
+const IMAGE_TIMEOUT_MS  = 45_000; // 45s mỗi ảnh Pollinations
+const MAX_RETRIES       = 1;      // Chỉ retry 1 lần (tránh spam 429)
+const VARIATION_DELAY   = 3000;   // 3s giữa 2 lần gọi (tránh rate limit)
+
+// ── ENUM loại bó hoa ───────────────────────────────────────────────────────────
+const BOUQUET_TYPES = {
+    BOUQUET: 'bouquet',
+    BASKET:  'basket',
+    BOX:     'box',
+    VASE:    'vase',
+    STAND:   'stand',
+};
+
+// ── Bảng ánh xạ Tiếng Việt → loại bó hoa ─────────────────────────────────────
+const BOUQUET_TYPE_MAP = {
+    'bó hoa':   BOUQUET_TYPES.BOUQUET,
+    'bó':       BOUQUET_TYPES.BOUQUET,
+    'giỏ hoa':  BOUQUET_TYPES.BASKET,
+    'giỏ':      BOUQUET_TYPES.BASKET,
+    'lẵng hoa': BOUQUET_TYPES.BASKET,
+    'lẵng':     BOUQUET_TYPES.BASKET,
+    'hộp hoa':  BOUQUET_TYPES.BOX,
+    'hộp':      BOUQUET_TYPES.BOX,
+    'bình hoa': BOUQUET_TYPES.VASE,
+    'bình':     BOUQUET_TYPES.VASE,
+    'kệ hoa':   BOUQUET_TYPES.STAND,
+    'kệ':       BOUQUET_TYPES.STAND,
+};
+
+// ── Mô tả tiếng Anh cho từng loại (dùng trong prompt) ─────────────────────────
+const BOUQUET_TYPE_LABELS = {
+    [BOUQUET_TYPES.BOUQUET]: 'hand-tied bouquet',
+    [BOUQUET_TYPES.BASKET]:  'flower basket arrangement',
+    [BOUQUET_TYPES.BOX]:     'flower box arrangement',
+    [BOUQUET_TYPES.VASE]:    'vase flower arrangement',
+    [BOUQUET_TYPES.STAND]:   'flower stand display',
+};
+
+// ── Ràng buộc "NOT other types" trong prompt ──────────────────────────────────
+const BOUQUET_TYPE_EXCLUSIONS = {
+    [BOUQUET_TYPES.BOUQUET]: 'NOT a basket, NOT a box, NOT in any container',
+    [BOUQUET_TYPES.BASKET]:  'NOT a hand-tied bouquet, NOT a box',
+    [BOUQUET_TYPES.BOX]:     'NOT a basket, NOT a hand-tied bouquet',
+    [BOUQUET_TYPES.VASE]:    'NOT a basket, NOT a hand-tied bouquet',
+    [BOUQUET_TYPES.STAND]:   'NOT a basket, NOT a hand-tied bouquet',
+};
+
+// ═════════════════════════════════════════════════════════════════════════════
+// BƯỚC 1 — Kiểm tra đầu vào
+// ═════════════════════════════════════════════════════════════════════════════
+function validateInput(entities, selectedItems) {
+    const hasFlowers = (entities?.flower_types?.length > 0) ||
+                       (selectedItems?.main_flowers?.length > 0);
+    const hasColors  = entities?.colors?.length > 0;
+
+    if (!hasFlowers && !hasColors) {
+        throw new Error(
+            'Vui lòng mô tả loại hoa hoặc màu sắc bạn muốn trước khi tạo ảnh!'
+        );
+    }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// BƯỚC 2 — Nhận dạng loại bó hoa (logic nội bộ, KHÔNG AI)
+// ═════════════════════════════════════════════════════════════════════════════
+function detectBouquetType(entities, selectedItems) {
+    // Ưu tiên 1: entities.category từ Python AI
+    if (entities?.category) {
+        const cat = entities.category.toLowerCase().trim();
+        for (const [keyword, type] of Object.entries(BOUQUET_TYPE_MAP)) {
+            if (cat.includes(keyword)) {
+                console.log(`[Pipeline] detectBouquetType: "${cat}" → "${type}" (from entities.category)`);
+                return type;
+            }
+        }
+    }
+
+    // Ưu tiên 2: tên basket đã chọn
+    const basketName = selectedItems?.basket?.name || '';
+    if (basketName) {
+        const bName = basketName.toLowerCase();
+        for (const [keyword, type] of Object.entries(BOUQUET_TYPE_MAP)) {
+            if (bName.includes(keyword)) {
+                console.log(`[Pipeline] detectBouquetType: "${bName}" → "${type}" (from basket name)`);
+                return type;
+            }
+        }
+    }
+
+    // Fallback an toàn
+    console.log(`[Pipeline] detectBouquetType: fallback → "bouquet"`);
+    return BOUQUET_TYPES.BOUQUET;
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// BƯỚC 3 — Xây dựng prompt có cấu trúc
+// ═════════════════════════════════════════════════════════════════════════════
+function buildStructuredPrompt(bouquetType, entities, selectedItems) {
+    const typeLabel     = BOUQUET_TYPE_LABELS[bouquetType] || 'flower arrangement';
+    const exclusion     = BOUQUET_TYPE_EXCLUSIONS[bouquetType] || '';
+
+    // Loại hoa
+    const flowers = [
+        ...(entities?.flower_types || []),
+        ...(selectedItems?.main_flowers?.map(f => f.name) || []),
+    ].filter(Boolean);
+
+    const subFlowers = (selectedItems?.sub_flowers?.map(f => f.name) || []).filter(Boolean);
+    const colors     = (entities?.colors || []).filter(Boolean);
+    const wrapper    = selectedItems?.wrapper?.name || entities?.wrapper || null;
+    const ribbon     = selectedItems?.ribbon?.name || entities?.ribbon || null;
+    const occasion   = entities?.occasion || null;
+
+    // Xây dựng prompt từng phần
+    const parts = [
+        `A realistic professional ${typeLabel} (${exclusion})`,
+        flowers.length > 0 ? `featuring ${flowers.join(' and ')}` : 'featuring beautiful flowers',
+        subFlowers.length > 0 ? `accented with ${subFlowers.join(' and ')}` : null,
+        colors.length > 0 ? `in ${colors.join(' and ')} color tones` : null,
+        wrapper ? `wrapped in ${wrapper}` : null,
+        ribbon ? `with ${ribbon} ribbon` : null,
+        occasion ? `perfect for ${occasion}` : null,
+        'professional florist photography, white background, sharp focus, high quality product photo',
+    ].filter(Boolean);
+
+    const rawPrompt = parts.join(', ');
+
+    const metadata = {
+        type:    bouquetType,
+        flowers: flowers,
+        colors:  colors,
+    };
+
+    console.log(`[Pipeline] buildStructuredPrompt: type="${bouquetType}", flowers=${JSON.stringify(flowers)}`);
+    return { rawPrompt, metadata };
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// BƯỚC 4 — Gọi Gemini để cải thiện câu từ (DUY NHẤT dùng Gemini)
+// ═════════════════════════════════════════════════════════════════════════════
+async function callGeminiForEnhancement(rawPrompt) {
+    if (!GEMINI_API_KEY) {
+        console.warn('[Pipeline] Không có GEMINI_API_KEY — dùng raw prompt');
+        return rawPrompt;
+    }
+
+    const metaPrompt = `You are an expert florist and professional photographer.
+Improve the following image generation prompt to make it more vivid and detailed.
+Keep the EXACT flower type structure (bouquet/basket/box) — do NOT change it.
+Do NOT change the flower types, colors, or container type.
+Output ONLY the improved prompt in English, max 120 words, no explanations.
+
+Original prompt:
+${rawPrompt}`;
+
+    try {
+        const geminiPromise = (async () => {
+            const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+            const model  = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+            const result = await model.generateContent(metaPrompt);
+            return result.response.text().trim();
+        })();
+
+        const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Gemini timeout (10s)')), GEMINI_TIMEOUT_MS)
+        );
+
+        const enhanced = await Promise.race([geminiPromise, timeoutPromise]);
+        console.log('[Pipeline] Gemini enhanced prompt:', enhanced.substring(0, 100));
+        return enhanced;
+    } catch (err) {
+        console.warn('[Pipeline] Gemini enhancement thất bại, dùng raw prompt:', err.message);
+        return rawPrompt;
+    }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// BƯỚC 5 — Xóa ảnh Cloudinary cũ (chạy trước khi generate nếu là regenerate)
+// ═════════════════════════════════════════════════════════════════════════════
+async function deletePreviousImages(publicIds = []) {
+    if (!publicIds?.length) return;
+    console.log(`[Pipeline] Xóa ${publicIds.length} ảnh cũ khỏi Cloudinary...`);
+    const result = await deleteImages(publicIds);
+    console.log(`[Pipeline] Đã xóa ${result.deleted}/${publicIds.length} ảnh, lỗi: ${result.failed}`);
+    // Không throw — lỗi xóa không được chặn luồng generate
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// BƯỚC 6 — Tạo ảnh từ Pollinations AI
+// ═════════════════════════════════════════════════════════════════════════════
+function fetchImageAsBase64(url) {
+    return new Promise((resolve, reject) => {
+        const protocol = url.startsWith('https') ? https : http;
+
+        const req = protocol.get(url, { timeout: IMAGE_TIMEOUT_MS }, (res) => {
+            // Theo redirect
+            if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+                fetchImageAsBase64(res.headers.location).then(resolve).catch(reject);
+                return;
+            }
+            if (res.statusCode !== 200) {
+                reject(new Error(`Pollinations HTTP ${res.statusCode}`));
+                return;
+            }
+            const chunks = [];
+            res.on('data', c  => chunks.push(c));
+            res.on('end',  () => resolve(Buffer.concat(chunks).toString('base64')));
+            res.on('error',    reject);
+        });
+
+        req.on('error',   reject);
+        req.on('timeout', () => {
+            req.destroy();
+            reject(new Error(`Pollinations timeout (${IMAGE_TIMEOUT_MS / 1000}s)`));
+        });
+    });
+}
+
+async function generateOneImage(prompt, retryCount = 0) {
+    const seed    = Math.floor(Math.random() * 999999);
+    const encoded = encodeURIComponent(prompt);
+    const url     = `https://image.pollinations.ai/prompt/${encoded}?width=768&height=768&model=flux&seed=${seed}&nologo=true`;
+
+    try {
+        console.log(`[Pipeline] Pollinations gọi lần ${retryCount + 1}, seed=${seed}`);
+        const base64 = await fetchImageAsBase64(url);
+        console.log(`[Pipeline] ✅ Ảnh nhận được, size=${base64.length} chars`);
+        return { success: true, base64, mimeType: 'image/jpeg' };
+    } catch (err) {
+        const is429 = err.message?.includes('429');
+        if (retryCount < MAX_RETRIES) {
+            // Chờ lâu hơn nếu bị rate limit
+            const waitMs = is429 ? 6000 : 2000 * (retryCount + 1);
+            console.warn(`[Pipeline] Retry ${retryCount + 1}/${MAX_RETRIES} (wait ${waitMs}ms): ${err.message}`);
+            await new Promise(r => setTimeout(r, waitMs));
+            return generateOneImage(prompt, retryCount + 1);
+        }
+        console.error(`[Pipeline] ❌ Ảnh thất bại sau ${MAX_RETRIES} lần retry: ${err.message}`);
+        return { success: false, error: err.message };
+    }
+}
+
+async function generateVariations(prompt, count = 2) {
+    const results = [];
+    for (let i = 0; i < count; i++) {
+        if (i > 0) {
+            // Delay giữa các lần gọi để tránh rate limit
+            await new Promise(r => setTimeout(r, VARIATION_DELAY));
+        }
+        const result = await generateOneImage(prompt);
+        results.push(result);
+    }
+    return results;
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// BƯỚC 7 — Upload lên Cloudinary
+// ═════════════════════════════════════════════════════════════════════════════
+async function uploadVariationsToCloudinary(variations) {
+    const uploaded = [];
+    for (const v of variations) {
+        if (!v.success || !v.base64) continue;
+        try {
+            const result = await uploadBase64Image(v.base64, 'hydrangea-generated', v.mimeType);
+            uploaded.push({ url: result.url, public_id: result.public_id });
+            console.log(`[Pipeline] ✅ Upload Cloudinary OK: ${result.url.substring(0, 60)}...`);
+        } catch (err) {
+            console.error('[Pipeline] ❌ Upload Cloudinary thất bại:', err.message);
+            // Bỏ qua ảnh lỗi, tiếp tục
+        }
+    }
+    return uploaded;
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// BƯỚC 8 — Lọc kết quả
+// ═════════════════════════════════════════════════════════════════════════════
+function filterResults(uploadedImages) {
+    const valid = uploadedImages.filter(img => img?.url && img?.public_id);
+    if (valid.length === 0) {
+        throw new Error('Không thể tạo ảnh lúc này. Vui lòng thử lại sau!');
+    }
+    return valid;
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// HÀM XUẤT CHÍNH
+// ═════════════════════════════════════════════════════════════════════════════
+
+/**
+ * generateBouquetImages
+ *
+ * Pipeline đầy đủ 8 bước. Timeout toàn cục 25 giây.
+ *
+ * @param {object} entities       - Thực thể từ AI (flower_types, colors, category, ...)
+ * @param {object} selectedItems  - Items người dùng đã chọn (basket, main_flowers, ...)
+ * @param {string} [customPrompt] - Prompt tùy chỉnh của người dùng (nếu dùng refine)
+ * @returns {{ success, images, prompt_used, metadata }}
+ */
+async function generateBouquetImages(entities, selectedItems, customPrompt = null) {
+    const pipeline = async () => {
+        // Bước 1: Validate
+        validateInput(entities, selectedItems);
+
+        // Bước 2: Detect loại bó hoa
+        const bouquetType = detectBouquetType(entities, selectedItems);
+
+        // Bước 3: Build prompt
+        const { rawPrompt, metadata } = buildStructuredPrompt(bouquetType, entities, selectedItems);
+
+        // Nếu user override prompt (refine flow)
+        const promptToEnhance = customPrompt?.trim() ? customPrompt.trim() : rawPrompt;
+
+        // Bước 4: Gemini enhance
+        const enhancedPrompt = await callGeminiForEnhancement(promptToEnhance);
+
+        // Bước 6: Generate 2 ảnh (bước 5 — deletePreviousImages — chạy ở controller)
+        const variations = await generateVariations(enhancedPrompt, 2);
+
+        // Bước 7: Upload Cloudinary
+        const uploaded = await uploadVariationsToCloudinary(variations);
+
+        // Bước 8: Filter
+        const images = filterResults(uploaded);
+
+        return {
+            success:     true,
+            images,                        // [{ url, public_id }, ...]
+            prompt_used: enhancedPrompt,
+            metadata,                      // { type, flowers, colors }
+        };
+    };
+
+    // Timeout toàn cục 90s
+    const globalTimeout = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Pipeline timeout (90s) — vui lòng thử lại!')), GLOBAL_TIMEOUT_MS)
+    );
+
+    try {
+        return await Promise.race([pipeline(), globalTimeout]);
+    } catch (err) {
+        console.error('[Pipeline] ❌ Lỗi pipeline:', err.message);
+        return {
+            success: false,
+            error:   err.message || 'Không thể tạo ảnh lúc này. Vui lòng thử lại!',
+        };
+    }
+}
+
+module.exports = {
+    generateBouquetImages,
+    deletePreviousImages,
+    detectBouquetType,
+    buildStructuredPrompt,
+    BOUQUET_TYPES,
+};

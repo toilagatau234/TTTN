@@ -10,7 +10,7 @@ const axios = require('axios');
 const Product = require('../../models/Product');
 const CustomBouquetOrder = require('../../models/CustomBouquetOrder');
 const { normalizeString } = require('../../utils/normalizer');
-const { generateBouquetImage } = require('./gemini.image.service');
+// generateBouquetImage được gọi qua aiImagePipeline.service.js — không import trực tiếp ở đây
 
 const AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://localhost:8000';
 const SESSION_TTL_MS = 30 * 60 * 1000;
@@ -60,7 +60,11 @@ class HydrangeaService {
             intent: null,
             history: [],
             missingDataAsked: new Set(),
-            lastActivity: Date.now()
+            lastActivity: Date.now(),
+            // — Trạng thái tạo ảnh mới (Cloudinary) —
+            generatedImages: [],    // [{ url, public_id }]
+            promptUsed:      null,
+            imageMetadata:   null,  // { type, flowers, colors }
         };
     }
 
@@ -378,57 +382,86 @@ class HydrangeaService {
         const inStock = filteredProducts.filter(p => p.stock > 0);
         const outOfStock = filteredProducts.filter(p => p.stock === 0);
 
-        // Score function — không lọc theo targetType (đã filter ở trước)
+        // Score function
         const score = (product) => {
             let s = 0;
+            const pNameN = norm(product.name);
+            const pColorN = norm(product.dominant_color || '');
+            const pColorsAll = [pColorN, ...(product.secondary_colors || []).map(c => norm(c))];
 
-            // Tùy chỉnh điểm cho Giấy gói (wrapper)
+            // === WRAPPER: ưu tiên màu sắc dominant_color, sau đó mới tên ===
             if (product.product_type === 'wrapper' && e.wrapper) {
                 const wN = norm(e.wrapper);
-                if (norm(product.name).includes(wN) || wN.includes(norm(product.name))) s += 50;
-                if (norm(product.dominant_color).includes(wN)) s += 30;
+                // Nếu entity wrapper là màu sắc → match dominant_color trước (điểm cao)
+                if (pColorsAll.some(c => c.includes(wN) || wN.includes(c))) s += 60;
+                // Match tên sản phẩm (ít ưu tiên hơn)
+                if (pNameN.includes(wN)) s += 20;
             }
 
-            // Tùy chỉnh điểm cho Ruy băng (ribbon)
+            // === RIBBON: ưu tiên màu sắc dominant_color ===
             if (product.product_type === 'ribbon' && e.ribbon) {
                 const rN = norm(e.ribbon);
-                if (norm(product.name).includes(rN) || rN.includes(norm(product.name))) s += 50;
-                if (norm(product.dominant_color).includes(rN)) s += 30;
+                if (pColorsAll.some(c => c.includes(rN) || rN.includes(c))) s += 60;
+                if (pNameN.includes(rN)) s += 20;
             }
 
-            // Tùy chỉnh điểm cho Giỏ/Lẵng (category/basket)
-            if (product.product_type === 'basket' && e.category) {
-                const cN = norm(e.category);
-                if (norm(product.name).includes(cN) || cN.includes(norm(product.name))) s += 50;
-            }
-
-            // Phụ kiện (accessories)
-            if (product.product_type === 'accessory' && e.accessories?.length > 0) {
-                e.accessories.forEach(acc => {
-                    const aN = norm(acc);
-                    if (norm(product.name).includes(aN) || aN.includes(norm(product.name))) s += 50;
+            // === WRAPPER/RIBBON: match màu chung từ entities.colors (fallback) ===
+            if (product.product_type === 'wrapper' || product.product_type === 'ribbon') {
+                e.colors?.forEach(c => {
+                    const cN = norm(c);
+                    if (pColorsAll.some(pc => pc.includes(cN) || cN.includes(pc))) s += 10;
                 });
             }
 
-            // Flower match
-            e.flower_types?.forEach(ft => {
-                const ftN = norm(ft);
-                if (product.main_flowers?.some(f => norm(f).includes(ftN) || ftN.includes(norm(f)))) s += 30;
-                if (product.sub_flowers?.some(f => norm(f).includes(ftN) || ftN.includes(norm(f)))) s += 15;
-                if (norm(product.name).includes(ftN)) s += 20;
-            });
+            // === BASKET ===
+            if (product.product_type === 'basket' && e.category) {
+                const cN = norm(e.category);
+                if (pNameN.includes(cN) || cN.includes(pNameN)) s += 50;
+            }
 
-            // Color match
-            e.colors?.forEach(c => {
-                const cN = norm(c);
-                if (norm(product.dominant_color || '').includes(cN) || cN.includes(norm(product.dominant_color || ''))) s += 20;
-                if (product.secondary_colors?.some(sc => norm(sc).includes(cN))) s += 10;
-            });
+            // === ACCESSORIES ===
+            if (product.product_type === 'accessory' && e.accessories?.length > 0) {
+                e.accessories.forEach(acc => {
+                    const aN = norm(acc);
+                    if (pNameN.includes(aN) || aN.includes(pNameN)) s += 50;
+                });
+            }
 
-            // Occasion match
+            // === HOA CHÍNH (flower_component / main_flower) ===
+            // PHẢI match flower_type trước, rồi mới tính màu
+            if (product.product_type === 'flower_component') {
+                let flowerTypeMatched = false;
+
+                e.flower_types?.forEach(ft => {
+                    const ftN = norm(ft);
+                    // Match tên loại hoa trong product.main_flowers[], sub_flowers[], tên sản phẩm
+                    const nameMatch    = pNameN.includes(ftN);
+                    const mainMatch    = product.main_flowers?.some(f => norm(f).includes(ftN) || ftN.includes(norm(f)));
+                    const subMatch     = product.sub_flowers?.some(f => norm(f).includes(ftN) || ftN.includes(norm(f)));
+
+                    if (mainMatch) { s += 80; flowerTypeMatched = true; }  // Match loại hoa chính → điểm rất cao
+                    if (subMatch)  { s += 40; flowerTypeMatched = true; }
+                    if (nameMatch) { s += 50; flowerTypeMatched = true; }
+                });
+
+                // Màu sắc chỉ cộng điểm nếu loại hoa đã match, hoặc không có flower_type entity
+                const colorWeight = (flowerTypeMatched || !e.flower_types?.length) ? 20 : 2;
+                e.colors?.forEach(c => {
+                    const cN = norm(c);
+                    if (pColorsAll.some(pc => pc.includes(cN) || cN.includes(pc))) s += colorWeight;
+                });
+            } else {
+                // Các loại sản phẩm khác: color match bình thường
+                e.colors?.forEach(c => {
+                    const cN = norm(c);
+                    if (pColorsAll.some(pc => pc.includes(cN) || cN.includes(pc))) s += 15;
+                });
+            }
+
+            // Occasion
             if (e.occasion && product.occasion?.some(o => norm(o).includes(norm(e.occasion)) || norm(e.occasion).includes(norm(o)))) s += 25;
 
-            // Style match
+            // Style
             if (e.style && product.style?.some(st => norm(st).includes(norm(e.style)))) s += 15;
 
             // Popularity boost
@@ -552,23 +585,25 @@ class HydrangeaService {
             complete_bouquets: completeBouquets.slice(0, 6), // fallback
         };
 
-        // Tôn trọng yêu cầu của người dùng: Không tự động fallback nếu sản phẩm bị thiếu
+        // ── Auto-select items tốt nhất cho session ───────────────────────
+        // HOA CHÍNH: CHỈ chọn nếu score >= 50 (có match đúng loại hoa)
         const mainAutoFilled = e.flower_types?.length > 0
-            ? mainFlowers.filter(f => f._score >= 20).slice(0, 2)
+            ? mainFlowers.filter(f => f._score >= 50).slice(0, 2)
             : mainFlowers.slice(0, 2);
 
-        // Auto-select items tốt nhất cho session
         session.selectedItems = {
             basket: baskets[0] || null,
-            wrapper: wrappers[0] || null,
-            ribbon: ribbons[0] || null,
+            // Wrapper: nếu entity.wrapper tồn tại → chọn lại theo score mới (màu đúng)
+            wrapper: e.wrapper ? (wrappers[0] || null) : (session.selectedItems.wrapper || wrappers[0] || null),
+            // Ribbon: tương tự
+            ribbon:  e.ribbon  ? (ribbons[0]  || null) : (session.selectedItems.ribbon  || ribbons[0]  || null),
             main_flowers: session.selectedItems.main_flowers?.length ? session.selectedItems.main_flowers : mainAutoFilled,
-            sub_flowers: session.selectedItems.sub_flowers?.length ? session.selectedItems.sub_flowers : subFlowers.slice(0, 1),
-            // Không bao giờ tự động chèn phụ kiện (Gấu bông) nếu khách không yêu cầu!
-            accessories: session.selectedItems.accessories?.length ? session.selectedItems.accessories : (e.accessories?.length ? accessories.slice(0, 1) : []),
+            sub_flowers:  session.selectedItems.sub_flowers?.length  ? session.selectedItems.sub_flowers  : subFlowers.slice(0, 1),
+            // Không tự động thêm phụ kiện nếu user không yêu cầu
+            accessories:  session.selectedItems.accessories?.length  ? session.selectedItems.accessories  : (e.accessories?.length ? accessories.slice(0, 1) : []),
         };
 
-        // Nếu HOA CHÍNH hoàn toàn không có trong kho, đảm bảo không nhét bừa hoa khác vào
+        // Nếu HOA CHÍNH hoàn toàn không có trong kho → không nhét bừa loại hoa khác
         if (missingFlowersFromDB.length > 0) {
             session.selectedItems.main_flowers = [];
         }
@@ -650,8 +685,8 @@ class HydrangeaService {
         };
     }
 
-    // ── Tạo CustomBouquetOrder ───────────────────────────────────────────────
-    async createOrder(sessionId, userId, userDescription, note = '') {
+    // ── Tạo CustomBouquetOrder (v2 — Cloudinary URL, không lưu base64) ────────
+    async createOrder(sessionId, userId, userDescription, note = '', selectedImage = null, promptUsed = null, imageMetadata = null) {
         const session = this.getSession(sessionId);
 
         const mapItem = (p) => p ? {
@@ -667,21 +702,19 @@ class HydrangeaService {
             entities: session.entities,
             userDescription,
             selectedItems: {
-                basket: mapItem(session.selectedItems.basket),
-                wrapper: mapItem(session.selectedItems.wrapper),
-                ribbon: mapItem(session.selectedItems.ribbon),
+                basket:       mapItem(session.selectedItems.basket),
+                wrapper:      mapItem(session.selectedItems.wrapper),
+                ribbon:       mapItem(session.selectedItems.ribbon),
                 main_flowers: (session.selectedItems.main_flowers || []).map(f => ({ ...mapItem(f), quantity: 1 })),
-                sub_flowers: (session.selectedItems.sub_flowers || []).map(f => ({ ...mapItem(f), quantity: 1 })),
-                accessories: (session.selectedItems.accessories || []).map(a => ({ ...mapItem(a), quantity: 1 })),
+                sub_flowers:  (session.selectedItems.sub_flowers  || []).map(f => ({ ...mapItem(f), quantity: 1 })),
+                accessories:  (session.selectedItems.accessories  || []).map(a => ({ ...mapItem(a), quantity: 1 })),
             },
-            totalPrice: session.current_bouquet.total_price,
-            generatedImage: session.generatedImage ? {
-                base64: session.generatedImage.base64,
-                generatedAt: session.generatedImage.generatedAt,
-                prompt: session.generatedImage.prompt,
-                model: session.generatedImage.modelUsed,
-            } : undefined,
-            status: 'confirmed',
+            totalPrice:    session.current_bouquet.total_price,
+            // Lưu chỉ ảnh được chọn (Cloudinary URL — không lưu base64)
+            generatedImages: selectedImage ? [{ ...selectedImage, selected: true }] : [],
+            promptUsed:      promptUsed || null,
+            imageMetadata:   imageMetadata || null,
+            status:          'confirmed',
             note,
             chatHistory: session.history.slice(-20),
             confirmedAt: new Date(),
