@@ -147,6 +147,29 @@ exports.restoreSession = async (req, res) => {
     }
 };
 
+// DELETE /api/ai/hydrangea/orders/:id
+// Xóa lịch sử thiết kế
+exports.deleteOrder = async (req, res) => {
+    try {
+        const userId = req.user?._id;
+        const { id } = req.params;
+        if (!userId) return res.status(401).json({ success: false, message: 'Vui lòng đăng nhập' });
+
+        const order = await CustomBouquetOrder.findOneAndDelete({ _id: id, user: userId });
+        if (!order) {
+            return res.status(404).json({ success: false, message: 'Không tìm thấy đơn hàng' });
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: 'Đã xóa lịch sử thiết kế'
+        });
+    } catch (error) {
+        console.error('[DeleteOrder Error]:', error);
+        return res.status(500).json({ success: false, message: error.message });
+    }
+};
+
 // GET /api/ai/hydrangea/check-api
 // Kiểm tra Gemini API key
 exports.checkApi = async (req, res) => {

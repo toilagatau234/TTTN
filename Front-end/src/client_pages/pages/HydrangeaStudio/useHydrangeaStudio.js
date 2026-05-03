@@ -189,12 +189,27 @@ export function useHydrangeaStudio() {
         }
     }, []);
 
+    const deleteHistory = useCallback(async (orderId) => {
+        const token = authService.getToken();
+        if (!token) return;
+        try {
+            const res = await axios.delete(`${API}/ai/hydrangea/orders/${orderId}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            if (res.data.success) {
+                setMyOrders(prev => prev.filter(o => o._id !== orderId));
+            }
+        } catch (err) {
+            console.error("Delete history error", err);
+        }
+    }, []);
+
     return {
         sessionId, messages, inputText, setInputText, isLoading,
         entities, suggestedItems, selectedItems, outOfStockWarnings, totalPrice, status,
         generatedImage, isGenerating, showConfirmModal, setShowConfirmModal,
         myOrders, showOrders, setShowOrders, isSavingOrder, savedOrder,
         chatEndRef, sendMessage, handleSelectItem, handleGenerate, handleConfirmOrder, loadMyOrders,
-        startNewChat, resumeChat
+        startNewChat, resumeChat, deleteHistory
     };
 }

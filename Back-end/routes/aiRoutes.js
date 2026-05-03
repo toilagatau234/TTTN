@@ -14,5 +14,6 @@ router.post('/hydrangea/confirm-order', protect, hydrangeaController.confirmOrde
 router.get('/hydrangea/my-orders', protect, hydrangeaController.getMyOrders);
 router.get('/hydrangea/orders/:id', protect, hydrangeaController.getOrderDetail);
 router.post('/hydrangea/restore-session', protect, hydrangeaController.restoreSession);
+router.delete('/hydrangea/orders/:id', protect, hydrangeaController.deleteOrder);
 
 module.exports = router;

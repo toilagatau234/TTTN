@@ -7,6 +7,7 @@ import { Home, Flower, LayoutGrid, Shapes } from "lucide-react"
 import { message } from "antd"
 import cartService from "../../../../../services/cartService"
 import authService from "../../../../../services/authService"
+import categoryService from "../../../../../services/categoryService"
 
 const Navbar = () => {
   const navigate = useNavigate()
@@ -19,6 +20,7 @@ const Navbar = () => {
   const [searchResults, setSearchResults] = useState([])
   const [showResults, setShowResults] = useState(false)
   const [loadingSearch, setLoadingSearch] = useState(false)
+  const [categories, setCategories] = useState([])
   const searchRef = useRef(null)
 
   // Lấy thông tin tài khoản đang login
@@ -42,6 +44,16 @@ const Navbar = () => {
     const init = async () => {
       if (currentUser) {
         await fetchCartCount();
+      }
+      
+      // Fetch categories
+      try {
+        const res = await categoryService.getAll();
+        if (res.success) {
+          setCategories(res.data);
+        }
+      } catch (error) {
+        console.error("Lỗi lấy danh mục:", error);
       }
     }
     init();
@@ -368,10 +380,18 @@ const Navbar = () => {
             {openMenu === "hoatuoi" && (
               <div className="absolute top-full left-0 mt-2 bg-white shadow-xl rounded-2xl p-4 w-48 border border-pink-100 text-pink-500 transition-all duration-200 opacity-100 translate-y-0 z-50">
                 <div className="absolute -top-4 left-0 w-full h-4 bg-transparent" />
-                <Link to="/" className="block py-2 hover:text-pink-400 hover:translate-x-1 transition-transform">Hoa hồng</Link>
-                <Link to="/" className="block py-2 hover:text-pink-400 hover:translate-x-1 transition-transform">Hoa tulip</Link>
-                <Link to="/" className="block py-2 hover:text-pink-400 hover:translate-x-1 transition-transform">Hoa hướng dương</Link>
-                <Link to="/" className="block py-2 hover:text-pink-400 hover:translate-x-1 transition-transform">Hoa lan</Link>
+                {[
+                  "Hoa hồng", "Hoa tulip", "Hoa hướng dương", "Hoa lan", "Hoa cẩm tú cầu", "Hoa baby"
+                ].map(flower => (
+                  <Link 
+                    key={flower}
+                    to={`/shop?keyword=${encodeURIComponent(flower)}`} 
+                    className="block py-2 hover:text-pink-400 hover:translate-x-1 transition-transform"
+                    onClick={() => setOpenMenu(null)}
+                  >
+                    {flower}
+                  </Link>
+                ))}
               </div>
             )}
           </div>
@@ -383,12 +403,24 @@ const Navbar = () => {
               Chủ đề
             </span>
             {openMenu === "chude" && (
-              <div className="absolute top-full left-0 mt-2 bg-white shadow-xl rounded-2xl p-4 w-48 border border-pink-100 text-pink-500 transition-all duration-200 opacity-100 translate-y-0 z-50">
+              <div className="absolute top-full left-0 mt-2 bg-white shadow-xl rounded-2xl p-4 w-56 border border-pink-100 text-pink-500 transition-all duration-200 opacity-100 translate-y-0 z-50">
                 <div className="absolute -top-4 left-0 w-full h-4 bg-transparent" />
-                <Link to="/" className="block py-2 hover:text-pink-400 hover:translate-x-1 transition-transform">Hoa cưới</Link>
-                <Link to="/" className="block py-2 hover:text-pink-400 hover:translate-x-1 transition-transform">Hoa sinh nhật</Link>
-                <Link to="/" className="block py-2 hover:text-pink-400 hover:translate-x-1 transition-transform">Hoa tốt nghiệp</Link>
-                <Link to="/" className="block py-2 hover:text-pink-400 hover:translate-x-1 transition-transform">Hoa khai trương</Link>
+                {categories.length > 0 ? (
+                  categories
+                    .filter(c => !["Thành phần giỏ hoa", "Giỏ & Lẵng", "Giấy Gói & Vải", "Ruy Băng & Nơ", "Phụ Kiện Trang Trí"].includes(c.name))
+                    .map(cat => (
+                      <Link 
+                        key={cat._id}
+                        to={`/shop?category=${cat._id}`} 
+                        className="block py-2 hover:text-pink-400 hover:translate-x-1 transition-transform"
+                        onClick={() => setOpenMenu(null)}
+                      >
+                        {cat.name}
+                      </Link>
+                    ))
+                ) : (
+                  <p className="py-2 text-xs text-gray-400 italic">Đang tải danh mục...</p>
+                )}
               </div>
             )}
           </div>

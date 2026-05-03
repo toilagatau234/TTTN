@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { Send, Sparkles, ShoppingCart, Star, RefreshCw, ImageIcon, Flower2, Package, AlertCircle, CheckCircle, Clock, ChevronDown } from 'lucide-react';
+import { Send, Sparkles, ShoppingCart, Star, RefreshCw, ImageIcon, Flower2, Package, AlertCircle, CheckCircle, Clock, ChevronDown, Trash2 } from 'lucide-react';
 import { useHydrangeaStudio } from './useHydrangeaStudio';
 
 const fmt = p => new Intl.NumberFormat('vi-VN').format(p) + 'đ';
@@ -122,7 +122,7 @@ export default function HydrangeaStudio() {
         generatedImage, isGenerating,
         myOrders, showOrders, setShowOrders, isSavingOrder, savedOrder,
         sendMessage, handleGenerate, handleConfirmOrder, loadMyOrders,
-        startNewChat, resumeChat
+        startNewChat, resumeChat, deleteHistory
     } = useHydrangeaStudio();
 
     useEffect(() => {
@@ -321,7 +321,20 @@ export default function HydrangeaStudio() {
                                                 <p className="text-[10px] text-gray-400 truncate">{o.entities?.flower_types?.join(', ') || 'Giỏ hoa'}</p>
                                             </div>
                                             <div className="text-right flex flex-col items-end gap-1">
-                                                <p className="text-xs font-bold text-pink-600">{fmt(o.totalPrice)}</p>
+                                                <div className="flex items-center gap-2">
+                                                    <p className="text-xs font-bold text-pink-600">{fmt(o.totalPrice)}</p>
+                                                    <button 
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            if (window.confirm("Bạn có chắc chắn muốn xóa lịch sử này?")) {
+                                                                deleteHistory(o._id);
+                                                            }
+                                                        }}
+                                                        className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                                    >
+                                                        <Trash2 size={12} />
+                                                    </button>
+                                                </div>
                                                 <span className="text-[9px] px-2 py-0.5 rounded-full font-bold bg-pink-100 text-pink-600 hover:bg-pink-200">
                                                     Tiếp tục
                                                 </span>
