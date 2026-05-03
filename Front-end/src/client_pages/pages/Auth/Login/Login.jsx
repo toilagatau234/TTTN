@@ -37,11 +37,13 @@ const Login = () => {
         authService.saveUser(res.data)
         message.success("Đăng nhập thành công!")
 
-        // Redirect dựa trên role
+        // Redirect dựa trên role hoặc về trang trước đó
+        const from = location.state?.from?.pathname || "/";
+        
         if (["Admin", "Manager", "Staff"].includes(res.data.role)) {
           navigate("/admin")
         } else {
-          navigate("/")
+          navigate(from, { replace: true })
         }
       }
     } catch (error) {

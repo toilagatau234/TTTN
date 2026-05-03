@@ -76,8 +76,10 @@ class HydrangeaService {
     }
 
     // ── Entity merge ─────────────────────────────────────────────────────────
-    mergeEntities(sessionEntities, newEntities) {
+    mergeEntities(session, newEntities) {
         if (!newEntities) return;
+        const sessionEntities = session.entities;
+
         ['occasion', 'style', 'target', 'category', 'wrapper', 'ribbon'].forEach(k => {
             if (newEntities[k]) sessionEntities[k] = newEntities[k];
         });
@@ -92,12 +94,20 @@ class HydrangeaService {
             ...(newEntities.flower_type ? [newEntities.flower_type] : [])
         ];
         if (newFlowers.length > 0) {
-            sessionEntities.flower_types = Array.from(new Set([...sessionEntities.flower_types, ...newFlowers]));
+            // FIX 1: Ghi đè (replace) thay vì gộp (append)
+            sessionEntities.flower_types = newFlowers;
+            
+            // Xóa lựa chọn hoa hiện tại để hệ thống tự động tìm hoa mới
+            if (session.selectedItems) {
+                session.selectedItems.main_flowers = [];
+                session.selectedItems.sub_flowers = [];
+            }
         }
 
         const newColors = [...(newEntities.colors || []), ...(newEntities.color ? [newEntities.color] : [])];
         if (newColors.length > 0) {
-            sessionEntities.colors = Array.from(new Set([...sessionEntities.colors, ...newColors]));
+            // FIX 1: Ghi đè màu
+            sessionEntities.colors = newColors;
             sessionEntities.color = sessionEntities.colors[0] || null;
         }
 
@@ -167,11 +177,29 @@ class HydrangeaService {
                 if (op.op === 'replace' && op.from && op.to) {
                     const idx = sessionEntities.flower_types.findIndex(f =>
                         norm(f).includes(norm(op.from)) || norm(op.from).includes(norm(f)));
-                    if (idx >= 0) { sessionEntities.flower_types[idx] = norm(op.to); changed = true; }
+                    if (idx >= 0) { 
+                        sessionEntities.flower_types[idx] = norm(op.to); 
+                        changed = true; 
+                        
+                        // Remove the old flower from selected items
+                        if (session.selectedItems) {
+                            session.selectedItems.main_flowers = session.selectedItems.main_flowers.filter(f => 
+                                !norm(f.name).includes(norm(op.from)) && !norm(op.from).includes(norm(f.name))
+                            );
+                            session.selectedItems.sub_flowers = session.selectedItems.sub_flowers.filter(f => 
+                                !norm(f.name).includes(norm(op.from)) && !norm(op.from).includes(norm(f.name))
+                            );
+                        }
+                    }
                 } else if (op.op === 'replace_all' && op.to) {
                     const toNorm = norm(op.to);
                     sessionEntities.flower_types = [toNorm];
                     changed = true;
+                    // Clear all flowers to pick new ones
+                    if (session.selectedItems) {
+                        session.selectedItems.main_flowers = [];
+                        session.selectedItems.sub_flowers = [];
+                    }
                 } else if (op.op === 'remove' && op.from) {
             if (!sessionEntities.removed_items) sessionEntities.removed_items = [];
             sessionEntities.removed_items.push(op.from);
@@ -180,6 +208,21 @@ class HydrangeaService {
                     sessionEntities.flower_types = sessionEntities.flower_types.filter(f =>
                         !norm(f).includes(norm(op.from)) && !norm(op.from).includes(norm(f)));
                     if (sessionEntities.flower_types.length !== before) changed = true;
+                    
+                    // FIX 2: Remove directly from selectedItems to make the item empty
+                    if (session.selectedItems) {
+                        const mBefore = session.selectedItems.main_flowers.length;
+                        session.selectedItems.main_flowers = session.selectedItems.main_flowers.filter(f => 
+                            !norm(f.name).includes(norm(op.from)) && !norm(op.from).includes(norm(f.name))
+                        );
+                        const sBefore = session.selectedItems.sub_flowers.length;
+                        session.selectedItems.sub_flowers = session.selectedItems.sub_flowers.filter(f => 
+                            !norm(f.name).includes(norm(op.from)) && !norm(op.from).includes(norm(f.name))
+                        );
+                        if (session.selectedItems.main_flowers.length !== mBefore || session.selectedItems.sub_flowers.length !== sBefore) {
+                            changed = true;
+                        }
+                    }
                 } else if (op.op === 'add' && op.to) {
                     const toNorm = norm(op.to);
                     if (!sessionEntities.flower_types.includes(toNorm)) {
@@ -228,7 +271,7 @@ class HydrangeaService {
         const session = this.getSession(sessionId);
 
         if (incomingEntities && Object.keys(incomingEntities).length > 0) {
-            this.mergeEntities(session.entities, incomingEntities);
+            this.mergeEntities(session, incomingEntities);
         }
         if (isConfirming) return this._handleConfirm(session, sessionId);
         if (!message?.trim()) return this._handleSuggest(session);
@@ -258,7 +301,7 @@ class HydrangeaService {
         }
 
         const aiEntities = aiResult?.entities || {};
-        this.mergeEntities(session.entities, aiEntities);
+        this.mergeEntities(session, aiEntities);
 
         // Map category/wrapper (bổ sung cho normalizer)
         if (aiEntities.category) session.entities.category = aiEntities.category;
@@ -395,10 +438,29 @@ class HydrangeaService {
         };
 
         // Chọn basket tốt nhất
-        const baskets = inStock
+        let baskets = inStock
             .filter(p => p.product_type === 'basket')
             .map(p => ({ ...p, _score: score(p) }))
             .sort((a, b) => b._score - a._score);
+            
+        // FIX 3: Cắt cứng logic category cho basket (đảm bảo bó hoa không có giỏ)
+        if (e.category) {
+            const catNorm = norm(e.category);
+            if (catNorm.includes('bó')) {
+                baskets = []; // Bó hoa thì không dùng giỏ
+            } else if (catNorm.includes('giỏ') || catNorm.includes('lẵng') || catNorm.includes('hộp') || catNorm.includes('kệ')) {
+                // Chỉ giữ lại những basket có keyword tương ứng trong tên
+                // VD: Hộp hoa thì tên basket phải có chữ 'hộp'
+                baskets = baskets.filter(p => {
+                    const pNameNorm = norm(p.name);
+                    const keyword = catNorm.includes('giỏ') ? 'giỏ' : 
+                                    catNorm.includes('lẵng') ? 'lẵng' : 
+                                    catNorm.includes('hộp') ? 'hộp' : 
+                                    catNorm.includes('kệ') ? 'kệ' : null;
+                    return keyword ? pNameNorm.includes(keyword) : true;
+                });
+            }
+        }
 
         // Chọn wrapper
         const wrappers = inStock

@@ -14,6 +14,7 @@ const ProductCard = ({ product }) => {
   const handleAddToCart = async () => {
     if (!authService.isLoggedIn()) {
       message.warning({ content: "Vui lòng đăng nhập để mua hàng", key: "cart_auth" });
+      navigate("/login", { state: { from: window.location } });
       return;
     }
     try {
@@ -31,6 +32,7 @@ const ProductCard = ({ product }) => {
   const handleBuyNow = async () => {
     if (!authService.isLoggedIn()) {
       message.warning({ content: "Vui lòng đăng nhập để mua hàng", key: "cart_auth" });
+      navigate("/login", { state: { from: window.location } });
       return;
     }
     // Chờ thêm vào giỏ xong rồi chuyển trang
@@ -55,6 +57,7 @@ const ProductCard = ({ product }) => {
   const toggleWishlist = async () => {
     if (!authService.isLoggedIn()) {
       message.warning({ content: "Vui lòng đăng nhập để lưu sản phẩm", key: "wishlist_auth" });
+      navigate("/login", { state: { from: window.location } });
       return;
     }
     if (loadingWishlist) return;

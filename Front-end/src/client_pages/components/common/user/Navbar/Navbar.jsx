@@ -40,7 +40,9 @@ const Navbar = () => {
 
   useEffect(() => {
     const init = async () => {
-      await fetchCartCount();
+      if (currentUser) {
+        await fetchCartCount();
+      }
     }
     init();
 

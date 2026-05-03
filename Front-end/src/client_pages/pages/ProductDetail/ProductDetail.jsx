@@ -107,8 +107,8 @@ const ProductDetail = () => {
 
   const handleAddToCart = async () => {
     if (!authService.isLoggedIn()) {
-      message.warning("Vui lòng đăng nhập để mổ hàng");
-      navigate("/login");
+      message.warning("Vui lòng đăng nhập để mua hàng");
+      navigate("/login", { state: { from: window.location } });
       return;
     }
 
@@ -131,6 +131,7 @@ const ProductDetail = () => {
   const handleToggleWishlist = async () => {
     if (!authService.isLoggedIn()) {
       message.warning({ content: "Vui lòng đăng nhập để lưu sản phẩm", key: "wishlist" });
+      navigate("/login", { state: { from: window.location } });
       return;
     }
     if (togglingWishlist) return;

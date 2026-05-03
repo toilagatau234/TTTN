@@ -18,12 +18,14 @@ import Profile from './client_pages/pages/Profile/Profile';
 import Shop from './client_pages/pages/Shop/Shop';
 import Wishlist from './client_pages/pages/Wishlist/Wishlist';
 import Auth from './client_pages/pages/Auth/Auth';
+
 import Login from './client_pages/pages/Auth/Login/Login';
 import Register from './client_pages/pages/Auth/Register/Register';
 import AccountLocked from './client_pages/pages/Auth/AccountLocked/AccountLocked';
 import ForgotPassword from './client_pages/pages/Auth/ForgotPassword/ForgotPassword';
 import Error from './client_pages/pages/Error/Error';
 import BlogDetail from './client_pages/pages/Blog/BlogDetail';
+import AuthCheck from './client_pages/components/common/user/AuthCheck/AuthCheck';
 
 function App() {
   return (
@@ -37,16 +39,16 @@ function App() {
         {/* Tất cả user routes liệt kê CỤ THỂ bên trong UserLayout */}
         <Route element={<UserLayout />}>
           <Route index element={<Home />} />
-          <Route path="cart" element={<Cart />} />
-          <Route path="checkout" element={<Checkout />} />
-          <Route path="checkout/vnpay-return" element={<VnpayReturn />} />
-          <Route path="customDesign" element={<HydrangeaStudio />} />
+          <Route path="cart" element={<AuthCheck><Cart /></AuthCheck>} />
+          <Route path="checkout" element={<AuthCheck><Checkout /></AuthCheck>} />
+          <Route path="checkout/vnpay-return" element={<AuthCheck><VnpayReturn /></AuthCheck>} />
+          <Route path="customDesign" element={<AuthCheck><HydrangeaStudio /></AuthCheck>} />
           <Route path="miniGame" element={<MiniGame />} />
           <Route path="product/:id" element={<ProductDetail />} />
           <Route path="blog/:slug" element={<BlogDetail />} />
-          <Route path="profile" element={<Profile />} />
+          <Route path="profile" element={<AuthCheck><Profile /></AuthCheck>} />
           <Route path="shop" element={<Shop />} />
-          <Route path="wishlist" element={<Wishlist />} />
+          <Route path="wishlist" element={<AuthCheck><Wishlist /></AuthCheck>} />
           <Route path="auth" element={<Auth />} />
           <Route path="login" element={<Login />} />
           <Route path="register" element={<Register />} />
