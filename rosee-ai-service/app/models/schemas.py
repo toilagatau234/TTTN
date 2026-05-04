@@ -63,41 +63,47 @@ class ModifyOp(BaseModel):
 class StructuredFlower(BaseModel):
     type: str
     color: Optional[str] = None
-    quantity: Optional[int] = None
+    quantity: int = 1
 
-# ── Analyze Entities (Chuẩn v3) ───────────────────────────────────────────────
+# ── Structured Accessory ─────────────────────────────────────────────────────
+class StructuredAccessory(BaseModel):
+    type: str
+    color: Optional[str] = None
+
+# ── Analyze Entities (Chuẩn v4) ───────────────────────────────────────────────
 class AnalyzeEntities(BaseModel):
     """
-    Chuẩn output format:
+    Chuẩn output format v4:
     {
-      flower_types: [],      # Tất cả loài hoa
-      colors: [],            # Tất cả màu sắc
+      flowers: [ {type, color, quantity} ],
+      accessories: [ {type, color} ],
+      category: "",
       occasion: "",
-      target: "",            # Người nhận
-      budget: number,        # VND đã normalize
+      target: "",
       style: "",
-      role_hint: {}          # { "rose": "main", "orchid": "secondary" }
-      modify_ops: []         # Chỉ có khi intent==MODIFY
+      budget: number
     }
     """
-    # Backward-compat fields
-    color: Optional[str] = None
-    flowers: List[str] = []
-
-    # New v3 fields
-    flower_types: List[str] = []
-    colors: List[str] = []
-    structured_flowers: List[StructuredFlower] = []
+    # New v4 fields
+    flowers: List[StructuredFlower] = []
+    accessories: List[StructuredAccessory] = []
+    category: Optional[str] = None
+    
+    # Common fields
     occasion: Optional[str] = None
     style: Optional[str] = None
     layout: Optional[str] = None
-    category: Optional[str] = None
     wrapper: Optional[str] = None
     price_hint: Optional[str] = None
     budget: Optional[int] = None
     target: Optional[str] = None
-    role_hint: Dict[str, str] = {}      # { flower_name: "main"|"secondary" }
-    modify_ops: List[Dict] = []         # [{ op, from, to }]
+    
+    # Backward compatibility (optional, keeping some for safety)
+    flower_types: List[str] = []
+    colors: List[str] = []
+    structured_flowers: List[StructuredFlower] = []
+    role_hint: Dict[str, str] = {}
+    modify_ops: List[Dict] = []
 
 
 class AnalyzeResponse(BaseModel):

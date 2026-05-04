@@ -10,7 +10,7 @@ from app.models.ml_models import ml_models
 from ai.intent.intent_service import classify_intent
 from ai.entity.ner_service import extract_entities
 from ai.entity.entity_processor import analyze_entities, process_entities
-from app.models.schemas import AnalyzeResponse, ProcessedResponse, RawOutput
+from app.models.schemas import AnalyzeResponse, ProcessedResponse, RawOutput, AnalyzeEntities
 
 logger = logging.getLogger("rosee.ai.pipeline")
 

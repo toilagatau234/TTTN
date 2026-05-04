@@ -171,11 +171,15 @@ export function useHydrangeaStudio() {
         setGenerateError(null);
 
         try {
+            const token = authService.getToken();
             const res = await axios.post(`${API}/ai/hydrangea/confirm-image-upload`, {
                 sessionId,
                 generationId,
                 imageBase64: previewBase64
-            }, { timeout: 30000 });
+            }, { 
+                timeout: 30000,
+                headers: token ? { Authorization: `Bearer ${token}` } : {}
+            });
 
             const d = res.data;
             if (d.success && d.cloudinaryUrl) {

@@ -200,21 +200,40 @@ export default function HydrangeaStudio() {
                         {/* Entity chips */}
                         {hasEntities && (
                             <div className="px-3 py-2.5 bg-gray-50 border-b border-gray-100">
-                                <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-[11px]">
-                                    <div className="flex gap-1 items-start truncate">
-                                        <span className="font-bold text-gray-500">Hoa:</span>
-                                        <span className="text-gray-800 truncate">{entities.flower_types?.length > 0 ? entities.flower_types.join(', ') : 'Không'}</span>
-                                    </div>
-                                    <div className="flex gap-1 items-start truncate">
-                                        <span className="font-bold text-gray-500">Màu:</span>
-                                        <span className="text-gray-800 truncate">{entities.colors?.length > 0 ? entities.colors.join(', ') : 'Không'}</span>
-                                    </div>
-                                    {detectedType && (
-                                        <div className="flex gap-1 items-start truncate col-span-2">
-                                            <span className="font-bold text-gray-500">Loại:</span>
-                                            <span className="text-pink-600 font-bold truncate">{BOUQUET_TYPE_LABELS[detectedType] || detectedType}</span>
+                                <div className="space-y-1.5 text-[11px]">
+                                    {/* Flowers Grouped */}
+                                    {entities.flowers?.length > 0 && (
+                                        <div className="flex gap-1 items-start">
+                                            <span className="font-bold text-gray-500 flex-shrink-0">Thành phần:</span>
+                                            <span className="text-gray-800 truncate">
+                                                {entities.flowers.map(f => `${f.type}${f.color ? ' ' + f.color : ''}${f.quantity > 1 ? ' x' + f.quantity : ''}`).join(', ')}
+                                            </span>
                                         </div>
                                     )}
+                                    {/* Accessories */}
+                                    {entities.accessories?.length > 0 && (
+                                        <div className="flex gap-1 items-start">
+                                            <span className="font-bold text-gray-500 flex-shrink-0">Phụ kiện:</span>
+                                            <span className="text-gray-800 truncate">
+                                                {entities.accessories.map(a => `${a.type}${a.color ? ' (' + a.color + ')' : ''}`).join(', ')}
+                                            </span>
+                                        </div>
+                                    )}
+                                    {/* Category & Details */}
+                                    <div className="grid grid-cols-2 gap-2 mt-0.5">
+                                        {detectedType && (
+                                            <div className="flex gap-1 items-center">
+                                                <span className="font-bold text-gray-500">Loại:</span>
+                                                <span className="text-pink-600 font-bold">{BOUQUET_TYPE_LABELS[detectedType] || detectedType}</span>
+                                            </div>
+                                        )}
+                                        {entities.occasion && (
+                                            <div className="flex gap-1 items-center">
+                                                <span className="font-bold text-gray-500">Dịp:</span>
+                                                <span className="text-gray-800">{entities.occasion}</span>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         )}

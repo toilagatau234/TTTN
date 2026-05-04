@@ -16,7 +16,7 @@ import logging
 import re
 from typing import Optional, List, Dict
 
-from app.models.schemas import ProcessedData, AnalyzeEntities, AnalyzeResponse, StructuredFlower
+from app.models.schemas import ProcessedData, AnalyzeEntities, AnalyzeResponse, StructuredFlower, StructuredAccessory
 from app.utils.normalizer import (
     normalize_flower, normalize_color, normalize_category,
     normalize_wrapper, normalize_occasion, normalize_style,
@@ -104,6 +104,109 @@ def detect_modify_ops(text: str) -> List[Dict]:
     return ops
 
 
+def extract_accessories(text: str) -> List[Dict]:
+    """
+    Deprecated. Use group_entities_with_proximity instead.
+    """
+    pass
+
+def group_entities_with_proximity(text: str, raw_ner: dict):
+    from app.utils.normalizer import FLOWER_MAP, COLOR_MAP
+    
+    text_lower = text.lower()
+    intervals = []
+    
+    def is_overlap(start, end):
+        return any(s <= start < e or s < end <= e or (start <= s and end >= e) for s, e in intervals)
+        
+    nouns = []
+    
+    # 1. Extract Flowers
+    flower_keys = list(FLOWER_MAP.keys())
+    if "FLOWER" in raw_ner:
+        ner_flowers = [f.strip() for f in raw_ner["FLOWER"].split(",")]
+        for f in ner_flowers:
+            if f and f.lower() not in flower_keys:
+                flower_keys.append(f.lower())
+                
+    flower_keys.sort(key=len, reverse=True)
+    for viet_key in flower_keys:
+        eng_val = FLOWER_MAP.get(viet_key, viet_key)
+        for m in re.finditer(re.escape(viet_key), text_lower):
+            if not is_overlap(m.start(), m.end()):
+                intervals.append((m.start(), m.end()))
+                nouns.append({
+                    "id": len(nouns), "type": "flower", "val": eng_val, "viet": viet_key,
+                    "start": m.start(), "end": m.end(), "color": None
+                })
+
+    # 2. Extract Accessories
+    acc_mapping = {
+        "ruy băng": "ribbon", "nơ": "ribbon", "giấy gói": "wrapping",
+        "lá trang trí": "decoration_leaf", "lá phụ": "decoration_leaf",
+        "thiệp": "card", "gấu bông": "teddy_bear"
+    }
+    for viet_key, eng_val in sorted(acc_mapping.items(), key=lambda x: -len(x[0])):
+        for m in re.finditer(re.escape(viet_key), text_lower):
+            if not is_overlap(m.start(), m.end()):
+                intervals.append((m.start(), m.end()))
+                nouns.append({
+                    "id": len(nouns), "type": "accessory", "val": eng_val, "viet": viet_key,
+                    "start": m.start(), "end": m.end(), "color": None
+                })
+
+    # 3. Extract Colors
+    colors_found = []
+    for viet_key, eng_val in sorted(COLOR_MAP.items(), key=lambda x: -len(x[0])):
+        for m in re.finditer(re.escape(viet_key), text_lower):
+            if not is_overlap(m.start(), m.end()):
+                intervals.append((m.start(), m.end()))
+                colors_found.append({
+                    "val": eng_val, "viet": viet_key,
+                    "start": m.start(), "end": m.end()
+                })
+
+    # 4. Compute Distances and Assign
+    def count_words_between(s1, e1, s2, e2):
+        if e1 <= s2: return len(text_lower[e1:s2].split())
+        elif e2 <= s1: return len(text_lower[e2:s1].split())
+        return 0
+
+    pairs = []
+    for c_idx, c in enumerate(colors_found):
+        for n_idx, n in enumerate(nouns):
+            word_dist = count_words_between(n["start"], n["end"], c["start"], c["end"])
+            if word_dist <= 3:
+                is_after = c["start"] >= n["end"]
+                # Score: word_dist ASC, is_after DESC (0 is better), char_dist ASC
+                score = (word_dist, 0 if is_after else 1, abs(c["start"] - n["start"]))
+                pairs.append({
+                    "c_idx": c_idx, "n_idx": n_idx, "score": score,
+                    "is_after": is_after, "word_dist": word_dist
+                })
+
+    pairs.sort(key=lambda x: x["score"])
+    
+    assigned_colors = set()
+    assigned_nouns = set()
+    
+    for p in pairs:
+        if p["c_idx"] in assigned_colors or p["n_idx"] in assigned_nouns:
+            continue
+        c = colors_found[p["c_idx"]]
+        n = nouns[p["n_idx"]]
+        n["color"] = c["val"]
+        assigned_colors.add(p["c_idx"])
+        assigned_nouns.add(p["n_idx"])
+        logger.info(f"[PROXIMITY] {{\n  noun: \"{n['viet']}\",\n  color: \"{c['viet']}\",\n  distance: {p['word_dist']},\n  direction: \"{'after' if p['is_after'] else 'before'}\"\n}}")
+
+    for c_idx, c in enumerate(colors_found):
+        if c_idx not in assigned_colors:
+            logger.info(f"[PROXIMITY] {{\n  noun: null,\n  color: \"{c['viet']}\",\n  distance: null,\n  direction: null\n}}")
+
+    return nouns
+
+
 # ── Core analyze function ─────────────────────────────────────────────────────
 def analyze_entities(
     raw_ner: dict,
@@ -114,37 +217,26 @@ def analyze_entities(
     ner_scores: dict = {}
 ) -> AnalyzeResponse:
     """
-    Trả về AnalyzeResponse với format chuẩn v3.
-    
-    Key improvements:
-    - scan_all_flowers() — detect nhiều loài hoa
-    - scan_all_colors() — detect nhiều màu
-    - extract_role_hints() — ROLE_MAIN / ROLE_SECONDARY
-    - extract_target() — người nhận
-    - detect_modify_ops() — phân tích lệnh chỉnh sửa
+    Trả về AnalyzeResponse với format chuẩn v4.
     """
     # ── Keyword scan fallback ─────────────────────────────────────────────────
     scanned = keyword_scan(original_text)
 
-    # ── Flower types: TẤT CẢ matches (NER + keyword scan) ───────────────────
+    # ── Flower types ──────────────────────────────────────────────────────────
     flower_types: List[str] = []
-
-    # Từ NER (có thể có nhiều FLOWER spans — entities_multi đã gộp)
     flower_raw = raw_ner.get("FLOWER", "")
     if flower_raw:
-        # NER có thể trả "rose orchid" nếu nhiều span — split và normalize
         for word in flower_raw.split():
             norm = normalize_flower(word)
             if norm and norm not in flower_types:
                 flower_types.append(norm)
 
-    # Keyword scan — collect ALL flowers từ text thô
     scanned_flowers = scan_all_flowers(original_text)
     for sf in scanned_flowers:
         if sf not in flower_types:
             flower_types.append(sf)
 
-    # ── Colors: TẤT CẢ matches ───────────────────────────────────────────────
+    # ── Colors ────────────────────────────────────────────────────────────────
     colors: List[str] = []
     color_raw = raw_ner.get("COLOR", "")
     if color_raw:
@@ -155,11 +247,42 @@ def analyze_entities(
     for sc_color in scanned_colors:
         if sc_color not in colors:
             colors.append(sc_color)
-    # Sunflower color default
+    
     if not colors and "sunflower" in flower_types:
         colors = ["yellow"]
 
-    # ── Others ───────────────────────────────────────────────────────────────
+    # ── Structured Grouping (v4) ──────────────────────────────────────────────
+    grouped_nouns = group_entities_with_proximity(original_text, raw_ner)
+    
+    qty = extract_quantity(original_text) or 1
+    flowers_list = []
+    accessories = []
+    unique_flower_types = []
+    colors = []
+    
+    for n in grouped_nouns:
+        if n["type"] == "flower":
+            # first flower gets the total qty, others 1
+            q = qty if len(flowers_list) == 0 else 1
+            flowers_list.append(StructuredFlower(type=n["val"], color=n["color"], quantity=q))
+            if n["val"] not in unique_flower_types:
+                unique_flower_types.append(n["val"])
+        elif n["type"] == "accessory":
+            accessories.append(StructuredAccessory(type=n["val"], color=n["color"]))
+            
+        if n["color"] and n["color"] not in colors:
+            colors.append(n["color"])
+            
+    # Fallback to general colors if nothing got mapped via proximity
+    if not colors:
+        scanned_colors = scan_all_colors(original_text)
+        for sc_color in scanned_colors:
+            if sc_color not in colors:
+                colors.append(sc_color)
+        if not colors and "sunflower" in unique_flower_types:
+            colors = ["yellow"]
+
+    # ── Others ────────────────────────────────────────────────────────────────
     category = normalize_category(raw_ner.get("CATEGORY", "")) or scanned.get("category")
     wrapper = normalize_wrapper(raw_ner.get("WRAPPER", "")) or scanned.get("wrapper")
     occasion = normalize_occasion(raw_ner.get("OCCASION", "")) or scanned.get("occasion")
@@ -171,24 +294,16 @@ def analyze_entities(
     budget = _normalize_budget(price_hint)
 
     # ── Role hints ────────────────────────────────────────────────────────────
-    role_hint = extract_role_hints(original_text, flower_types)
+    role_hint = extract_role_hints(original_text, unique_flower_types)
 
     # ── Modify ops ────────────────────────────────────────────────────────────
     modify_ops = detect_modify_ops(original_text)
     if modify_ops:
         intent = "MODIFY"
 
-    # ── Structured Flowers ────────────────────────────────────────────────────
-    structured_flowers = []
-    qty = extract_quantity(original_text)
-    for i, f_type in enumerate(flower_types):
-        c = colors[i] if i < len(colors) else (colors[0] if colors else None)
-        q = qty if i == 0 else None
-        structured_flowers.append(StructuredFlower(type=f_type, color=c, quantity=q))
-
     # ── Missing fields & Clarification ────────────────────────────────────────
     missing_fields = []
-    if not flower_types:
+    if not flowers_list:
         missing_fields.append("flower_type")
     if not occasion:
         missing_fields.append("occasion")
@@ -200,32 +315,33 @@ def analyze_entities(
         if "flower_type" in missing_fields and "occasion" in missing_fields:
             clarification_question = "Bạn muốn tặng hoa vào dịp gì và bạn có thích loại hoa nào đặc biệt không?"
         elif "flower_type" in missing_fields:
-            clarification_question = "Bạn có yêu cầu cụ thể về loại hoa nào (như hoa hồng, hướng dương, tú cầu...) không?"
+            clarification_question = "Bạn có yêu cầu cụ thể về loại hoa nào không?"
         elif "occasion" in missing_fields:
-            clarification_question = "Bạn tặng hoa này vào dịp gì (sinh nhật, kỷ niệm, 8/3...) để mình tư vấn mẫu phù hợp nhất nhé?"
+            clarification_question = "Bạn tặng hoa này vào dịp gì để mình tư vấn mẫu phù hợp nhất nhé?"
         elif "category" in missing_fields:
-            clarification_question = "Bạn muốn làm dạng bó hoa, giỏ hoa hay hộp hoa nhỉ?"
+            clarification_question = "Bạn muốn làm dạng bó hoa, giỏ hoa hay lẵng hoa?"
 
-    logger.info(f"[analyze_entities] structured_flowers: {structured_flowers}")
+    logger.info(f"[analyze_entities] flowers: {flowers_list}, accessories: {accessories}")
 
     return AnalyzeResponse(
         intent=intent,
         entities=AnalyzeEntities(
+            flowers=flowers_list,
+            accessories=accessories,
+            category=category.lower() if category else None,
             occasion=occasion.lower() if occasion else None,
             style=style.lower() if style else None,
-            color=colors[0].lower() if colors else None,   # compat field
-            colors=[c.lower() for c in colors],
-            flowers=flower_types,                          # compat field
-            flower_types=flower_types,
-            structured_flowers=structured_flowers,
             layout=category.lower() if category else None,
-            category=category.lower() if category else None,
             wrapper=wrapper.lower() if wrapper else None,
             price_hint=price_hint,
             budget=budget,
             target=target,
             role_hint=role_hint,
             modify_ops=modify_ops,
+            # Backward compatibility
+            flower_types=unique_flower_types,
+            colors=colors,
+            structured_flowers=flowers_list
         ),
         missing_fields=missing_fields,
         clarification_question=clarification_question,

@@ -19,6 +19,7 @@ const protect = async (req, res, next) => {
 
             // Tìm user từ token (loại bỏ password khỏi kết quả)
             req.user = await User.findById(decoded.id).select('-password');
+            console.log('[AuthMiddleware] req.user:', req.user ? req.user.email : 'None');
 
             if (!req.user) {
                 console.error('Auth middleware error: User không tồn tại (Token ID:', decoded.id, ')');

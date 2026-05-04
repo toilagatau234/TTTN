@@ -44,15 +44,17 @@ const matchInArray = (targetValue, sourceArray) => {
 const matchProducts = (filters = {}, products = [], strictMode = true) => {
     let validProducts = [];
 
+    // Support both 'flowers' and 'structured_flowers' (backward compatibility)
+    const flowerFilters = filters.flowers || filters.structured_flowers || [];
+
     for (let product of products) {
         if (product.stock <= 0) continue; // Skip out of stock
 
         let totalScore = 0;
-        let breakdown = { typeMatch: false, colorMatch: false, similarity: 0 };
+        let bestBreakdown = { typeMatch: false, colorMatch: false, similarity: 0, isFallback: false };
 
-        // 1. Flower Type Priority (CRITICAL)
-        if (filters.structured_flowers && filters.structured_flowers.length > 0) {
-            filters.structured_flowers.forEach(sf => {
+        if (flowerFilters.length > 0) {
+            flowerFilters.forEach(sf => {
                 const typeNorm = normalizeString(sf.type);
                 const colorNorm = sf.color ? normalizeString(sf.color) : null;
                 const pNameNorm = normalizeString(product.name);
@@ -62,23 +64,32 @@ const matchProducts = (filters = {}, products = [], strictMode = true) => {
                     ...(product.sub_flowers || []).map(f => normalizeString(typeof f === 'string' ? f : f.type))
                 ];
 
+                // Step 1: TYPE MATCH (Ignore accents via normalizeString)
                 const typeMatch = productTypes.some(t => t.includes(typeNorm) || typeNorm.includes(t)) || pNameNorm.includes(typeNorm);
-                const colorMatch = colorNorm && [normalizeString(product.dominant_color || ''), ...(product.secondary_colors || []).map(normalizeString)].some(c => c.includes(colorNorm) || colorNorm.includes(c));
                 
+                // Step 2: COLOR MATCH (Soft)
+                let colorMatch = false;
+                if (colorNorm) {
+                    colorMatch = [normalizeString(product.dominant_color || ''), ...(product.secondary_colors || []).map(normalizeString)]
+                        .some(c => c.includes(colorNorm) || colorNorm.includes(c));
+                }
+                
+                // Step 3: NAME SIMILARITY
                 let similarity = 0;
                 if (pNameNorm.includes(typeNorm)) {
                     similarity = typeNorm.length / pNameNorm.length;
                 }
 
-                const currentScore = (typeMatch ? 10 : -100) + (colorMatch ? 5 : 0) + (similarity * 2);
+                // Formula: (typeMatch ? +10 : -50) + (colorMatch ? +5 : -1) + (similarity * 2)
+                const currentScore = (typeMatch ? 10 : -50) + (colorMatch ? 5 : -1) + (similarity * 2);
                 
                 if (currentScore > totalScore || totalScore === 0) {
                     totalScore = currentScore;
-                    breakdown = { typeMatch, colorMatch, similarity };
+                    bestBreakdown = { typeMatch, colorMatch, similarity };
                 }
             });
         } else {
-            // General scoring for non-structured filters
+            // General scoring for non-flower products (fallback)
             if (filters.occasion && product.occasion?.some(o => normalizeString(o).includes(normalizeString(filters.occasion)))) totalScore += 5;
             if (filters.style && product.style?.some(s => normalizeString(s).includes(normalizeString(filters.style)))) totalScore += 2;
             if (filters.color) {
@@ -90,24 +101,26 @@ const matchProducts = (filters = {}, products = [], strictMode = true) => {
         validProducts.push({
             ...(product.toObject ? product.toObject() : product),
             matchScore: totalScore,
-            matchBreakdown: breakdown
+            matchBreakdown: bestBreakdown
         });
     }
 
     // Sort by score DESC
     let matchedProducts = validProducts.sort((a, b) => b.matchScore - a.matchScore);
 
-    // Fallback Logic
-    if (matchedProducts.length > 0 && matchedProducts[0].matchScore <= 0) {
-        // Apply fallback penalty -20 if it was a keyword match but no type match
+    // Step 4: Fallback (score -20 if no type match)
+    if (matchedProducts.length > 0 && matchedProducts[0].matchScore < 0) {
         matchedProducts = matchedProducts.map(p => {
-            if (p.matchScore <= 0 && p.matchScore > -100) {
-                return { ...p, matchScore: p.matchScore - 20 };
+            // If it was a keyword match but no strict type match, ensure it's at least -20
+            if (p.matchScore < 0 && p.matchScore > -50) {
+                p.matchScore = -20;
+                p.matchBreakdown.isFallback = true;
             }
             return p;
         });
     }
 
+    // Return products above threshold (allowing some negative scores for fallback)
     return matchedProducts.filter(p => p.matchScore > -50);
 };
 
