@@ -66,6 +66,7 @@ class HydrangeaService {
             generatedImages: [],    // [{ url, public_id }]
             promptUsed:      null,
             imageMetadata:   null,  // { type, flowers, colors }
+            hasGreeting:     true,  // Trạng thái hỏi lời chúc
         };
     }
 
@@ -196,7 +197,7 @@ class HydrangeaService {
         if (!e.colors?.length && !asked.has('colors')) return 'colors';
         if (!e.category && !asked.has('category')) return 'category';
         if (!e.wrapper && !asked.has('wrapper')) return 'wrapper';
-        if (!e.note && !asked.has('note')) return 'note';
+        if (!e.note && !asked.has('note') && session.hasGreeting !== false) return 'note';
         return null;
     }
 
@@ -321,6 +322,13 @@ class HydrangeaService {
         if (incomingEntities && Object.keys(incomingEntities).length > 0) {
             this.mergeEntities(session, incomingEntities);
         }
+        
+        // Fix [4] Chat greeting logic
+        if (message && message.toLowerCase().includes("không cần lời chúc")) {
+            session.hasGreeting = false;
+        }
+
+        console.log("[HydrangeaService] Input:", message);
         if (isConfirming) return this._handleConfirm(session, sessionId);
         if (!message?.trim()) return this._handleSuggest(session);
 
@@ -545,29 +553,45 @@ class HydrangeaService {
             .map(p => ({ ...p, _score: genericScore(p, e.ribbon, 'ribbon') }))
             .sort((a, b) => b._score - a._score);
 
-        // 4. Process Flowers (Main and Sub)
+        // 4. Process Flowers (Main and Sub) - Multi-flower support
         let allMainFlowerResults = [];
         let allSubFlowerResults = [];
 
-        // Use the new 'flowers' structured list
         const flowerEntities = e.flowers || e.structured_flowers || [];
         if (flowerEntities.length > 0) {
-            flowerEntities.forEach(sf => {
-                const mainMatches = processFlowerProducts(
-                    inStock.filter(p => p.product_type === 'flower_component' && p.role_type === 'main_flower'),
-                    sf.type,
-                    sf.color,
-                    sf.quantity
-                );
-                const subMatches = processFlowerProducts(
-                    inStock.filter(p => p.product_type === 'flower_component' && p.role_type === 'sub_flower'),
-                    sf.type,
-                    sf.color,
-                    sf.quantity
-                );
-                allMainFlowerResults.push(...mainMatches);
-                allSubFlowerResults.push(...subMatches);
-            });
+            const mainFlowersEntities = flowerEntities.filter(f => f.role === 'main');
+            const subFlowersEntities = flowerEntities.filter(f => f.role === 'secondary');
+
+            // If no roles, fallback
+            if (mainFlowersEntities.length === 0 && subFlowersEntities.length === 0) {
+                flowerEntities.forEach(sf => {
+                    const mainMatches = processFlowerProducts(
+                        inStock.filter(p => p.product_type === 'flower_component' && p.role_type === 'main_flower'),
+                        sf.type, sf.color, sf.quantity
+                    );
+                    const subMatches = processFlowerProducts(
+                        inStock.filter(p => p.product_type === 'flower_component' && p.role_type === 'sub_flower'),
+                        sf.type, sf.color, sf.quantity
+                    );
+                    allMainFlowerResults.push(...mainMatches);
+                    allSubFlowerResults.push(...subMatches);
+                });
+            } else {
+                mainFlowersEntities.forEach(sf => {
+                    const matches = processFlowerProducts(
+                        inStock.filter(p => p.product_type === 'flower_component' && p.role_type === 'main_flower'),
+                        sf.type, sf.color, sf.quantity
+                    );
+                    allMainFlowerResults.push(...matches);
+                });
+                subFlowersEntities.forEach(sf => {
+                    const matches = processFlowerProducts(
+                        inStock.filter(p => p.product_type === 'flower_component' && p.role_type === 'sub_flower'),
+                        sf.type, sf.color, sf.quantity
+                    );
+                    allSubFlowerResults.push(...matches);
+                });
+            }
         }
 
         // Deduplicate and sort flowers
@@ -604,6 +628,13 @@ class HydrangeaService {
             accessories: accessories.filter(p => p._score >= 0).slice(0, 3),
             complete_bouquets: completeBouquets.slice(0, 6),
         };
+
+        console.log("[HydrangeaService] Structured:", JSON.stringify(e));
+        console.log("[HydrangeaService] Matched:", JSON.stringify({
+            main: suggestedItems.main_flowers.length,
+            sub: suggestedItems.sub_flowers.length,
+            acc: suggestedItems.accessories.length
+        }));
 
         // Auto-selection logic
         const mainAutoFilled = session.selectedItems.main_flowers?.length ? session.selectedItems.main_flowers : mainFlowers.filter(p => p._score >= 10).slice(0, 2);

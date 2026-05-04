@@ -124,42 +124,38 @@ function detectBouquetType(entities, selectedItems) {
 // BƯỚC 3 — Xây dựng prompt có cấu trúc
 // ═════════════════════════════════════════════════════════════════════════════
 function buildStructuredPrompt(bouquetType, entities, selectedItems) {
-    const typeLabel     = BOUQUET_TYPE_LABELS[bouquetType] || 'flower arrangement';
-    const exclusion     = BOUQUET_TYPE_EXCLUSIONS[bouquetType] || '';
+    // Main flowers logic
+    const mainFlowers = (entities?.flowers || entities?.structured_flowers || [])
+        .filter(f => f.role === 'main' || !f.role);
+    
+    const wrapping = selectedItems?.wrapper;
+    const ribbon = selectedItems?.ribbon;
 
-    // Loại hoa
-    const flowers = [
-        ...(entities?.flower_types || []),
-        ...(selectedItems?.main_flowers?.map(f => f.name) || []),
-    ].filter(Boolean);
+    // Structured prompt as requested
+    const prompt = `
+A realistic flower bouquet:
 
-    const subFlowers = (selectedItems?.sub_flowers?.map(f => f.name) || []).filter(Boolean);
-    const colors     = (entities?.colors || []).filter(Boolean);
-    const wrapper    = selectedItems?.wrapper?.name || entities?.wrapper || null;
-    const ribbon     = selectedItems?.ribbon?.name || entities?.ribbon || null;
-    const occasion   = entities?.occasion || null;
+Main flower:
+${mainFlowers.map(f => `- ${f.type} (${f.color || "natural color"})`).join('\n')}
 
-    // Xây dựng prompt từng phần
-    const parts = [
-        `A realistic professional ${typeLabel} (${exclusion})`,
-        flowers.length > 0 ? `featuring ${flowers.join(' and ')}` : 'featuring beautiful flowers',
-        subFlowers.length > 0 ? `accented with ${subFlowers.join(' and ')}` : null,
-        colors.length > 0 ? `in ${colors.join(' and ')} color tones` : null,
-        wrapper ? `wrapped in ${wrapper}` : null,
-        ribbon ? `with ${ribbon} ribbon` : null,
-        occasion ? `perfect for ${occasion}` : null,
-        'professional florist photography, white background, sharp focus, high quality product photo',
-    ].filter(Boolean);
+Accessories:
+- Wrapping: ${wrapping?.color || entities?.wrapper || "none"}
+- Ribbon: ${ribbon?.color || entities?.ribbon || "none"}
 
-    const rawPrompt = parts.join(', ');
+Clean background, high detail, studio lighting
+`;
 
+    const rawPrompt = prompt.trim();
+    
+    // Maintain metadata for later use
     const metadata = {
         type:    bouquetType,
-        flowers: flowers,
-        colors:  colors,
+        flowers: mainFlowers.map(f => f.type),
+        colors:  mainFlowers.map(f => f.color).filter(Boolean),
+        accessories: [wrapping?.color, ribbon?.color].filter(Boolean)
     };
 
-    console.log(`[Pipeline] buildStructuredPrompt: type="${bouquetType}", flowers=${JSON.stringify(flowers)}`);
+    console.log(`[Pipeline] buildStructuredPrompt: type="${bouquetType}", flowers=${JSON.stringify(metadata.flowers)}`);
     return { rawPrompt, metadata };
 }
 

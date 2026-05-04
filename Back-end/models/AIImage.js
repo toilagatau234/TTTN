@@ -40,12 +40,7 @@ const aiImageSchema = new mongoose.Schema({
     },
 
     // Thông tin metadata về nội dung ảnh (tuỳ chọn)
-    metadata: {
-        prompt: String,
-        type: String,
-        flowers: [String],
-        colors: [String]
-    },
+    metadata: { type: String },
 
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now }

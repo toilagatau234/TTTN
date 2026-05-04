@@ -164,12 +164,11 @@ exports.confirmImageUpload = async (req, res) => {
                 imageUrl: cloudinaryResult.url,
                 publicId: cloudinaryResult.public_id,
                 status: 'draft',
-                metadata: {
+                metadata: JSON.stringify({
                     prompt: session.promptUsed,
-                    type: session.imageMetadata?.type,
                     flowers: session.imageMetadata?.flowers,
-                    colors: session.imageMetadata?.colors
-                }
+                    accessories: session.imageMetadata?.accessories
+                })
             });
 
             // Save Cloudinary URL to session
