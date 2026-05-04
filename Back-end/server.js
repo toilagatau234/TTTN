@@ -25,12 +25,13 @@ const inventoryRoutes = require('./routes/inventoryRoutes');
 const bannerRoutes = require('./routes/bannerRoutes');
 const blogRoutes = require('./routes/blogRoutes');
 const vnpayRoutes = require('./routes/vnpayRoutes');
-
+const { startCleanupJobs } = require('./jobs/cleanupJobs');
 
 
 
 dotenv.config();
 connectDB();
+startCleanupJobs();
 
 const app = express();
 

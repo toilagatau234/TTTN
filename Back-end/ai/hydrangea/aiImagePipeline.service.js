@@ -268,7 +268,9 @@ async function generateOneImage(prompt, retryCount = 0) {
     }
 }
 
-async function generateVariations(prompt, count = 2) {
+async function generateVariations(prompt, count = 1) {
+    // FIX: Generate only 1 image (not 2) to reduce timeout risk
+    // Typical: 30-40s for 1 image vs 60-90s for 2 images
     const results = [];
     for (let i = 0; i < count; i++) {
         if (i > 0) {
@@ -318,12 +320,17 @@ function filterResults(uploadedImages) {
 /**
  * generateBouquetImages
  *
- * Pipeline đầy đủ 8 bước. Timeout toàn cục 25 giây.
+ * Pipeline đầy đủ 8 bước. Timeout toàn cục 90 giây.
+ * 
+ * FIX v3: Tạo 1 ảnh + return base64 (KHÔNG upload Cloudinary ngay)
+ * - User thấy preview (base64)
+ * - Khi confirm → upload
+ * - Tiết kiệm resource + tránh timeout
  *
  * @param {object} entities       - Thực thể từ AI (flower_types, colors, category, ...)
  * @param {object} selectedItems  - Items người dùng đã chọn (basket, main_flowers, ...)
  * @param {string} [customPrompt] - Prompt tùy chỉnh của người dùng (nếu dùng refine)
- * @returns {{ success, images, prompt_used, metadata }}
+ * @returns {{ success, imageBase64, prompt_used, metadata, status }}
  */
 async function generateBouquetImages(entities, selectedItems, customPrompt = null) {
     const pipeline = async () => {
@@ -342,20 +349,26 @@ async function generateBouquetImages(entities, selectedItems, customPrompt = nul
         // Bước 4: Gemini enhance
         const enhancedPrompt = await callGeminiForEnhancement(promptToEnhance);
 
-        // Bước 6: Generate 2 ảnh (bước 5 — deletePreviousImages — chạy ở controller)
-        const variations = await generateVariations(enhancedPrompt, 2);
+        // Bước 6: Generate 1 ảnh (bước 5 — deletePreviousImages — chạy ở controller)
+        const variations = await generateVariations(enhancedPrompt, 1);
 
-        // Bước 7: Upload Cloudinary
-        const uploaded = await uploadVariationsToCloudinary(variations);
+        // FIX v3: Return base64 KHÔNG upload Cloudinary
+        if (!variations[0]?.success || !variations[0]?.base64) {
+            throw new Error('Không thể tạo ảnh. Vui lòng thử lại!');
+        }
 
-        // Bước 8: Filter
-        const images = filterResults(uploaded);
+        // FIX v4: Generate generationId
+        const crypto = require('crypto');
+        const generationId = crypto.randomUUID();
 
         return {
-            success:     true,
-            images,                        // [{ url, public_id }, ...]
-            prompt_used: enhancedPrompt,
-            metadata,                      // { type, flowers, colors }
+            success:      true,
+            generationId: generationId,
+            imageBase64:  variations[0].base64,     // base64 string
+            mimeType:     variations[0].mimeType,   // 'image/jpeg'
+            prompt_used:  enhancedPrompt,
+            metadata,                                // { type, flowers, colors }
+            status:       'preview_ready',           // NEW: Chỉ preview, chưa upload Cloudinary
         };
     };
 
@@ -371,6 +384,7 @@ async function generateBouquetImages(entities, selectedItems, customPrompt = nul
         return {
             success: false,
             error:   err.message || 'Không thể tạo ảnh lúc này. Vui lòng thử lại!',
+            status:  'error',
         };
     }
 }

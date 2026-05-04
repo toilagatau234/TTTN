@@ -59,11 +59,16 @@ function ErrorPanel({ message, onRetry }) {
 }
 
 // ── Image Grid (2 ảnh) ────────────────────────────────────────────────────────
-function ImageGrid({ images, selectedIndex, onSelect }) {
-    if (!images?.length) return null;
+function ImageGrid({ previewBase64, images, selectedIndex, onSelect }) {
+    // FIX v3: Handle both base64 preview and Cloudinary URLs
+    const imagesToShow = previewBase64 
+        ? [{ url: `data:image/jpeg;base64,${previewBase64}`, public_id: 'preview' }]
+        : images || [];
+    
+    if (!imagesToShow?.length) return null;
     return (
-        <div data-testid="image-grid" className={`grid gap-2 p-2 ${images.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}>
-            {images.map((img, i) => (
+        <div data-testid="image-grid" className={`grid gap-2 p-2 ${imagesToShow.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+            {imagesToShow.map((img, i) => (
                 <button key={img.public_id || i} onClick={() => onSelect(i)}
                     className={`relative rounded-xl overflow-hidden border-2 transition-all cursor-pointer
                         ${i === selectedIndex ? 'border-pink-500 shadow-lg shadow-pink-100' : 'border-gray-100 hover:border-pink-300'}`}>
@@ -143,19 +148,21 @@ export default function HydrangeaStudio() {
     const {
         messages, inputText, setInputText, isLoading, chatEndRef,
         entities, suggestedItems, selectedItems, outOfStockWarnings, totalPrice, status,
-        generatedImages, selectedImageIndex, isGenerating, generateError,
+        previewBase64, generatedImages, selectedImageIndex, isGenerating, generateError, isConfirmingImage,
         promptUsed, detectedType, customPrompt, setCustomPrompt,
         myOrders, isSavingOrder, savedOrder,
+        draftImages, showDrafts, setShowDrafts,
         sendMessage, handleGenerate, handleRefine, handleSelectImage,
-        handleConfirmOrder, loadMyOrders, startNewChat, resumeChat, deleteHistory,
+        handleConfirmImageUpload, handleConfirmOrder, loadMyOrders, startNewChat, resumeChat, deleteHistory,
+        loadDraftImages, retryOrderFromDraft, deleteDraftImage,
     } = useHydrangeaStudio();
 
     useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }, [messages]);
-    useEffect(() => { loadMyOrders(); }, [loadMyOrders]);
+    useEffect(() => { loadMyOrders(); loadDraftImages(); }, [loadMyOrders, loadDraftImages]);
 
     const hasEntities = Object.keys(entities).some(k => Array.isArray(entities[k]) ? entities[k].length > 0 : !!entities[k]);
     const canGenerate = hasEntities && suggestedItems && !isGenerating && status !== 'generating';
-    const imageReady  = generatedImages.length > 0 && status === 'image_ready';
+    const imageReady  = (previewBase64 || generatedImages.length > 0) && (status === 'preview_ready' || status === 'image_ready' || status === 'image_confirmed');
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-pink-50 via-rose-50 to-fuchsia-50 pt-24 pb-12">
@@ -277,10 +284,10 @@ export default function HydrangeaStudio() {
                                 {!isGenerating && generateError && (
                                     <ErrorPanel message={generateError} onRetry={() => handleGenerate()} />
                                 )}
-                                {!isGenerating && !generateError && generatedImages.length > 0 && (
-                                    <ImageGrid images={generatedImages} selectedIndex={selectedImageIndex} onSelect={handleSelectImage} />
+                                {!isGenerating && !generateError && (previewBase64 || generatedImages.length > 0) && (
+                                    <ImageGrid previewBase64={previewBase64} images={generatedImages} selectedIndex={selectedImageIndex} onSelect={handleSelectImage} />
                                 )}
-                                {!isGenerating && !generateError && generatedImages.length === 0 && (
+                                {!isGenerating && !generateError && !previewBase64 && generatedImages.length === 0 && (
                                     <div className="flex flex-col items-center justify-center h-full text-center p-6">
                                         <div className="w-16 h-16 bg-pink-100 rounded-full flex items-center justify-center mx-auto mb-3">
                                             <Flower2 size={28} className="text-pink-300" />
@@ -345,34 +352,61 @@ export default function HydrangeaStudio() {
                             </div>
                         </div>
 
-                        {/* Lịch sử */}
+                        {/* Lịch sử & Nháp */}
                         <div className="bg-white rounded-2xl shadow border border-pink-100 overflow-hidden flex flex-col max-h-[185px]">
-                            <div className="p-3 bg-gray-50 border-b border-pink-50 flex items-center gap-2">
-                                <Clock size={14} className="text-pink-500" />
-                                <span className="text-sm font-semibold text-gray-700 flex-1">Lịch sử thiết kế</span>
+                            <div className="flex border-b border-pink-50">
+                                <button onClick={() => setShowDrafts(false)} className={`flex-1 py-2 text-xs font-bold transition-colors cursor-pointer ${!showDrafts ? 'text-pink-600 bg-pink-50' : 'text-gray-500 hover:bg-gray-50'}`}>
+                                    <Clock size={12} className="inline mr-1 mb-0.5" /> Lịch sử
+                                </button>
+                                <button onClick={() => setShowDrafts(true)} className={`flex-1 py-2 text-xs font-bold transition-colors cursor-pointer ${showDrafts ? 'text-pink-600 bg-pink-50' : 'text-gray-500 hover:bg-gray-50'}`}>
+                                    <ImageIcon size={12} className="inline mr-1 mb-0.5" /> Bản nháp ({draftImages.length})
+                                </button>
                             </div>
                             <div className="overflow-y-auto">
-                                {myOrders.length === 0
-                                    ? <p className="text-xs text-gray-400 text-center py-4">Chưa có lịch sử</p>
-                                    : myOrders.map(o => (
-                                        <div key={o._id} onClick={() => resumeChat(o._id)}
-                                            className="p-3 border-b border-gray-50 flex items-center gap-3 hover:bg-pink-50 cursor-pointer transition-colors group">
-                                            {o.generatedImages?.[0]?.url
-                                                ? <img src={o.generatedImages[0].url} className="w-10 h-10 rounded-lg object-cover" alt="" />
-                                                : <div className="w-10 h-10 bg-pink-100 rounded-lg flex items-center justify-center"><Flower2 size={16} className="text-pink-400" /></div>}
-                                            <div className="flex-1 min-w-0">
-                                                <p className="text-xs font-bold text-gray-700 group-hover:text-pink-600 truncate">{o.orderCode}</p>
-                                                <p className="text-[10px] text-gray-400 truncate">{o.entities?.flower_types?.join(', ') || 'Giỏ hoa'}</p>
+                                {!showDrafts ? (
+                                    myOrders.length === 0
+                                        ? <p className="text-xs text-gray-400 text-center py-4">Chưa có lịch sử</p>
+                                        : myOrders.map(o => (
+                                            <div key={o._id} onClick={() => resumeChat(o._id)}
+                                                className="p-3 border-b border-gray-50 flex items-center gap-3 hover:bg-pink-50 cursor-pointer transition-colors group">
+                                                {o.generatedImages?.[0]?.url
+                                                    ? <img src={o.generatedImages[0].url} className="w-10 h-10 rounded-lg object-cover" alt="" />
+                                                    : <div className="w-10 h-10 bg-pink-100 rounded-lg flex items-center justify-center"><Flower2 size={16} className="text-pink-400" /></div>}
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-xs font-bold text-gray-700 group-hover:text-pink-600 truncate">{o.orderCode}</p>
+                                                    <p className="text-[10px] text-gray-400 truncate">{o.entities?.flower_types?.join(', ') || 'Giỏ hoa'}</p>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <p className="text-xs font-bold text-pink-600">{fmt(o.totalPrice)}</p>
+                                                    <button onClick={e => { e.stopPropagation(); if (window.confirm('Xóa lịch sử này?')) deleteHistory(o._id); }}
+                                                        className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors cursor-pointer">
+                                                        <Trash2 size={12} />
+                                                    </button>
+                                                </div>
                                             </div>
-                                            <div className="flex items-center gap-2">
-                                                <p className="text-xs font-bold text-pink-600">{fmt(o.totalPrice)}</p>
-                                                <button onClick={e => { e.stopPropagation(); if (window.confirm('Xóa lịch sử này?')) deleteHistory(o._id); }}
-                                                    className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
-                                                    <Trash2 size={12} />
-                                                </button>
+                                        ))
+                                ) : (
+                                    draftImages.length === 0
+                                        ? <p className="text-xs text-gray-400 text-center py-4">Chưa có bản nháp nào</p>
+                                        : draftImages.map(d => (
+                                            <div key={d._id} className="p-3 border-b border-gray-50 flex items-center gap-3 hover:bg-pink-50 transition-colors group">
+                                                <img src={d.imageUrl} className="w-10 h-10 rounded-lg object-cover" alt="" />
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-xs font-bold text-gray-700 truncate">{d.metadata?.prompt || 'Bản nháp thiết kế'}</p>
+                                                    <p className="text-[10px] text-gray-400 truncate">{new Date(d.createdAt).toLocaleDateString('vi-VN')} {new Date(d.createdAt).toLocaleTimeString('vi-VN', {hour: '2-digit', minute:'2-digit'})}</p>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <button onClick={() => retryOrderFromDraft(d._id)} className="text-[10px] bg-gradient-to-r from-pink-500 to-fuchsia-500 hover:from-pink-600 hover:to-fuchsia-600 text-white px-2 py-1.5 rounded shadow cursor-pointer font-bold">
+                                                        Đặt lại
+                                                    </button>
+                                                    <button onClick={() => { if (window.confirm('Xóa bản nháp này?')) deleteDraftImage(d._id); }}
+                                                        className="p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors cursor-pointer">
+                                                        <Trash2 size={14} />
+                                                    </button>
+                                                </div>
                                             </div>
-                                        </div>
-                                    ))}
+                                        ))
+                                )}
                             </div>
                         </div>
                     </div>

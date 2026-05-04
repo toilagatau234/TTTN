@@ -59,6 +59,11 @@ class ModifyOp(BaseModel):
     class Config:
         populate_by_name = True
 
+# ── Structured Flower ────────────────────────────────────────────────────────
+class StructuredFlower(BaseModel):
+    type: str
+    color: Optional[str] = None
+    quantity: Optional[int] = None
 
 # ── Analyze Entities (Chuẩn v3) ───────────────────────────────────────────────
 class AnalyzeEntities(BaseModel):
@@ -82,6 +87,7 @@ class AnalyzeEntities(BaseModel):
     # New v3 fields
     flower_types: List[str] = []
     colors: List[str] = []
+    structured_flowers: List[StructuredFlower] = []
     occasion: Optional[str] = None
     style: Optional[str] = None
     layout: Optional[str] = None

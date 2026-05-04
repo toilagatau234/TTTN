@@ -19,12 +19,17 @@ router.post('/hydrangea/update-items', hydrangeaController.updateSelectedItems);
 router.post('/hydrangea/generate', generateLimiter, hydrangeaController.generateBouquetImage);
 router.post('/hydrangea/refine-generate', generateLimiter, hydrangeaController.refineGenerate);
 router.get('/hydrangea/check-api', hydrangeaController.checkApi);
-
 // Protected routes (cần đăng nhập)
+router.post('/hydrangea/confirm-image-upload', protect, hydrangeaController.confirmImageUpload); // FIX v4: Protected
 router.post('/hydrangea/confirm-order', protect, hydrangeaController.confirmOrder);
 router.get('/hydrangea/my-orders', protect, hydrangeaController.getMyOrders);
 router.get('/hydrangea/orders/:id', protect, hydrangeaController.getOrderDetail);
 router.post('/hydrangea/restore-session', protect, hydrangeaController.restoreSession);
 router.delete('/hydrangea/orders/:id', protect, hydrangeaController.deleteOrder);
+
+// New APIs for AI Images (Drafts)
+router.get('/hydrangea/images/drafts', protect, hydrangeaController.getDraftImages);
+router.post('/hydrangea/images/retry', protect, hydrangeaController.retryOrderFromDraft);
+router.delete('/hydrangea/images/:id', protect, hydrangeaController.deleteDraftImage);
 
 module.exports = router;

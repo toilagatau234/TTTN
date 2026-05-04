@@ -18,13 +18,19 @@ const DICTIONARY = {
 /**
  * Clean, standard validation for string formatting
  * @param {string} value The raw string
- * @returns {string} Trims, lowercases, and maps to dictionary
+ * @returns {string} Trims, lowercases, removes accents, and maps to dictionary
  */
 const normalizeString = (value) => {
     if (!value || typeof value !== 'string') return '';
-    let normalized = value.trim().toLowerCase();
     
-    // Map with Dictionary Fallback
+    // 1. Lowercase, Trim, Remove Vietnamese accents
+    let normalized = value.trim().toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/đ/g, 'd')
+        .replace(/Đ/g, 'D');
+    
+    // 2. Map with Dictionary Fallback
     if (DICTIONARY[normalized]) {
         normalized = DICTIONARY[normalized];
     }
@@ -72,6 +78,7 @@ const countOccurrences = (text, target) => {
 const createStrictEntitiesMap = (aiEntities, originalText) => {
     const strictFormat = {
         flowers: { main: [], secondary: [] },
+        structured_flowers: [],
         color: [],
         occasion: "",
         target: "",
@@ -120,6 +127,10 @@ const createStrictEntitiesMap = (aiEntities, originalText) => {
                 strictFormat.flowers.secondary.push(flower);
             }
         }
+    }
+
+    if (Array.isArray(aiEntities.structured_flowers)) {
+        strictFormat.structured_flowers = aiEntities.structured_flowers;
     }
 
     return strictFormat;

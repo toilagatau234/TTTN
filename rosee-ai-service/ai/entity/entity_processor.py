@@ -16,7 +16,7 @@ import logging
 import re
 from typing import Optional, List, Dict
 
-from app.models.schemas import ProcessedData, AnalyzeEntities, AnalyzeResponse
+from app.models.schemas import ProcessedData, AnalyzeEntities, AnalyzeResponse, StructuredFlower
 from app.utils.normalizer import (
     normalize_flower, normalize_color, normalize_category,
     normalize_wrapper, normalize_occasion, normalize_style,
@@ -178,6 +178,14 @@ def analyze_entities(
     if modify_ops:
         intent = "MODIFY"
 
+    # ── Structured Flowers ────────────────────────────────────────────────────
+    structured_flowers = []
+    qty = extract_quantity(original_text)
+    for i, f_type in enumerate(flower_types):
+        c = colors[i] if i < len(colors) else (colors[0] if colors else None)
+        q = qty if i == 0 else None
+        structured_flowers.append(StructuredFlower(type=f_type, color=c, quantity=q))
+
     # ── Missing fields & Clarification ────────────────────────────────────────
     missing_fields = []
     if not flower_types:
@@ -198,6 +206,8 @@ def analyze_entities(
         elif "category" in missing_fields:
             clarification_question = "Bạn muốn làm dạng bó hoa, giỏ hoa hay hộp hoa nhỉ?"
 
+    logger.info(f"[analyze_entities] structured_flowers: {structured_flowers}")
+
     return AnalyzeResponse(
         intent=intent,
         entities=AnalyzeEntities(
@@ -207,6 +217,7 @@ def analyze_entities(
             colors=[c.lower() for c in colors],
             flowers=flower_types,                          # compat field
             flower_types=flower_types,
+            structured_flowers=structured_flowers,
             layout=category.lower() if category else None,
             category=category.lower() if category else None,
             wrapper=wrapper.lower() if wrapper else None,

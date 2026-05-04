@@ -92,9 +92,9 @@ const customBouquetOrderSchema = new mongoose.Schema({
     // Ảnh AI tạo — v2: Cloudinary URL (KHÔNG lưu base64)
     // Chỉ lưu ảnh được người dùng chọn (selected: true)
     generatedImages: [{
-        url:       String,        // Cloudinary secure_url
+        url: String,        // Cloudinary secure_url
         public_id: String,        // để xóa Cloudinary nếu cần
-        selected:  { type: Boolean, default: false }
+        selected: { type: Boolean, default: false }
     }],
 
     // Prompt đã dùng để tạo ảnh
@@ -102,18 +102,18 @@ const customBouquetOrderSchema = new mongoose.Schema({
 
     // Metadata loại bó hoa do pipeline detect
     imageMetadata: {
-        type:    String,       // 'bouquet' | 'basket' | 'box' | 'vase' | 'stand'
+        type: String,       // 'bouquet' | 'basket' | 'box' | 'vase' | 'stand'
         flowers: [String],
-        colors:  [String]
+        colors: [String]
     },
 
     // (backward compat) Ảnh cũ có base64 — trước phiên bản v2
     generatedImage: {
-        url:         String,
-        base64:      String,
+        url: String,
+        base64: String,
         generatedAt: Date,
-        prompt:      String,
-        model:       String,
+        prompt: String,
+        model: String,
     },
 
     // Trạng thái đơn
@@ -143,21 +143,21 @@ const customBouquetOrderSchema = new mongoose.Schema({
     }],
 
     // Timestamps
-    createdAt:   { type: Date, default: Date.now },
-    updatedAt:   { type: Date, default: Date.now },
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now },
     confirmedAt: Date,
 }, {
-    toJSON:   { virtuals: true },
+    toJSON: { virtuals: true },
     toObject: { virtuals: true }
 });
 
 // Auto-update updatedAt
-customBouquetOrderSchema.pre('save', function() {
+customBouquetOrderSchema.pre('save', function () {
     this.updatedAt = Date.now();
 });
 
 // Virtual: order code hiển thị
-customBouquetOrderSchema.virtual('orderCode').get(function() {
+customBouquetOrderSchema.virtual('orderCode').get(function () {
     return `CB-${String(this._id).slice(-8).toUpperCase()}`;
 });
 

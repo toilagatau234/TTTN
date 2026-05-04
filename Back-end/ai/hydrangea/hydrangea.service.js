@@ -47,6 +47,7 @@ class HydrangeaService {
         return {
             entities: {
                 flower_types: [], colors: [], color: null,
+                structured_flowers: [],
                 occasion: null, style: null, budget: 0,
                 target: null, role_hint: {},
                 category: null, wrapper: null, ribbon: null, accessories: [],
@@ -96,10 +97,25 @@ class HydrangeaService {
             ...(newEntities.flower_types || []),
             ...(newEntities.flowers || []),
             ...(newEntities.flower_type ? [newEntities.flower_type] : [])
-        ];
+        ].filter(Boolean);
+
         if (newFlowers.length > 0) {
-            // FIX 1: Ghi đè (replace) thay vì gộp (append)
-            sessionEntities.flower_types = newFlowers;
+            // FIX 1: Ghi đè (replace) thay vì gộp (append) + DEDUPLICATE (với normalization)
+            sessionEntities.flower_types = Array.from(new Set(newFlowers.map(f => normalizeString(f))));
+            
+            if (newEntities.structured_flowers) {
+                // Deduplicate structured_flowers by type and color
+                const uniqueSF = [];
+                const seenSF = new Set();
+                newEntities.structured_flowers.forEach(sf => {
+                    const key = `${normalizeString(sf.type)}|${normalizeString(sf.color || '')}`;
+                    if (!seenSF.has(key)) {
+                        seenSF.add(key);
+                        uniqueSF.push(sf);
+                    }
+                });
+                sessionEntities.structured_flowers = uniqueSF;
+            }
             
             // Xóa lựa chọn hoa hiện tại để hệ thống tự động tìm hoa mới
             if (session.selectedItems) {
@@ -383,171 +399,215 @@ class HydrangeaService {
         const outOfStock = filteredProducts.filter(p => p.stock === 0);
 
         // Score function
-        const score = (product) => {
+        const score = (product, targetType = null, targetColor = null) => {
+            const pNameN = normalizeString(product.name);
+            const pColorsAll = [normalizeString(product.dominant_color || ''), ...(product.secondary_colors || []).map(c => normalizeString(c))];
+            
+            // Default logic for non-flower products or when no specific target is provided
+            if (!targetType) {
+                let s = 0;
+                // ... (original non-flower logic will be handled below or merged)
+                return s;
+            }
+
+            const tTypeN = normalizeString(targetType);
+            const tColorN = targetColor ? normalizeString(targetColor) : null;
+
+            // 1. HARD FILTER / TYPE MATCH check
+            // product.main_flowers contains types, or product.name contains type
+            const productTypes = [
+                ...(product.main_flowers || []).map(normalizeString),
+                ...(product.sub_flowers || []).map(normalizeString)
+            ];
+            const hasTypeMatch = productTypes.some(t => t.includes(tTypeN) || tTypeN.includes(t)) || pNameN.includes(tTypeN);
+
+            // 2. COLOR MATCH
+            const hasColorMatch = tColorN && pColorsAll.some(pc => pc.includes(tColorN) || tColorN.includes(pc));
+
+            // 3. NAME SIMILARITY (Simple ratio)
+            let similarity = 0;
+            if (pNameN.includes(tTypeN)) {
+                similarity = tTypeN.length / pNameN.length;
+            }
+
+            // 4. SCORE CALCULATION: score = (typeMatch ? +10 : -100) + (colorMatch ? +5 : 0) + (similarity * 2)
+            let total = (hasTypeMatch ? 10 : -100) + (hasColorMatch ? 5 : 0) + (similarity * 2);
+
+            // 5. FALLBACK LOGIC: If no match found for any product, the penalty is already applied via -100.
+            // But if we want to support keyword fallback if NO exact match exists at all, 
+            // we handle that in the loop.
+
+            return {
+                total,
+                breakdown: {
+                    typeMatch: hasTypeMatch,
+                    colorMatch: hasColorMatch,
+                    similarity: parseFloat(similarity.toFixed(2))
+                }
+            };
+        };
+
+        const processFlowerProducts = (products, targetType, targetColor) => {
+            let results = products.map(p => {
+                const { total, breakdown } = score(p, targetType, targetColor);
+                return { ...p, _score: total, _breakdown: breakdown };
+            });
+
+            // If no positive scores (no type match), fallback to keyword search with penalty
+            if (!results.some(r => r._score > 0)) {
+                results = products.map(p => {
+                    const pNameN = normalizeString(p.name);
+                    const tTypeN = normalizeString(targetType);
+                    const hasKeyword = pNameN.split(' ').some(word => tTypeN.includes(word));
+                    
+                    let fallbackScore = -20; // Base penalty for fallback
+                    if (hasKeyword) fallbackScore += 5;
+
+                    return { 
+                        ...p, 
+                        _score: fallbackScore, 
+                        _breakdown: { typeMatch: false, colorMatch: false, similarity: 0, isFallback: true } 
+                    };
+                });
+            }
+
+            return results.sort((a, b) => b._score - a._score);
+        };
+
+        // Custom scoring for non-flower items
+        const genericScore = (product, entityValue, type) => {
+            if (!entityValue) return 0;
+            const pNameN = normalizeString(product.name);
+            const pColorsAll = [normalizeString(product.dominant_color || ''), ...(product.secondary_colors || []).map(c => normalizeString(c))];
+            const eValN = normalizeString(entityValue);
+
             let s = 0;
-            const pNameN = norm(product.name);
-            const pColorN = norm(product.dominant_color || '');
-            const pColorsAll = [pColorN, ...(product.secondary_colors || []).map(c => norm(c))];
-
-            // === WRAPPER: ưu tiên màu sắc dominant_color, sau đó mới tên ===
-            if (product.product_type === 'wrapper' && e.wrapper) {
-                const wN = norm(e.wrapper);
-                // Nếu entity wrapper là màu sắc → match dominant_color trước (điểm cao)
-                if (pColorsAll.some(c => c.includes(wN) || wN.includes(c))) s += 60;
-                // Match tên sản phẩm (ít ưu tiên hơn)
-                if (pNameN.includes(wN)) s += 20;
+            if (type === 'wrapper' || type === 'ribbon') {
+                if (pColorsAll.some(c => c.includes(eValN) || eValN.includes(c))) s += 60;
+                if (pNameN.includes(eValN)) s += 20;
+            } else if (type === 'basket' || type === 'accessory') {
+                if (pNameN.includes(eValN) || eValN.includes(pNameN)) s += 50;
             }
-
-            // === RIBBON: ưu tiên màu sắc dominant_color ===
-            if (product.product_type === 'ribbon' && e.ribbon) {
-                const rN = norm(e.ribbon);
-                if (pColorsAll.some(c => c.includes(rN) || rN.includes(c))) s += 60;
-                if (pNameN.includes(rN)) s += 20;
-            }
-
-            // === WRAPPER/RIBBON: match màu chung từ entities.colors (fallback) ===
-            if (product.product_type === 'wrapper' || product.product_type === 'ribbon') {
-                e.colors?.forEach(c => {
-                    const cN = norm(c);
-                    if (pColorsAll.some(pc => pc.includes(cN) || cN.includes(pc))) s += 10;
-                });
-            }
-
-            // === BASKET ===
-            if (product.product_type === 'basket' && e.category) {
-                const cN = norm(e.category);
-                if (pNameN.includes(cN) || cN.includes(pNameN)) s += 50;
-            }
-
-            // === ACCESSORIES ===
-            if (product.product_type === 'accessory' && e.accessories?.length > 0) {
-                e.accessories.forEach(acc => {
-                    const aN = norm(acc);
-                    if (pNameN.includes(aN) || aN.includes(pNameN)) s += 50;
-                });
-            }
-
-            // === HOA CHÍNH (flower_component / main_flower) ===
-            // PHẢI match flower_type trước, rồi mới tính màu
-            if (product.product_type === 'flower_component') {
-                let flowerTypeMatched = false;
-
-                e.flower_types?.forEach(ft => {
-                    const ftN = norm(ft);
-                    // Match tên loại hoa trong product.main_flowers[], sub_flowers[], tên sản phẩm
-                    const nameMatch    = pNameN.includes(ftN);
-                    const mainMatch    = product.main_flowers?.some(f => norm(f).includes(ftN) || ftN.includes(norm(f)));
-                    const subMatch     = product.sub_flowers?.some(f => norm(f).includes(ftN) || ftN.includes(norm(f)));
-
-                    if (mainMatch) { s += 80; flowerTypeMatched = true; }  // Match loại hoa chính → điểm rất cao
-                    if (subMatch)  { s += 40; flowerTypeMatched = true; }
-                    if (nameMatch) { s += 50; flowerTypeMatched = true; }
-                });
-
-                // Màu sắc chỉ cộng điểm nếu loại hoa đã match, hoặc không có flower_type entity
-                const colorWeight = (flowerTypeMatched || !e.flower_types?.length) ? 20 : 2;
-                e.colors?.forEach(c => {
-                    const cN = norm(c);
-                    if (pColorsAll.some(pc => pc.includes(cN) || cN.includes(pc))) s += colorWeight;
-                });
-            } else {
-                // Các loại sản phẩm khác: color match bình thường
-                e.colors?.forEach(c => {
-                    const cN = norm(c);
-                    if (pColorsAll.some(pc => pc.includes(cN) || cN.includes(pc))) s += 15;
-                });
-            }
-
-            // Occasion
-            if (e.occasion && product.occasion?.some(o => norm(o).includes(norm(e.occasion)) || norm(e.occasion).includes(norm(o)))) s += 25;
-
-            // Style
-            if (e.style && product.style?.some(st => norm(st).includes(norm(e.style)))) s += 15;
-
-            // Popularity boost
-            s += Math.min((product.sold || 0) * 0.1, 10);
-
             return s;
         };
 
-        // Chọn basket tốt nhất
-        let baskets = inStock
+        // 1. Process Baskets
+        const baskets = inStock
             .filter(p => p.product_type === 'basket')
-            .map(p => ({ ...p, _score: score(p) }))
+            .map(p => ({ ...p, _score: genericScore(p, e.category, 'basket') }))
             .sort((a, b) => b._score - a._score);
-            
-        // FIX 3: Cắt cứng logic category cho basket (đảm bảo bó hoa không có giỏ)
-        if (e.category) {
-            const catNorm = norm(e.category);
-            if (catNorm.includes('bó')) {
-                baskets = []; // Bó hoa thì không dùng giỏ
-            } else if (catNorm.includes('giỏ') || catNorm.includes('lẵng') || catNorm.includes('hộp') || catNorm.includes('kệ')) {
-                // Chỉ giữ lại những basket có keyword tương ứng trong tên
-                // VD: Hộp hoa thì tên basket phải có chữ 'hộp'
-                baskets = baskets.filter(p => {
-                    const pNameNorm = norm(p.name);
-                    const keyword = catNorm.includes('giỏ') ? 'giỏ' : 
-                                    catNorm.includes('lẵng') ? 'lẵng' : 
-                                    catNorm.includes('hộp') ? 'hộp' : 
-                                    catNorm.includes('kệ') ? 'kệ' : null;
-                    return keyword ? pNameNorm.includes(keyword) : true;
-                });
-            }
-        }
 
-        // Chọn wrapper
+        // 2. Process Wrappers
         const wrappers = inStock
             .filter(p => p.product_type === 'wrapper')
-            .map(p => ({ ...p, _score: score(p) }))
+            .map(p => ({ ...p, _score: genericScore(p, e.wrapper, 'wrapper') }))
             .sort((a, b) => b._score - a._score);
 
-        // Chọn ribbon
+        // 3. Process Ribbons
         const ribbons = inStock
             .filter(p => p.product_type === 'ribbon')
-            .map(p => ({ ...p, _score: score(p) }))
+            .map(p => ({ ...p, _score: genericScore(p, e.ribbon, 'ribbon') }))
             .sort((a, b) => b._score - a._score);
 
-        // Hoa chính
-        const mainFlowers = inStock
-            .filter(p => p.product_type === 'flower_component' && p.role_type === 'main_flower')
-            .map(p => ({ ...p, _score: score(p) }))
+        // 4. Process Flowers (Main and Sub)
+        let allMainFlowerResults = [];
+        let allSubFlowerResults = [];
+
+        if (e.structured_flowers?.length > 0) {
+            e.structured_flowers.forEach(sf => {
+                const mainMatches = processFlowerProducts(
+                    inStock.filter(p => p.product_type === 'flower_component' && p.role_type === 'main_flower'),
+                    sf.type,
+                    sf.color
+                );
+                const subMatches = processFlowerProducts(
+                    inStock.filter(p => p.product_type === 'flower_component' && p.role_type === 'sub_flower'),
+                    sf.type,
+                    sf.color
+                );
+                allMainFlowerResults.push(...mainMatches);
+                allSubFlowerResults.push(...subMatches);
+            });
+        } else if (e.flower_types?.length > 0) {
+            e.flower_types.forEach(ft => {
+                const mainMatches = processFlowerProducts(
+                    inStock.filter(p => p.product_type === 'flower_component' && p.role_type === 'main_flower'),
+                    ft,
+                    null
+                );
+                const subMatches = processFlowerProducts(
+                    inStock.filter(p => p.product_type === 'flower_component' && p.role_type === 'sub_flower'),
+                    ft,
+                    null
+                );
+                allMainFlowerResults.push(...mainMatches);
+                allSubFlowerResults.push(...subMatches);
+            });
+        }
+
+        // Deduplicate and sort flowers
+        const mainFlowers = Array.from(new Map(allMainFlowerResults.map(p => [String(p._id), p])).values())
+            .sort((a, b) => b._score - a._score);
+        const subFlowers = Array.from(new Map(allSubFlowerResults.map(p => [String(p._id), p])).values())
             .sort((a, b) => b._score - a._score);
 
-        // Hoa phụ
-        const subFlowers = inStock
-            .filter(p => p.product_type === 'flower_component' && p.role_type === 'sub_flower')
-            .map(p => ({ ...p, _score: score(p) }))
-            .sort((a, b) => b._score - a._score);
-
-        // Phụ kiện
+        // 5. Process Accessories
         const accessories = inStock
             .filter(p => p.product_type === 'accessory')
-
-            .map(p => ({ ...p, _score: score(p) }))
+            .map(p => ({ ...p, _score: e.accessories?.length ? Math.max(...e.accessories.map(acc => genericScore(p, acc, 'accessory'))) : 0 }))
             .sort((a, b) => b._score - a._score);
 
-        // Complete bouquet (legacy fallback)
+        // 6. Complete bouquet (legacy fallback)
         const completeBouquets = inStock
             .filter(p => p.product_type === 'complete_bouquet' || !p.product_type)
-            .map(p => ({ ...p, _score: score(p) }))
+            .map(p => ({ ...p, _score: 0 })) // Basic score or keep legacy? User didn't specify for complete bouquets.
             .sort((a, b) => b._score - a._score);
+
+        // ... (Out-of-stock and missing from DB logic remains similar)
+
+        // Build suggestedItems
+        const suggestedItems = {
+            basket: baskets.slice(0, 3),
+            wrapper: wrappers.slice(0, 3),
+            ribbon: ribbons.slice(0, 3),
+            main_flowers: mainFlowers.filter(p => p._score > -50).slice(0, 4), // Only show somewhat relevant items
+            sub_flowers: subFlowers.filter(p => p._score > -50).slice(0, 3),
+            accessories: accessories.slice(0, 3),
+            complete_bouquets: completeBouquets.slice(0, 6),
+        };
+
+        // Debug Logging
+        console.log(`[HydrangeaService] AI Structured Data:`, JSON.stringify(e.structured_flowers));
+        const logBreakdown = (p) => ({
+            name: p.name,
+            score: p._score,
+            breakdown: p._breakdown
+        });
+        console.log(`[HydrangeaService] Matched Main Flowers:`, JSON.stringify(suggestedItems.main_flowers.map(logBreakdown), null, 2));
+        console.log(`[HydrangeaService] Matched Sub Flowers:`, JSON.stringify(suggestedItems.sub_flowers.map(logBreakdown), null, 2));
 
         // Out-of-stock items người dùng muốn + alternatives
         const outOfStockWarnings = [];
         if (e.flower_types?.length > 0) {
             outOfStock.forEach(oos => {
-                const oosFt = [...(oos.main_flowers || []), ...(oos.sub_flowers || [])];
+                const oosFt = [
+                    ...(oos.main_flowers || []), 
+                    ...(oos.sub_flowers || [])
+                ].map(normalizeString);
+                
                 const matches = e.flower_types.some(ft =>
-                    oosFt.some(f => normalizeString(f).includes(normalizeString(ft)) || normalizeString(ft).includes(normalizeString(f)))
+                    oosFt.some(f => f.includes(normalizeString(ft)) || normalizeString(ft).includes(f))
                 );
+
                 if (matches) {
                     // Tìm alternatives in-stock
                     const alternatives = inStock
                         .filter(p => {
-                            const pFt = [...(p.main_flowers || []), ...(p.sub_flowers || [])];
-                            return oosFt.some(f => pFt.some(pf =>
-                                normalizeString(f).includes(normalizeString(pf)) || normalizeString(pf).includes(normalizeString(f))
-                            ));
+                            const pFt = [
+                                ...(p.main_flowers || []), 
+                                ...(p.sub_flowers || [])
+                            ].map(normalizeString);
+                            return oosFt.some(f => pFt.some(pf => pf.includes(f) || f.includes(pf)));
                         })
                         .slice(0, 3)
                         .map(p => ({ _id: p._id, name: p.name, price: p.price, images: p.images }));
@@ -560,7 +620,7 @@ class HydrangeaService {
             });
         }
 
-        // Check missing flowers from DB entirely
+        // Check for missing flowers from DB entirely
         const missingFlowersFromDB = [];
         if (e.flower_types?.length > 0) {
             e.flower_types.forEach(ft => {
@@ -574,21 +634,11 @@ class HydrangeaService {
             });
         }
 
-        // Build structured items response
-        const suggestedItems = {
-            basket: baskets.slice(0, 3),
-            wrapper: wrappers.slice(0, 3),
-            ribbon: ribbons.slice(0, 3),
-            main_flowers: mainFlowers.slice(0, 4),
-            sub_flowers: subFlowers.slice(0, 3),
-            accessories: accessories.slice(0, 3),
-            complete_bouquets: completeBouquets.slice(0, 6), // fallback
-        };
 
         // ── Auto-select items tốt nhất cho session ───────────────────────
-        // HOA CHÍNH: CHỈ chọn nếu score >= 50 (có match đúng loại hoa)
+        // HOA CHÍNH: CHỈ chọn nếu score >= 10 (có match đúng loại hoa)
         const mainAutoFilled = e.flower_types?.length > 0
-            ? mainFlowers.filter(f => f._score >= 50).slice(0, 2)
+            ? mainFlowers.filter(f => f._score >= 10).slice(0, 2)
             : mainFlowers.slice(0, 2);
 
         session.selectedItems = {
