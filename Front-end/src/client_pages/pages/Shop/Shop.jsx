@@ -34,7 +34,25 @@ const Shop = () => {
   const [loading, setLoading] = useState(true);
   const [totalPages, setTotalPages] = useState(1);
 
+  // Local search state for smooth Vietnamese typing
+  const [localSearch, setLocalSearch] = useState(search);
+
   const productsPerPage = 12;
+
+  // Sync local search with URL param (when navigating from other pages)
+  useEffect(() => {
+    setLocalSearch(search);
+  }, [search]);
+
+  // Debounce search update to URL
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (localSearch !== search) {
+        handleFilterChange("keyword", localSearch);
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [localSearch]);
 
   // Lấy Categories
   useEffect(() => {
@@ -285,8 +303,8 @@ const Shop = () => {
             <div className="relative group">
                 <input
                     type="text"
-                    value={search}
-                    onChange={(e) => handleFilterChange("keyword", e.target.value)}
+                    value={localSearch}
+                    onChange={(e) => setLocalSearch(e.target.value)}
                     placeholder="Tìm đóa hoa bạn thích..."
                     className="w-72 px-6 py-3.5 rounded-2xl bg-neutral-50 border border-transparent text-sm font-medium text-gray-700 focus:bg-white focus:border-pink-200 focus:ring-4 focus:ring-pink-50 outline-none transition-all placeholder:text-gray-300"
                 />

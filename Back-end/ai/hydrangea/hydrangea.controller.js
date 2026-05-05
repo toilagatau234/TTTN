@@ -75,12 +75,16 @@ exports.generateBouquetImage = async (req, res) => {
         return res.status(200).json({
             success:       true,
             generationId:  result.generationId,
-            imageBase64:   result.imageBase64,  // Trả về cho frontend giữ
-            mimeType:      result.mimeType,     // 'image/jpeg'
+            imageBase64:   result.imageBase64,  // null nếu fallback
+            imageUrl:      result.imageUrl,     // URL nếu fallback
+            isFallback:    result.isFallback,
+            mimeType:      result.mimeType,
             prompt_used:   result.prompt_used,
             metadata:      result.metadata,
-            reply:         '✨ Đã tạo xong! Xem trước ảnh bên dưới rồi nhấn "Đồng ý & Chọn mua" nhé.',
-            status:        'preview_ready',    // FIX: preview_ready = chưa upload Cloudinary
+            reply:         result.isFallback 
+                ? '✨ Hệ thống AI đang quá tải, tôi đã chọn một mẫu hoa tuyệt đẹp gần nhất với ý tưởng của bạn. Bạn có thể nhấn "Tạo lại" sau ít phút hoặc nhấn "Đồng ý" để mua mẫu này nhé!'
+                : '✨ Đã tạo xong! Xem trước ảnh bên dưới rồi nhấn "Đồng ý & Chọn mua" nhé.',
+            status:        'preview_ready',
         });
     } catch (error) {
         console.error('[Generate Image Error]:', error);
@@ -120,10 +124,14 @@ exports.refineGenerate = async (req, res) => {
             success:       true,
             generationId:  result.generationId,
             imageBase64:   result.imageBase64,
+            imageUrl:      result.imageUrl,
+            isFallback:    result.isFallback,
             mimeType:      result.mimeType,
             prompt_used:   result.prompt_used,
             metadata:      result.metadata,
-            reply:         '✨ Đã tạo lại với prompt mới!',
+            reply:         result.isFallback 
+                ? '✨ AI đang bận một chút, tôi đã tìm mẫu hoa phù hợp nhất với yêu cầu chỉnh sửa của bạn!' 
+                : '✨ Đã tạo lại với prompt mới!',
             status:        'preview_ready',
         });
     } catch (error) {
@@ -148,12 +156,26 @@ exports.confirmImageUpload = async (req, res) => {
         }
 
         try {
-            // Upload base64 to Cloudinary NOW (khi user confirm)
-            const cloudinaryResult = await uploadBase64Image(
-                imageBase64,
-                'hydrangea-generated',
-                session.previewMimeType || 'image/jpeg'
-            );
+            let cloudinaryResult;
+            
+            // Nếu imageBase64 thực chất là 1 URL (trường hợp fallback)
+            if (imageBase64.startsWith('http')) {
+                console.log('[Pipeline] 🔄 Sử dụng URL có sẵn (Fallback confirmation)');
+                cloudinaryResult = {
+                    url: imageBase64,
+                    public_id: 'fallback_' + Date.now()
+                };
+            } else {
+                // Upload base64 to Cloudinary NOW (khi user confirm)
+                // Loại bỏ prefix data:image/...;base64, nếu có
+                const pureBase64 = imageBase64.replace(/^data:image\/\w+;base64,/, "");
+                
+                cloudinaryResult = await uploadBase64Image(
+                    pureBase64,
+                    'hydrangea-generated',
+                    session.previewMimeType || 'image/jpeg'
+                );
+            }
 
             // FIX: Create an AIImage draft
             const userId = req.user?._id;

@@ -97,7 +97,27 @@ class HydrangeaService {
         if (newEntities.budget > 0) sessionEntities.budget = newEntities.budget;
 
         // 2. Flowers (Grouped with color & quantity)
-        // Support both 'flowers' and 'structured_flowers'
+        // ── Interceptor: Đánh chặn và sửa lỗi phân loại của AI (Python) ──────
+        
+        // 1. Sửa lỗi chéo giữa Wrapper và Ribbon
+        if (newEntities.wrapper) {
+            const wN = normalizeString(newEntities.wrapper);
+            if (wN.includes('ruy bang') || wN.includes('ribbon')) {
+                // Nếu AI nhét "ruy băng" vào ô "giấy gói" -> chuyển nó sang ribbon
+                newEntities.ribbon = newEntities.ribbon || newEntities.wrapper;
+                newEntities.wrapper = null;
+            }
+        }
+        if (newEntities.ribbon) {
+            const rN = normalizeString(newEntities.ribbon);
+            if (rN.includes('giay') || rN.includes('wrapping') || rN.includes('giay goi')) {
+                // Nếu AI nhét "giấy gói" vào ô "ruy băng" -> chuyển nó sang wrapper
+                newEntities.wrapper = newEntities.wrapper || newEntities.ribbon;
+                newEntities.ribbon = null;
+            }
+        }
+
+        // 2. Sửa lỗi trong mảng hoa (nhận diện nhầm phụ kiện thành hoa)
         const incomingFlowers = newEntities.flowers || newEntities.structured_flowers || [];
         if (incomingFlowers.length > 0) {
             const uniqueFlowers = [];
@@ -115,13 +135,24 @@ class HydrangeaService {
                     if (f.color) sessionEntities.wrapper = f.color;
                     return; // Bỏ qua, không lưu vào mảng hoa
                 }
-                if (typeN.includes('ruy bang') || typeN.includes('ribbon') || typeN.includes('no ')) {
-                    if (f.color) sessionEntities.ribbon = f.color;
+
+                // Nhận diện Nơ / Ruy băng
+                if (typeN === 'no' || typeN.startsWith('no ') || typeN.includes('ruy bang') || typeN.includes('ribbon')) {
+                    // Nếu AI bóc tách "nơ hồng" thành {type: "nơ", color: "hồng"}, ta lấy color. 
+                    // Nhưng đôi khi AI lại bóc {type: "nơ"} và {type: "hoa hồng"} riêng biệt.
+                    sessionEntities.ribbon = f.color || sessionEntities.ribbon || 'hong'; 
                     return;
                 }
+
                 if (typeN.includes('thiep') || typeN.includes('card')) {
                     sessionEntities.hasCard = true;
                     return;
+                }
+
+                // CHẶN ẢO GIÁC: Nếu user nói "nơ hồng", AI hay tự thêm "hoa hồng". 
+                // Nếu loại hoa là "hoa hồng" nhưng không có số lượng cụ thể và đi kèm với nơ, khả năng cao là nhầm lẫn.
+                if (typeN === 'hoa hong' && sessionEntities.ribbon === 'hong' && !f.color) {
+                    return; // Bỏ qua hoa hồng ảo giác
                 }
                 
                 if (!seenFlowers.has(key)) {
@@ -413,10 +444,6 @@ class HydrangeaService {
         const aiEntities = aiResult?.entities || {};
         this.mergeEntities(session, aiEntities);
 
-        // Map category/wrapper (bổ sung cho normalizer)
-        if (aiEntities.category) session.entities.category = aiEntities.category;
-        if (aiEntities.wrapper) session.entities.wrapper = aiEntities.wrapper;
-
         // BUG FIX #2: Map accessories array đúng sang ribbon/wrapper/card
         // LUÔN ưu tiên dùng accessories[] từ Python (chính xác nhất) để ghi đè wrapper/ribbon
         if (aiEntities.accessories?.length > 0) {
@@ -602,6 +629,9 @@ class HydrangeaService {
                 if (pNameN.includes(eValN)) s += 20;
             } else if (type === 'basket' || type === 'accessory') {
                 if (pNameN.includes(eValN) || eValN.includes(pNameN)) s += 50;
+                // Khớp màu sắc cho giỏ/hộp nếu có
+                if (session.entities.colors?.some(c => pColorsAll.some(pc => pc.includes(normalizeString(c))))) s += 30;
+                
                 // Nhận diện thiệp chúc mừng nếu user yêu cầu
                 if (type === 'accessory' && (eValN.includes('thiệp') || eValN.includes('thư'))) {
                     if (pNameN.includes('thiệp') || pNameN.includes('card')) s += 100;

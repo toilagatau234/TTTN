@@ -27,7 +27,7 @@ const GEMINI_API_KEY    = process.env.GEMINI_API_KEY;
 const GLOBAL_TIMEOUT_MS = 90_000; // 90s toàn cục (2 ảnh mỗi ảnh tối đa 45s)
 const GEMINI_TIMEOUT_MS = 10_000; // 10s cho Gemini
 const IMAGE_TIMEOUT_MS  = 45_000; // 45s mỗi ảnh Pollinations
-const MAX_RETRIES       = 3;      // Tăng số lần thử lại để vượt qua overload của server AI
+const MAX_RETRIES       = 5;      // Tăng lên 5 lần để vượt qua overload nặng
 const VARIATION_DELAY   = 3000;   // 3s giữa 2 lần gọi (tránh rate limit)
 
 // ── ENUM loại bó hoa ───────────────────────────────────────────────────────────
@@ -264,7 +264,8 @@ function fetchImageAsBase64(url) {
 async function generateOneImage(prompt, retryCount = 0) {
     const seed    = Math.floor(Math.random() * 999999);
     const encoded = encodeURIComponent(prompt);
-    const url     = `https://image.pollinations.ai/prompt/${encoded}?width=768&height=768&model=flux&seed=${seed}&nologo=true`;
+    // Thay đổi sang model=turbo để nhanh hơn và ổn định hơn model=flux
+    const url     = `https://image.pollinations.ai/prompt/${encoded}?width=768&height=768&model=turbo&seed=${seed}&nologo=true`;
 
     try {
         console.log(`[Pipeline] Pollinations gọi lần ${retryCount + 1}, seed=${seed}`);
@@ -274,14 +275,25 @@ async function generateOneImage(prompt, retryCount = 0) {
     } catch (err) {
         const is429 = err.message?.includes('429');
         if (retryCount < MAX_RETRIES) {
-            // Chờ lâu hơn nếu bị rate limit
-            const waitMs = is429 ? 6000 : 2000 * (retryCount + 1);
+            // Chờ lâu hơn (10s) nếu bị rate limit để server hồi phục
+            const waitMs = is429 ? 10000 : 2000 * (retryCount + 1);
             console.warn(`[Pipeline] Retry ${retryCount + 1}/${MAX_RETRIES} (wait ${waitMs}ms): ${err.message}`);
             await new Promise(r => setTimeout(r, waitMs));
             return generateOneImage(prompt, retryCount + 1);
         }
+        
         console.error(`[Pipeline] ❌ Ảnh thất bại sau ${MAX_RETRIES} lần retry: ${err.message}`);
-        return { success: false, error: err.message };
+        
+        // CƠ CHẾ DỰ PHÒNG: Trả về ảnh mẫu đẹp nếu AI chết hẳn, tránh lỗi 500
+        console.log('[Pipeline] 🔄 Sử dụng ảnh dự phòng (Fallback)...');
+        return { 
+            success: true, 
+            isFallback: true,
+            // Một ảnh hoa cẩm tú cầu/bouquet mẫu đẹp từ Cloudinary hoặc source uy tín
+            fallbackUrl: "https://res.cloudinary.com/drwles2k0/image/upload/v1776510344/fallback-bouquet.jpg",
+            base64: null, // Sẽ xử lý ở bước sau
+            mimeType: 'image/jpeg' 
+        };
     }
 }
 
@@ -381,11 +393,13 @@ async function generateBouquetImages(entities, selectedItems, customPrompt = nul
         return {
             success:      true,
             generationId: generationId,
-            imageBase64:  variations[0].base64,     // base64 string
-            mimeType:     variations[0].mimeType,   // 'image/jpeg'
+            imageBase64:  variations[0].base64,     // Có thể là null nếu là fallback
+            imageUrl:     variations[0].fallbackUrl, // NEW: Dùng khi AI thất bại
+            isFallback:   variations[0].isFallback || false,
+            mimeType:     variations[0].mimeType,
             prompt_used:  enhancedPrompt,
-            metadata,                                // { type, flowers, colors }
-            status:       'preview_ready',           // NEW: Chỉ preview, chưa upload Cloudinary
+            metadata,
+            status:       'preview_ready',
         };
     };
 

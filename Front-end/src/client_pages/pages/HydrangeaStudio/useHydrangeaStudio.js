@@ -124,15 +124,21 @@ export function useHydrangeaStudio() {
             const res = await axios.post(endpoint, payload, { timeout: 60000 });
             const d   = res.data;
 
-            // FIX v3/v4: Expect imageBase64 and generationId instead of images array
-            if (d.success && d.imageBase64 && d.generationId) {
-                setPreviewBase64(d.imageBase64);  // FIX: Store base64 preview
-                setGenerationId(d.generationId);  // FIX v4: Store generationId
+            // FIX v3/v4/v5: Expect imageBase64 OR imageUrl (for fallback)
+            if (d.success && (d.imageBase64 || d.imageUrl) && d.generationId) {
+                // Nếu là fallback (URL) thì ưu tiên dùng URL, nếu không dùng base64
+                if (d.imageUrl) {
+                    setPreviewBase64(d.imageUrl); 
+                } else {
+                    setPreviewBase64(`data:${d.mimeType || 'image/jpeg'};base64,${d.imageBase64}`);
+                }
+                
+                setGenerationId(d.generationId);
                 setPromptUsed(d.prompt_used || '');
                 setDetectedType(d.metadata?.type || null);
-                setStatus('preview_ready');  // FIX: New status
+                setStatus('preview_ready');
                 setCustomPrompt(d.prompt_used || '');
-                addBotMsg('🌸 Xong rồi! Xem trước ảnh bên dưới rồi nhấn "Đồng ý & Chọn mua" nhé.');
+                addBotMsg(d.reply || '🌸 Xong rồi! Xem trước ảnh bên dưới rồi nhấn "Đồng ý & Chọn mua" nhé.');
             } else {
                 const errMsg = d.reply || 'Không thể tạo ảnh lúc này.';
                 setGenerateError(errMsg);

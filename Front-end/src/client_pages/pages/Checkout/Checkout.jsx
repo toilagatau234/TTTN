@@ -485,7 +485,7 @@ const Checkout = () => {
             <Link to="/shop" className="flex-1 bg-pink-50 text-pink-500 font-medium py-3 rounded-xl hover:bg-pink-100 transition">
               Tiếp tục mua sắm
             </Link>
-            <Link to="/profile/orders" className="flex-1 bg-emerald-400 text-white font-medium py-3 rounded-xl hover:bg-emerald-500 transition shadow-md">
+            <Link to="/profile" className="flex-1 bg-emerald-400 text-white font-medium py-3 rounded-xl hover:bg-emerald-500 transition shadow-md">
               Xem đơn hàng
             </Link>
           </div>

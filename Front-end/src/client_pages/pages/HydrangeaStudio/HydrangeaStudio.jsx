@@ -62,7 +62,12 @@ function ErrorPanel({ message, onRetry }) {
 function ImageGrid({ previewBase64, images, selectedIndex, onSelect }) {
     // FIX v3: Handle both base64 preview and Cloudinary URLs
     const imagesToShow = previewBase64 
-        ? [{ url: `data:image/jpeg;base64,${previewBase64}`, public_id: 'preview' }]
+        ? [{ 
+            url: (previewBase64.startsWith('http') || previewBase64.startsWith('data:')) 
+                ? previewBase64 
+                : `data:image/jpeg;base64,${previewBase64}`, 
+            public_id: 'preview' 
+          }]
         : images || [];
     
     if (!imagesToShow?.length) return null;

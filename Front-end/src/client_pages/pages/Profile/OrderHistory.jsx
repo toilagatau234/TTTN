@@ -98,15 +98,17 @@ const OrderHistory = ({ orders, handleReorder }) => {
               </div>
 
               <div className="space-y-3 bg-gray-50/50 p-4 rounded-xl border border-gray-100">
-                {order.orderItems?.map((item, idx) => (
+                {order.items?.map((item, idx) => (
                   <div key={idx} className="flex gap-4 items-center">
                     <img
-                      src={item.product?.images?.[0]?.url || "https://placehold.co/40"}
-                      alt={item.product?.name || "Sản phẩm"}
-                      className="w-12 h-12 object-cover rounded-lg border border-gray-200 shadow-sm"
+                      src={item.isCustom ? item.image : (item.product?.images?.[0]?.url || "https://placehold.co/40")}
+                      alt={item.name || "Sản phẩm"}
+                      className={`w-12 h-12 object-cover rounded-lg border shadow-sm ${item.isCustom ? 'border-purple-200' : 'border-gray-200'}`}
                     />
                     <div className="flex-1">
-                      <p className="font-semibold text-gray-800 line-clamp-1">{item.product?.name || "Hoa Thiết Kế"}</p>
+                      <p className={`font-semibold line-clamp-1 ${item.isCustom ? 'text-purple-700' : 'text-gray-800'}`}>
+                        {item.name || (item.isCustom ? "Hoa Thiết Kế AI" : "Sản phẩm")}
+                      </p>
                       <p className="text-xs font-medium text-gray-500 bg-gray-100 w-fit px-2 py-0.5 rounded-md mt-1">x{item.quantity}</p>
                     </div>
                     <p className="font-bold text-gray-700">{(item.price * item.quantity).toLocaleString()} đ</p>

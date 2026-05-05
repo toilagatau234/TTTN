@@ -70,12 +70,12 @@ const Cart = () => {
 
   // Tính toán các con số tổng quát
   const originalSubTotal = (cart?.items || []).reduce((acc, item) => {
-    const p = item.product?.originalPrice || item.product?.price || 0;
+    const p = item.isCustom ? item.price : (item.product?.originalPrice || item.product?.price || 0);
     return acc + p * (item.quantity || 1);
   }, 0);
 
   const saleSubTotal = (cart?.items || []).reduce((acc, item) => {
-    const p = item.product?.price || 0;
+    const p = item.isCustom ? item.price : (item.product?.price || 0);
     return acc + p * (item.quantity || 1);
   }, 0);
 
@@ -136,25 +136,41 @@ const Cart = () => {
                         <div className="absolute -top-4 left-0 w-full h-px bg-neutral-50 first:hidden"></div>
                         <div className="relative shrink-0 overflow-hidden rounded-2xl">
                           <img
-                            src={item.product?.images?.[0]?.url || "https://placehold.co/100"}
-                            alt={item.product?.name}
-                            className="w-24 h-24 object-cover group-hover:scale-110 transition-transform duration-500"
+                            src={item.isCustom ? item.image : (item.product?.images?.[0]?.url || "https://placehold.co/100")}
+                            alt={item.isCustom ? item.name : item.product?.name}
+                            className={`w-24 h-24 object-cover group-hover:scale-110 transition-transform duration-500 ${item.isCustom ? 'border-2 border-purple-100 shadow-sm' : ''}`}
                           />
+                          {item.isCustom && (
+                            <div className="absolute top-0 right-0 bg-purple-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded-bl-lg uppercase tracking-tighter">AI</div>
+                          )}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <Link to={`/product/${item.product?._id}`} className="text-lg font-bold text-gray-800 hover:text-pink-500 transition-colors line-clamp-1 block">
-                            {item.product?.name || "Sản phẩm đã bị xóa"}
-                          </Link>
+                          {item.isCustom ? (
+                            <span className="text-lg font-bold text-purple-700 tracking-tight block">
+                              {item.name}
+                            </span>
+                          ) : (
+                            <Link to={`/product/${item.product?._id}`} className="text-lg font-bold text-gray-800 hover:text-pink-500 transition-colors line-clamp-1 block">
+                              {item.product?.name || "Sản phẩm đã bị xóa"}
+                            </Link>
+                          )}
+                          
                           <div className="flex flex-col mt-1">
-                            {item.product?.originalPrice > item.product?.price && (
+                            {!item.isCustom && item.product?.originalPrice > item.product?.price && (
                               <span className="text-[11px] text-gray-400 line-through font-bold">
                                 {(item.product.originalPrice || 0).toLocaleString()}đ
                               </span>
                             )}
-                            <span className="text-pink-600 font-black text-base leading-tight">
-                              {(item.product?.price || 0).toLocaleString()}đ
+                            <span className={`${item.isCustom ? 'text-purple-600' : 'text-pink-600'} font-black text-base leading-tight`}>
+                              {(item.isCustom ? item.price : (item.product?.price || 0)).toLocaleString()}đ
                             </span>
                           </div>
+                          
+                          {item.isCustom && item.note && (
+                            <p className="text-[10px] text-gray-400 mt-1 italic line-clamp-1">
+                              Thành phần: {item.note}
+                            </p>
+                          )}
                         </div>
 
                         {/* Quantity */}
@@ -177,8 +193,8 @@ const Cart = () => {
                         {/* Tổng tiền của item */}
                         <div className="w-32 text-right">
                           <p className="text-[10px] text-gray-500 font-black uppercase tracking-widest mb-1.5">Thành tiền</p>
-                          <p className="font-black text-[#2B3674] tracking-tighter text-xl leading-none">
-                            {((item.product?.price || 0) * (item.quantity || 1)).toLocaleString()}đ
+                          <p className={`font-black tracking-tighter text-xl leading-none ${item.isCustom ? 'text-purple-800' : 'text-[#2B3674]'}`}>
+                            {((item.isCustom ? item.price : (item.product?.price || 0)) * (item.quantity || 1)).toLocaleString()}đ
                           </p>
                         </div>
 
