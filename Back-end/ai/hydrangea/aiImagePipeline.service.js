@@ -27,7 +27,7 @@ const GEMINI_API_KEY    = process.env.GEMINI_API_KEY;
 const GLOBAL_TIMEOUT_MS = 90_000; // 90s toàn cục (2 ảnh mỗi ảnh tối đa 45s)
 const GEMINI_TIMEOUT_MS = 10_000; // 10s cho Gemini
 const IMAGE_TIMEOUT_MS  = 45_000; // 45s mỗi ảnh Pollinations
-const MAX_RETRIES       = 1;      // Chỉ retry 1 lần (tránh spam 429)
+const MAX_RETRIES       = 3;      // Tăng số lần thử lại để vượt qua overload của server AI
 const VARIATION_DELAY   = 3000;   // 3s giữa 2 lần gọi (tránh rate limit)
 
 // ── ENUM loại bó hoa ───────────────────────────────────────────────────────────
@@ -163,10 +163,14 @@ function buildStructuredPrompt(bouquetType, entities, selectedItems) {
     // 1. Lấy thông tin Hoa chính (Ưu tiên từ selectedItems trước)
     let mainFlowers = [];
     if (selectedItems?.main_flowers?.length > 0) {
-        mainFlowers = selectedItems.main_flowers.map(f => ({
-            type: f.name,
-            color: f.dominant_color || 'natural color'
-        }));
+        mainFlowers = selectedItems.main_flowers.map((f, i) => {
+            // Lấy màu user yêu cầu trong entities (nếu có), fallback sang màu mặc định trong DB
+            const userReqColor = (entities?.flowers || entities?.structured_flowers || [])[i]?.color;
+            return {
+                type: f.name,
+                color: userReqColor || f.dominant_color || 'natural color'
+            };
+        });
     } else {
         mainFlowers = (entities?.flowers || entities?.structured_flowers || [])
             .filter(f => f.role === 'main' || !f.role);
@@ -176,16 +180,16 @@ function buildStructuredPrompt(bouquetType, entities, selectedItems) {
     const wrapping = selectedItems?.wrapper;
     const ribbon = selectedItems?.ribbon;
 
-    // Lấy màu giấy gói và ruy băng (Ưu tiên dominant_color từ DB)
-    const wrappingColor = wrapping?.dominant_color || entities?.wrapper || "none";
-    const ribbonColor = ribbon?.dominant_color || entities?.ribbon || "none";
+    // Lấy màu giấy gói và ruy băng (Ưu tiên màu user yêu cầu, tránh lỗi DB lưu sai màu)
+    const wrappingColor = entities?.wrapper || wrapping?.dominant_color || "none";
+    const ribbonColor = entities?.ribbon || ribbon?.dominant_color || "none";
 
     // Structured prompt as requested
     const prompt = `
 A realistic, highly detailed, masterpiece photography of a ${translateViToEn(bouquetType)}:
 
 Main flowers:
-${mainFlowers.map(f => `- ${translateViToEn(f.color || "natural color")} ${translateViToEn(f.type)}`).join('\n')}
+${mainFlowers.map(f => `- ONLY ${translateViToEn(f.color || "natural color")} ${translateViToEn(f.type)}`).join('\n')}
 
 Accessories:
 - Wrapping: ${translateViToEn(wrappingColor)}

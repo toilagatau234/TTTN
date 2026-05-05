@@ -54,9 +54,13 @@ exports.generateBouquetImage = async (req, res) => {
         );
 
         if (!result.success) {
+            let msg = result.error || 'Không thể tạo ảnh lúc này, vui lòng thử lại!';
+            if (msg.includes('429')) {
+                msg = '✨ Hệ thống AI đang quá tải do có quá nhiều người dùng. Bạn vui lòng đợi 5-10 giây rồi nhấn "Tạo lại" nhé!';
+            }
             return res.status(500).json({
                 success: false,
-                reply: result.error || 'Không thể tạo ảnh lúc này, vui lòng thử lại!',
+                reply: msg,
                 status: result.status || 'error'
             });
         }

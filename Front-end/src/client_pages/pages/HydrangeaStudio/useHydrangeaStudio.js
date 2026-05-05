@@ -1,10 +1,12 @@
 import { useState, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import authService from '../../../services/authService';
 
 const API = 'http://localhost:8080/api';
 
 export function useHydrangeaStudio() {
+    const navigate = useNavigate();
     const defaultMessages = [{
         role: 'bot',
         text: 'Chào mừng đến Hydrangea Studio! 🌸 Bạn muốn giỏ hoa như thế nào? Mô tả cho mình nghe nào!',
@@ -244,7 +246,8 @@ export function useHydrangeaStudio() {
                         { orderId: res.data.order._id },
                         { headers: { Authorization: `Bearer ${token}` } }
                     );
-                    addBotMsg(`🎉 Đơn **${res.data.order.orderCode}** đã được thêm vào Giỏ hàng!`);
+                    addBotMsg(`🎉 Đơn **${res.data.order.orderCode}** đã được thêm vào Giỏ hàng! Đang chuyển đến trang thanh toán...`);
+                    setTimeout(() => navigate('/cart'), 1500);
                 } catch {
                     addBotMsg(`🎉 Đơn **${res.data.order.orderCode}** đã lưu.`);
                 }

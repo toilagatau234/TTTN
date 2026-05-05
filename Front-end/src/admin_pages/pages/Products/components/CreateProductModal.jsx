@@ -358,35 +358,36 @@ const CreateProductModal = ({ open, onCancel, onSuccess, initialData }) => {
               <span className="font-bold text-navy-700">Bouquet Builder (AI Matching)</span>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50/40 p-4 rounded-2xl border border-gray-100/70">
-              {/* product_type */}
-              <Form.Item label={<span className="font-semibold text-purple-700">🧺 Loại thành phần</span>} name="product_type" className="mb-1 col-span-2">
-                <Select size="large" className="rounded-xl" placeholder="Chọn loại sản phẩm">
-                  <Option value="complete_bouquet">💐 Giỏ hoa hoàn chỉnh</Option>
-                  <Option value="basket">🧺 Giỏ / Lẵng / Hộp</Option>
-                  <Option value="wrapper">🎁 Giấy gói</Option>
-                  <Option value="ribbon">🎀 Ruy băng / Nơ</Option>
-                  <Option value="flower_component">🌸 Hoa (thành phần)</Option>
-                  <Option value="accessory">✨ Phụ kiện trang trí</Option>
-                </Select>
-              </Form.Item>
+              {/* product_type & role_type (Đã ẩn theo yêu cầu vì hệ thống AI giờ tự động quét qua tên sản phẩm) */}
+              <div className="hidden">
+                <Form.Item label={<span className="font-semibold text-purple-700">🧺 Loại thành phần</span>} name="product_type" className="mb-1 col-span-2">
+                  <Select size="large" className="rounded-xl" placeholder="Chọn loại sản phẩm">
+                    <Option value="complete_bouquet">💐 Giỏ hoa hoàn chỉnh</Option>
+                    <Option value="basket">🧺 Giỏ / Lẵng / Hộp</Option>
+                    <Option value="wrapper">🎁 Giấy gói</Option>
+                    <Option value="ribbon">🎀 Ruy băng / Nơ</Option>
+                    <Option value="flower_component">🌸 Hoa (thành phần)</Option>
+                    <Option value="accessory">✨ Phụ kiện trang trí</Option>
+                  </Select>
+                </Form.Item>
 
-              {/* role_type — chỉ hiện khi là flower_component */}
-              <Form.Item noStyle shouldUpdate={(prev, cur) => prev.product_type !== cur.product_type}>
-                {({ getFieldValue }) =>
-                  getFieldValue('product_type') === 'flower_component' ? (
-                    <Form.Item label={<span className="font-semibold text-pink-700">Vai trò hoa</span>} name="role_type" className="mb-1">
-                      <Select size="large" className="rounded-xl" placeholder="Chọn vai trò">
-                        <Option value="main_flower">🌹 Hoa chính</Option>
-                        <Option value="sub_flower">🌿 Hoa phụ / Lá</Option>
-                      </Select>
-                    </Form.Item>
-                  ) : null
-                }
-              </Form.Item>
+                <Form.Item noStyle shouldUpdate={(prev, cur) => prev.product_type !== cur.product_type}>
+                  {({ getFieldValue }) =>
+                    getFieldValue('product_type') === 'flower_component' ? (
+                      <Form.Item label={<span className="font-semibold text-pink-700">Vai trò hoa</span>} name="role_type" className="mb-1">
+                        <Select size="large" className="rounded-xl" placeholder="Chọn vai trò">
+                          <Option value="main_flower">🌹 Hoa chính</Option>
+                          <Option value="sub_flower">🌿 Hoa phụ / Lá</Option>
+                        </Select>
+                      </Form.Item>
+                    ) : null
+                  }
+                </Form.Item>
+              </div>
 
-              {/* type — loại hoa / loại vật liệu */}
-              <Form.Item label="Loại (Type)" name="dominant_color" className="mb-1"
-                tooltip="Ví dụ: hoa hồng, hoa cúc, giấy kraft... Dùng để AI khớp sản phẩm theo loại">
+              {/* dominant_color */}
+              <Form.Item label="Màu chủ đạo (Color)" name="dominant_color" className="mb-1"
+                tooltip="Ví dụ: đỏ, xanh dương, vàng... Dùng để AI khớp màu sản phẩm">
                 <Select placeholder="Chọn màu chủ đạo" size="large" className="rounded-xl">
                   <Option value="đỏ">Đỏ</Option>
                   <Option value="hồng">Hồng</Option>

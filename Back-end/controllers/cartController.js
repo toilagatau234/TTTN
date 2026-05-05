@@ -255,12 +255,12 @@ const addCustomBouquetToCart = async (req, res) => {
             if (!order.selectedItems) return;
             const items = Array.isArray(order.selectedItems[cat]) ? order.selectedItems[cat] : (order.selectedItems[cat] ? [order.selectedItems[cat]] : []);
             items.forEach(item => {
-                if(item && item._id) {
+                if(item && item.product) {
                     components.push({
                         item: item.name,
-                        qty: 1,
+                        qty: item.quantity || 1,
                         unitPrice: item.price,
-                        totalPrice: item.price
+                        totalPrice: (item.price || 0) * (item.quantity || 1)
                     });
                 }
             });
@@ -279,7 +279,7 @@ const addCustomBouquetToCart = async (req, res) => {
         const customItem = {
             isCustom: true,
             name: `Giỏ hoa AI - ${order.orderCode || 'Độc bản'}`,
-            image: order.generatedImage?.url || '',
+            image: order.generatedImages?.find(i => i.selected)?.url || order.generatedImages?.[0]?.url || order.generatedImage?.url || 'https://res.cloudinary.com/dtj211y2c/image/upload/v1714032152/hydrangea_logo_placeholder.png',
             price: order.totalPrice,
             quantity: 1,
             components: components,
@@ -301,6 +301,11 @@ const addCustomBouquetToCart = async (req, res) => {
         });
     } catch (error) {
         console.error('Lỗi Add to Cart AI:', error);
+        if (error.name === 'ValidationError') {
+            for (let field in error.errors) {
+                console.error(`Validation Error on ${field}: ${error.errors[field].message}`);
+            }
+        }
         res.status(500).json({
             success: false,
             message: 'Lỗi server khi thêm vào giỏ hàng.',
