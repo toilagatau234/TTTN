@@ -121,7 +121,7 @@ function detectBouquetType(entities, selectedItems) {
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-// TỪ ĐIỂN DỊCH TỰ ĐỘNG (Bỏ Gemini để tránh sai màu)
+// TỪ ĐIỂN DỊCH TỰ ĐỘNG
 // ═════════════════════════════════════════════════════════════════════════════
 const VI_TO_EN_MAP = {
     // Màu sắc
