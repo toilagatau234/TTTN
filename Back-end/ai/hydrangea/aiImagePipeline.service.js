@@ -121,28 +121,77 @@ function detectBouquetType(entities, selectedItems) {
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
+// TỪ ĐIỂN DỊCH TỰ ĐỘNG (Bỏ Gemini để tránh sai màu)
+// ═════════════════════════════════════════════════════════════════════════════
+const VI_TO_EN_MAP = {
+    // Màu sắc
+    'đỏ': 'red', 'đỏ nhung': 'velvet red', 'đỏ cam': 'orange red', 'đỏ mận': 'burgundy',
+    'xanh': 'blue', 'xanh dương': 'blue', 'xanh lá': 'green', 'xanh lơ': 'cyan', 'xanh ngọc': 'turquoise',
+    'vàng': 'yellow', 'vàng chanh': 'lemon yellow', 'vàng cam': 'golden yellow',
+    'trắng': 'white', 'trắng kem': 'cream white', 'trắng sữa': 'milky white',
+    'hồng': 'pink', 'hồng phấn': 'pastel pink', 'hồng đào': 'peach pink', 'hồng đậm': 'hot pink',
+    'tím': 'purple', 'tím nhạt': 'lavender', 'tím đậm': 'deep purple',
+    'cam': 'orange', 'cam đất': 'terracotta', 'cam đào': 'peach',
+    'đen': 'black', 'nâu': 'brown', 'nâu đất': 'earth brown', 'xám': 'gray',
+    // Hoa
+    'cẩm tú cầu': 'hydrangea', 'hoa hồng': 'rose', 'hướng dương': 'sunflower',
+    'cúc': 'daisy', 'cúc mẫu đơn': 'peony', 'lan': 'orchid', 'lan hồ điệp': 'phalaenopsis orchid',
+    'tulip': 'tulip', 'đồng tiền': 'gerbera', 'thạch thảo': 'aster', 'baby': 'baby breath',
+    'cẩm chướng': 'carnation', 'ly': 'lily', 'hoa ly': 'lily', 'hoa sen': 'lotus',
+    // Phụ kiện
+    'giấy gói': 'wrapping paper', 'ruy băng': 'ribbon', 'giỏ': 'basket', 'lẵng': 'basket', 'hộp': 'box',
+    'giấy': 'paper', 'trong suốt': 'transparent', 'kraft': 'kraft'
+};
+
+function translateViToEn(text) {
+    if (!text) return text;
+    let translated = text.toLowerCase();
+    // Thay thế các cụm từ dài trước
+    const sortedKeys = Object.keys(VI_TO_EN_MAP).sort((a, b) => b.length - a.length);
+    for (const key of sortedKeys) {
+        if (translated.includes(key)) {
+            translated = translated.replace(new RegExp(key, 'g'), VI_TO_EN_MAP[key]);
+        }
+    }
+    return translated;
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
 // BƯỚC 3 — Xây dựng prompt có cấu trúc
 // ═════════════════════════════════════════════════════════════════════════════
 function buildStructuredPrompt(bouquetType, entities, selectedItems) {
-    // Main flowers logic
-    const mainFlowers = (entities?.flowers || entities?.structured_flowers || [])
-        .filter(f => f.role === 'main' || !f.role);
+    // 1. Lấy thông tin Hoa chính (Ưu tiên từ selectedItems trước)
+    let mainFlowers = [];
+    if (selectedItems?.main_flowers?.length > 0) {
+        mainFlowers = selectedItems.main_flowers.map(f => ({
+            type: f.name,
+            color: f.dominant_color || 'natural color'
+        }));
+    } else {
+        mainFlowers = (entities?.flowers || entities?.structured_flowers || [])
+            .filter(f => f.role === 'main' || !f.role);
+    }
     
+    // 2. Lấy thông tin Phụ kiện
     const wrapping = selectedItems?.wrapper;
     const ribbon = selectedItems?.ribbon;
 
+    // Lấy màu giấy gói và ruy băng (Ưu tiên dominant_color từ DB)
+    const wrappingColor = wrapping?.dominant_color || entities?.wrapper || "none";
+    const ribbonColor = ribbon?.dominant_color || entities?.ribbon || "none";
+
     // Structured prompt as requested
     const prompt = `
-A realistic flower bouquet:
+A realistic, highly detailed, masterpiece photography of a ${translateViToEn(bouquetType)}:
 
-Main flower:
-${mainFlowers.map(f => `- ${f.type} (${f.color || "natural color"})`).join('\n')}
+Main flowers:
+${mainFlowers.map(f => `- ${translateViToEn(f.color || "natural color")} ${translateViToEn(f.type)}`).join('\n')}
 
 Accessories:
-- Wrapping: ${wrapping?.color || entities?.wrapper || "none"}
-- Ribbon: ${ribbon?.color || entities?.ribbon || "none"}
+- Wrapping: ${translateViToEn(wrappingColor)}
+- Ribbon: ${translateViToEn(ribbonColor)}
 
-Clean background, high detail, studio lighting
+Professional studio lighting, 8k resolution, photorealistic, elegant composition, clean background.
 `;
 
     const rawPrompt = prompt.trim();
@@ -152,7 +201,7 @@ Clean background, high detail, studio lighting
         type:    bouquetType,
         flowers: mainFlowers.map(f => f.type),
         colors:  mainFlowers.map(f => f.color).filter(Boolean),
-        accessories: [wrapping?.color, ribbon?.color].filter(Boolean)
+        accessories: [wrappingColor, ribbonColor].filter(c => c !== "none")
     };
 
     console.log(`[Pipeline] buildStructuredPrompt: type="${bouquetType}", flowers=${JSON.stringify(metadata.flowers)}`);
@@ -160,42 +209,10 @@ Clean background, high detail, studio lighting
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-// BƯỚC 4 — Gọi Gemini để cải thiện câu từ (DUY NHẤT dùng Gemini)
+// BƯỚC 4 — Gọi Gemini để cải thiện câu từ (ĐÃ TẮT THEO YÊU CẦU ĐỂ TRÁNH SAI MÀU)
 // ═════════════════════════════════════════════════════════════════════════════
 async function callGeminiForEnhancement(rawPrompt) {
-    if (!GEMINI_API_KEY) {
-        console.warn('[Pipeline] Không có GEMINI_API_KEY — dùng raw prompt');
-        return rawPrompt;
-    }
-
-    const metaPrompt = `You are an expert florist and professional photographer.
-Improve the following image generation prompt to make it more vivid and detailed.
-Keep the EXACT flower type structure (bouquet/basket/box) — do NOT change it.
-Do NOT change the flower types, colors, or container type.
-Output ONLY the improved prompt in English, max 120 words, no explanations.
-
-Original prompt:
-${rawPrompt}`;
-
-    try {
-        const geminiPromise = (async () => {
-            const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-            const model  = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
-            const result = await model.generateContent(metaPrompt);
-            return result.response.text().trim();
-        })();
-
-        const timeoutPromise = new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('Gemini timeout (10s)')), GEMINI_TIMEOUT_MS)
-        );
-
-        const enhanced = await Promise.race([geminiPromise, timeoutPromise]);
-        console.log('[Pipeline] Gemini enhanced prompt:', enhanced.substring(0, 100));
-        return enhanced;
-    } catch (err) {
-        console.warn('[Pipeline] Gemini enhancement thất bại, dùng raw prompt:', err.message);
-        return rawPrompt;
-    }
+    return rawPrompt; // Bỏ qua hoàn toàn Gemini, trả về nguyên mẫu tĩnh
 }
 
 // ═════════════════════════════════════════════════════════════════════════════

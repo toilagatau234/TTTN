@@ -37,6 +37,10 @@ const MISSING_DATA_QUESTIONS = {
     note: {
         question: 'Bạn có muốn gửi gắm lời chúc hay thông điệp gì không? Mình sẽ lưu lại giúp bạn nhé! 💌',
         chips: ['Chúc mừng sinh nhật!', 'Kỷ niệm ngày cưới', 'Không cần']
+    },
+    card_note: {
+        question: '💌 Bạn muốn ghi nội dung gì lên thiệp chúc mừng? (thợ cắm hoa sẽ viết theo yêu cầu của bạn)',
+        chips: ['Chúc mừng sinh nhật! Hạnh phúc! 🎂', 'Thành công trên con đường phía trước! 🎉', 'Yêu em mãi! ❤️', 'Kỷ niệm đáng nhớ 💐']
     }
 };
 
@@ -195,9 +199,23 @@ class HydrangeaService {
         const asked = session.missingDataAsked;
         if (!e.flower_types?.length && !asked.has('flower_types')) return 'flower_types';
         if (!e.colors?.length && !asked.has('colors')) return 'colors';
-        if (!e.category && !asked.has('category')) return 'category';
+        // Fix [5]: Skip asking category if already detected from text
+        if (!e.category && !asked.has('category') && !this._detectCategoryFromText(session._lastMessage || '')) return 'category';
         if (!e.wrapper && !asked.has('wrapper')) return 'wrapper';
+        // BUG FIX #1: Nếu khách hàng đã yêu cầu thiệp (hasCard), hỏi ngay nội dung thiệp thay vì hỏi thêm lần nữa
+        if (e.hasCard && !e.note && !asked.has('card_note')) return 'card_note';
         if (!e.note && !asked.has('note') && session.hasGreeting !== false) return 'note';
+        return null;
+    }
+
+    // Fix [3]: Detect category from Vietnamese keywords
+    _detectCategoryFromText(text) {
+        if (!text) return null;
+        const t = text.toLowerCase();
+        if (t.includes('lẵng') || t.includes('giỏ')) return 'giỏ';
+        if (t.includes('bó')) return 'bó';
+        if (t.includes('hộp')) return 'hộp';
+        if (t.includes('kệ')) return 'kệ';
         return null;
     }
 
@@ -332,7 +350,14 @@ class HydrangeaService {
         if (isConfirming) return this._handleConfirm(session, sessionId);
         if (!message?.trim()) return this._handleSuggest(session);
 
-        // Nếu đang trong trạng thái hỏi 'note'
+        // Fix [3]: Auto-detect category from raw message before asking
+        if (message) {
+            const detectedCategory = this._detectCategoryFromText(message);
+            if (detectedCategory && !session.entities.category) {
+                session.entities.category = detectedCategory;
+            }
+            session._lastMessage = message;
+        }
         if (session.asking_for === 'note' && message?.trim()) {
             const lowMsg = message.trim().toLowerCase();
             if (!['không', 'không cần', 'bỏ qua', 'ko', 'ko cần'].includes(lowMsg)) {
@@ -342,7 +367,20 @@ class HydrangeaService {
             }
             session.asking_for = null;
             session.missingDataAsked.add('note');
-            // Sau khi có note, tiếp tục quy trình để gen ảnh hoặc hỏi tiếp
+            return this.processChat(sessionId, '', false, null);
+        }
+
+        // BUG FIX #1b: Xử lý khi đang hỏi nội dung thiệp (card_note)
+        if (session.asking_for === 'card_note' && message?.trim()) {
+            const lowMsg = message.trim().toLowerCase();
+            if (!['không', 'không cần', 'bỏ qua', 'ko', 'ko cần'].includes(lowMsg)) {
+                session.entities.note = message.trim();
+            } else {
+                session.entities.note = '';
+                session.entities.hasCard = false; // Hủy thiệp nếu không cần
+            }
+            session.asking_for = null;
+            session.missingDataAsked.add('card_note');
             return this.processChat(sessionId, '', false, null);
         }
 
@@ -362,6 +400,23 @@ class HydrangeaService {
         // Map category/wrapper (bổ sung cho normalizer)
         if (aiEntities.category) session.entities.category = aiEntities.category;
         if (aiEntities.wrapper) session.entities.wrapper = aiEntities.wrapper;
+
+        // BUG FIX #2: Map accessories array đúng sang ribbon/wrapper/card
+        if (aiEntities.accessories?.length > 0) {
+            for (const acc of aiEntities.accessories) {
+                const t = (acc.type || '').toLowerCase();
+                const val = acc.color || acc.type;
+                if (t === 'ribbon' || t === 'ruy băng') {
+                    // Cập nhật đè lên luôn để tránh PhoBERT extract sai
+                    session.entities.ribbon = val;
+                } else if (t === 'wrapping' || t === 'giấy gói' || t === 'wrapper') {
+                    session.entities.wrapper = val;
+                } else if (t === 'card' || t === 'thiệp' || t === 'thư') {
+                    // Đánh dấu khách hàng muốn thiệp — sẽ hỏi nội dung
+                    session.entities.hasCard = true;
+                }
+            }
+        }
 
         if (!session.entities.budget) {
             const b = this.parseBudget(message);
@@ -398,6 +453,7 @@ class HydrangeaService {
         const missingField = this._getMissingField(session);
         if (missingField) {
             if (missingField === 'note') session.asking_for = 'note';
+            if (missingField === 'card_note') session.asking_for = 'card_note';
             session.missingDataAsked.add(missingField);
             const q = MISSING_DATA_QUESTIONS[missingField];
             session.history.push({ role: 'bot', text: q.question, ts: new Date() });
@@ -434,48 +490,49 @@ class HydrangeaService {
         const inStock = filteredProducts.filter(p => p.stock > 0);
         const outOfStock = filteredProducts.filter(p => p.stock === 0);
 
-        // Score function
+        // BUG FIX #3: Score function — ưu tiên theo TÊN SẢN PHẨM trước, sau đó màu sắc
         const score = (product, targetType = null, targetColor = null) => {
-            const pNameN = normalizeString(product.name);
-            const pColorsAll = [normalizeString(product.dominant_color || ''), ...(product.secondary_colors || []).map(c => normalizeString(c))];
-            
-            // Default logic for non-flower products or when no specific target is provided
-            if (!targetType) {
-                let s = 0;
-                // ... (original non-flower logic will be handled below or merged)
-                return s;
-            }
+            if (!targetType) return { total: 0, breakdown: {} };
 
             const tTypeN = normalizeString(targetType);
             const tColorN = targetColor ? normalizeString(targetColor) : null;
+            const pNameN = normalizeString(product.name || '');
 
-            // 1. HARD FILTER / TYPE MATCH check
-            // product.main_flowers contains types, or product.name contains type
             const productTypes = [
                 ...(product.main_flowers || []).map(normalizeString),
-                ...(product.sub_flowers || []).map(normalizeString)
+                ...(product.sub_flowers  || []).map(normalizeString)
             ];
-            const hasTypeMatch = productTypes.some(t => t.includes(tTypeN) || tTypeN.includes(t)) || pNameN.includes(tTypeN);
 
-            // 2. COLOR MATCH
-            const hasColorMatch = tColorN && pColorsAll.some(pc => pc.includes(tColorN) || tColorN.includes(pc));
+            // 1. Khớp tên sản phẩm (name) — ưu tiên cao nhất
+            const hasNameMatch = pNameN.includes(tTypeN) || tTypeN.includes(pNameN);
+            // 2. Khớp theo main_flowers/sub_flowers
+            const hasTypeMatch = productTypes.some(t => t.includes(tTypeN) || tTypeN.includes(t));
+            // 3. Khớp màu sắc dominant_color
+            const pColor = normalizeString(product.dominant_color || '');
+            const secColors = (product.secondary_colors || []).map(normalizeString);
+            const hasColorMatch = tColorN
+                ? (pColor.includes(tColorN) || tColorN.includes(pColor) || secColors.some(c => c.includes(tColorN) || tColorN.includes(c)))
+                : false;
 
-            // 3. NAME SIMILARITY (Simple ratio)
-            let similarity = 0;
-            if (pNameN.includes(tTypeN)) {
-                similarity = tTypeN.length / pNameN.length;
+            // Scoring: tên+màu > tên > type+màu > type (fallback)
+            let total;
+            if ((hasNameMatch || hasTypeMatch) && hasColorMatch) {
+                total = hasNameMatch ? 120 : 100; // tên+màu = best match
+            } else if (hasNameMatch) {
+                total = 60;  // tên khớp, chưa có màu
+            } else if (hasTypeMatch) {
+                total = 10;  // type match only (fallback, same type)
+            } else {
+                total = -50; // không khớp gì
             }
-
-            // 4. SCORE CALCULATION: (typeMatch ? +10 : -50) + (colorMatch ? +5 : -1) + (similarity * 2)
-            let total = (hasTypeMatch ? 10 : -50) + (hasColorMatch ? 5 : -1) + (similarity * 2);
 
             return {
                 total,
                 breakdown: {
+                    nameMatch: hasNameMatch,
                     typeMatch: hasTypeMatch,
                     colorMatch: hasColorMatch,
-                    similarity: parseFloat(similarity.toFixed(2)),
-                    isFallback: !hasTypeMatch
+                    isFallback: !hasNameMatch && hasTypeMatch && !hasColorMatch
                 }
             };
         };
@@ -531,6 +588,10 @@ class HydrangeaService {
                 if (pNameN.includes(eValN)) s += 20;
             } else if (type === 'basket' || type === 'accessory') {
                 if (pNameN.includes(eValN) || eValN.includes(pNameN)) s += 50;
+                // Nhận diện thiệp chúc mừng nếu user yêu cầu
+                if (type === 'accessory' && (eValN.includes('thiệp') || eValN.includes('thư'))) {
+                    if (pNameN.includes('thiệp') || pNameN.includes('card')) s += 100;
+                }
             }
             return s;
         };
@@ -637,34 +698,63 @@ class HydrangeaService {
         }));
 
         // Auto-selection logic
-        const mainAutoFilled = session.selectedItems.main_flowers?.length ? session.selectedItems.main_flowers : mainFlowers.filter(p => p._score >= 10).slice(0, 2);
+        let mainAutoFilled = session.selectedItems.main_flowers?.length ? session.selectedItems.main_flowers : mainFlowers.filter(p => p._score >= 10).slice(0, 2);
         
         session.selectedItems = {
             ...session.selectedItems,
-            basket:  session.selectedItems.basket  ? session.selectedItems.basket  : baskets[0],
-            wrapper: session.selectedItems.wrapper ? session.selectedItems.wrapper : wrappers[0],
-            ribbon:  session.selectedItems.ribbon  ? session.selectedItems.ribbon  : ribbons[0],
+            basket:  session.selectedItems.basket  || (baskets.length > 0 && baskets[0]._score > 0 ? baskets[0] : null),
+            wrapper: session.selectedItems.wrapper || (wrappers.length > 0 && wrappers[0]._score > 0 ? wrappers[0] : null),
+            ribbon:  session.selectedItems.ribbon  || (ribbons.length > 0 && ribbons[0]._score > 0 ? ribbons[0] : null),
             main_flowers: mainAutoFilled,
             sub_flowers:  session.selectedItems.sub_flowers?.length  ? session.selectedItems.sub_flowers  : subFlowers.filter(p => p._score >= 5).slice(0, 1),
             accessories:  session.selectedItems.accessories?.length  ? session.selectedItems.accessories  : accessories.filter(p => p._score >= 50).slice(0, 1),
         };
 
-        const missingFlowersFromDB = [];
+        // Logic kiểm tra Out of Stock theo yêu cầu khách hàng
+        const missingItems = [];
+
+        // Kiểm tra Hoa chính/Hoa phụ (nếu user đòi hoa mà system không tìm thấy flower_component nào khớp)
         if (e.flower_types?.length > 0) {
             e.flower_types.forEach(ft => {
                 const ftN = normalizeString(ft);
-                const foundAny = allProducts.some(p => {
-                    return (p.main_flowers?.some(f => normalizeString(f).includes(ftN) || ftN.includes(normalizeString(f)))) ||
-                           (p.sub_flowers?.some(f => normalizeString(f).includes(ftN) || ftN.includes(normalizeString(f)))) ||
-                           (normalizeString(p.name).includes(ftN));
+                const isSelected = [...(session.selectedItems.main_flowers || []), ...(session.selectedItems.sub_flowers || [])].some(p => {
+                    return p.name && normalizeString(p.name).includes(ftN) || 
+                           (p.main_flowers && p.main_flowers.some(f => normalizeString(f).includes(ftN) || ftN.includes(normalizeString(f)))) ||
+                           (p.sub_flowers && p.sub_flowers.some(f => normalizeString(f).includes(ftN) || ftN.includes(normalizeString(f))));
                 });
-                if (!foundAny) missingFlowersFromDB.push(ft);
+                if (!isSelected) {
+                    missingItems.push(`Hoa ${ft}`);
+                }
             });
+            // Nếu thiếu hoa chủ đạo, clear main_flowers để tránh chọn bừa
+            if (missingItems.some(i => i.startsWith('Hoa '))) {
+                session.selectedItems.main_flowers = [];
+            }
         }
 
-        // Nếu HOA CHÍNH hoàn toàn không có trong kho → không nhét bừa loại hoa khác
-        if (missingFlowersFromDB.length > 0) {
-            session.selectedItems.main_flowers = [];
+        // Kiểm tra Giấy gói
+        if (e.wrapper && !session.selectedItems.wrapper) {
+            missingItems.push(`Giấy gói (${e.wrapper})`);
+        }
+
+        // Kiểm tra Ruy băng
+        if (e.ribbon && !session.selectedItems.ribbon) {
+            missingItems.push(`Ruy băng (${e.ribbon})`);
+        }
+
+        // Kiểm tra Giỏ/Lẵng (nếu user không yêu cầu bó hoa mà yêu cầu giỏ/lẵng/hộp nhưng không tìm thấy)
+        if (e.category && e.category !== 'bó' && !session.selectedItems.basket) {
+            missingItems.push(`Phụ kiện cắm (${e.category})`);
+        }
+
+        if (missingItems.length > 0) {
+            return {
+                success: true,
+                reply: `Hiện tại cửa hàng đang tạm hết các mặt hàng: ${missingItems.join(', ')}. Bạn có thể chọn loại khác giúp mình được không ạ?`,
+                extractedEntities: e,
+                status: 'missing_items',
+                outOfStockWarnings: missingItems.map(item => ({ item: { name: item } }))
+            };
         }
 
         // Tính tổng giá (SỬ DỤNG product.price * quantity)

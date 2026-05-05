@@ -321,24 +321,15 @@ export default function HydrangeaStudio() {
                             {imageReady && promptUsed && (
                                 <div className="px-3 py-2.5 border-t border-pink-50 bg-gray-50">
                                     <p className="text-[10px] font-bold text-gray-400 uppercase mb-1.5 flex items-center gap-1">
-                                        <Wand2 size={10} /> Tinh chỉnh prompt
+                                        <Wand2 size={10} /> Thêm phong cách
                                     </p>
-                                    <div className="flex flex-wrap gap-1 mb-2">
+                                    <div className="flex flex-wrap gap-1.5">
                                         {PROMPT_SUGGESTIONS.map((s, i) => (
-                                            <button key={i} onClick={() => handleRefine(`${promptUsed}, ${s}`)}
-                                                className="text-[10px] bg-white border border-pink-200 text-pink-600 hover:bg-pink-50 px-2 py-0.5 rounded-full cursor-pointer transition-colors">
+                                            <button key={i} onClick={() => handleRefine(`${promptUsed}, ${s}`)} disabled={isGenerating}
+                                                className="text-[10px] bg-white border border-pink-200 text-pink-600 hover:bg-pink-50 px-2.5 py-1 rounded-full cursor-pointer transition-colors disabled:opacity-40">
                                                 {s}
                                             </button>
                                         ))}
-                                    </div>
-                                    <div className="flex gap-1.5">
-                                        <input value={customPrompt} onChange={e => setCustomPrompt(e.target.value)}
-                                            placeholder="Sửa prompt tiếng Anh..."
-                                            className="flex-1 text-xs bg-white border border-gray-200 px-3 py-1.5 rounded-full focus:outline-none focus:ring-2 focus:ring-pink-300" />
-                                        <button onClick={() => handleRefine(customPrompt)} disabled={!customPrompt.trim() || isGenerating}
-                                            className="bg-pink-500 hover:bg-pink-600 disabled:opacity-40 text-white text-xs px-3 py-1.5 rounded-full font-bold cursor-pointer transition-colors flex items-center gap-1">
-                                            <RefreshCw size={11} /> Tạo lại
-                                        </button>
                                     </div>
                                 </div>
                             )}

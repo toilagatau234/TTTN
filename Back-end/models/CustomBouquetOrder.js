@@ -102,9 +102,10 @@ const customBouquetOrderSchema = new mongoose.Schema({
 
     // Metadata loại bó hoa do pipeline detect
     imageMetadata: {
-        type: String,       // 'bouquet' | 'basket' | 'box' | 'vase' | 'stand'
+        type: { type: String },       // 'bouquet' | 'basket' | 'box' | 'vase' | 'stand'
         flowers: [String],
-        colors: [String]
+        colors: [String],
+        accessories: [String]
     },
 
     // (backward compat) Ảnh cũ có base64 — trước phiên bản v2

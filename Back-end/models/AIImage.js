@@ -48,10 +48,4 @@ const aiImageSchema = new mongoose.Schema({
     timestamps: true // Tự động quản lý createdAt và updatedAt
 });
 
-// Auto-update updatedAt
-aiImageSchema.pre('save', function (next) {
-    this.updatedAt = Date.now();
-    next();
-});
-
 module.exports = mongoose.model('AIImage', aiImageSchema);

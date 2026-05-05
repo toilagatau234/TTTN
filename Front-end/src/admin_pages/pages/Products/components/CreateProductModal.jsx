@@ -351,60 +351,15 @@ const CreateProductModal = ({ open, onCancel, onSuccess, initialData }) => {
             </div>
           </div>
           
-          {/* Section 4: Phân loại AI (Mới) */}
+          {/* Section 4: Bouquet Builder - Phân loại sản phẩm */}
           <div>
             <div className="flex items-center gap-2 mb-3">
               <div className="w-1 h-5 bg-purple-500 rounded-full"></div>
-              <span className="font-bold text-navy-700">Phân loại AI (AI Matching)</span>
+              <span className="font-bold text-navy-700">Bouquet Builder (AI Matching)</span>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50/40 p-4 rounded-2xl border border-gray-100/70">
-              <Form.Item label="Dịp tặng (Occasions)" name="occasion" className="mb-1">
-                <Select mode="tags" placeholder="Ví dụ: Birthday, Anniversary..." size="large" className="rounded-xl" />
-              </Form.Item>
-
-              <Form.Item label="Phong cách (Styles)" name="style" className="mb-1">
-                <Select mode="tags" placeholder="Ví dụ: Luxury, Vintage, Minimalist..." size="large" className="rounded-xl" />
-              </Form.Item>
-
-              <Form.Item label="Hoa chính (Main Flowers)" name="main_flowers" className="mb-1">
-                <Select mode="tags" placeholder="Ví dụ: Rose, Tulip, Lily..." size="large" className="rounded-xl" />
-              </Form.Item>
-
-              <Form.Item label="Hoa phụ & Lá (Sub Flowers)" name="sub_flowers" className="mb-1">
-                <Select mode="tags" placeholder="Ví dụ: Baby Breath, Eucalyptus..." size="large" className="rounded-xl" />
-              </Form.Item>
-
-              <Form.Item label="Màu chủ đạo" name="dominant_color" className="mb-1">
-                <Select placeholder="Chọn màu chủ đạo" size="large" className="rounded-xl">
-                  <Option value="red">Đỏ (Red)</Option>
-                  <Option value="pink">Hồng (Pink)</Option>
-                  <Option value="white">Trắng (White)</Option>
-                  <Option value="yellow">Vàng (Yellow)</Option>
-                  <Option value="orange">Cam (Orange)</Option>
-                  <Option value="purple">Tím (Purple)</Option>
-                  <Option value="blue">Xanh dương (Blue)</Option>
-                </Select>
-              </Form.Item>
-
-              <Form.Item label="Màu phối hợp" name="secondary_colors" className="mb-1">
-                <Select mode="tags" placeholder="Chọn các màu phối" size="large" className="rounded-xl" />
-              </Form.Item>
-
-              <Form.Item label="Bố cục (Layout)" name="layout" className="mb-1">
-                <Select placeholder="Chọn bố cục" size="large" className="rounded-xl">
-                  <Option value="round">Tròn (Round)</Option>
-                  <Option value="heart">Trái tim (Heart)</Option>
-                  <Option value="cascade">Dòng thác (Cascade)</Option>
-                  <Option value="one-sided">Một mặt (One-sided)</Option>
-                </Select>
-              </Form.Item>
-
-              <Form.Item label="Yếu tố trang trí" name="elements" className="mb-1">
-                <Select mode="tags" placeholder="Ví dụ: Ribbon, Box, Pearl..." size="large" className="rounded-xl" />
-              </Form.Item>
-
-              {/* Bouquet Builder Type */}
-              <Form.Item label={<span className="font-semibold text-purple-700">🧺 Loại thành phần (Bouquet Builder)</span>} name="product_type" className="mb-1 col-span-2">
+              {/* product_type */}
+              <Form.Item label={<span className="font-semibold text-purple-700">🧺 Loại thành phần</span>} name="product_type" className="mb-1 col-span-2">
                 <Select size="large" className="rounded-xl" placeholder="Chọn loại sản phẩm">
                   <Option value="complete_bouquet">💐 Giỏ hoa hoàn chỉnh</Option>
                   <Option value="basket">🧺 Giỏ / Lẵng / Hộp</Option>
@@ -415,10 +370,8 @@ const CreateProductModal = ({ open, onCancel, onSuccess, initialData }) => {
                 </Select>
               </Form.Item>
 
-              <Form.Item
-                noStyle
-                shouldUpdate={(prev, cur) => prev.product_type !== cur.product_type}
-              >
+              {/* role_type — chỉ hiện khi là flower_component */}
+              <Form.Item noStyle shouldUpdate={(prev, cur) => prev.product_type !== cur.product_type}>
                 {({ getFieldValue }) =>
                   getFieldValue('product_type') === 'flower_component' ? (
                     <Form.Item label={<span className="font-semibold text-pink-700">Vai trò hoa</span>} name="role_type" className="mb-1">
@@ -429,6 +382,34 @@ const CreateProductModal = ({ open, onCancel, onSuccess, initialData }) => {
                     </Form.Item>
                   ) : null
                 }
+              </Form.Item>
+
+              {/* type — loại hoa / loại vật liệu */}
+              <Form.Item label="Loại (Type)" name="dominant_color" className="mb-1"
+                tooltip="Ví dụ: hoa hồng, hoa cúc, giấy kraft... Dùng để AI khớp sản phẩm theo loại">
+                <Select placeholder="Chọn màu chủ đạo" size="large" className="rounded-xl">
+                  <Option value="đỏ">Đỏ</Option>
+                  <Option value="hồng">Hồng</Option>
+                  <Option value="trắng">Trắng</Option>
+                  <Option value="vàng">Vàng</Option>
+                  <Option value="cam">Cam</Option>
+                  <Option value="tím">Tím</Option>
+                  <Option value="xanh dương">Xanh dương</Option>
+                  <Option value="xanh lá">Xanh lá</Option>
+                  <Option value="đen">Đen</Option>
+                  <Option value="be">Be / Kem</Option>
+                </Select>
+              </Form.Item>
+
+              {/* main_flowers — danh sách loại hoa chính của sản phẩm */}
+              <Form.Item label="Loại hoa chính (Main Flowers)" name="main_flowers" className="mb-1"
+                tooltip="Nhập loại hoa chính, ví dụ: hoa hồng, lan hồ điệp...">
+                <Select mode="tags" placeholder="Ví dụ: hoa hồng, lan hồ điệp..." size="large" className="rounded-xl" />
+              </Form.Item>
+
+              {/* sub_flowers */}
+              <Form.Item label="Hoa phụ / Lá (Sub Flowers)" name="sub_flowers" className="mb-1">
+                <Select mode="tags" placeholder="Ví dụ: baby breath, lá bạch đàn..." size="large" className="rounded-xl" />
               </Form.Item>
             </div>
           </div>
